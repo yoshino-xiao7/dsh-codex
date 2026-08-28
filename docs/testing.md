@@ -1,0 +1,56 @@
+# 测试策略
+
+[简体中文](testing.md) | [English](testing.en.md)
+
+## 本地门禁
+
+```sh
+corepack enable
+pnpm install --frozen-lockfile
+pnpm --dir test/fixtures/dsh-runtime install --frozen-lockfile --ignore-scripts
+pnpm run check
+pnpm run verify:release
+```
+
+`pnpm run check` 依次执行语法与导入边界扫描、公开声明的严格 TypeScript 消费检查、全部测试、构建、中英文配对检查和 npm pack 白名单检查。全部测试包含真实冻结 DSH AgentLoop/Retry 编排，因此本地、CI、兼容性监测和发布候选都必须先安装已提交的 DSH 运行时夹具。
+
+根目录 `pnpm-lock.yaml` 与夹具的 `test/fixtures/dsh-runtime/pnpm-lock.yaml` 必须同时保持受审查状态。升级 DSH、pi-ai 或其他运行依赖时要更新两套 lockfile，并重新运行完整 CI、profile smoke 与受控真实验收。
+
+夹具禁用生命周期脚本，因此这一级只验证 DSH Web/profile 与插件集成，不代表已验证 DSH 依赖中需要安装脚本的原生终端或本机构建能力。
+
+## 故障回归
+
+- `failure-normalizer.test.mjs`：精确的 `AccountQuotaExceeded`、DSH canonical `QUOTA`、五小时 reset、request ID、普通/不确定 429、窄化 transport 与敏感字段不回显；嵌套 request metadata 和其他独立 JSON envelope 不得冒充或向命中的 provider `error` envelope 注入配额事实，canonical `QUOTA` 仍可从一个自身匹配的 envelope 保留合法 reset/request ID；
+- `image-policy.test.mjs`：完整默认值与所有非法数字；
+- `stream-resilience.test.mjs`：半段纯文本保存、pre-output quota、瞬时/不确定 429、直接抛出的 quota/usage-limit/`STREAM_CLOSED`、未完成工具调用、纯工具流失败关闭与非 Codex route；`onRecovery` 观察者自身抛错时也不能破坏已恢复的文本、恢复提示或正常终态；
+- `provider-reliability-public-api.test.mjs`：公开 pi-ai → PiAiAdapter → route → resilience 的成功文本/reasoning/usage、工具调用与两轮 replay、原生图片预算、text-only 图片拒绝、429、`STREAM_CLOSED` 与 WebSocket failure 链路；
+- `llm-runtime-integration.test.mjs`：真实冻结 DSH `LlmRuntime + AgentLoop + Retry` 编排证明瞬时 `RATE_LIMIT` 发生一次重试，而归一化后的 `QUOTA` 与 `QUOTA_OR_RATE_LIMIT` 都只调用 provider 一次；同时验证 waterfall 在恢复策略读取结果前发布非重试 `QUOTA`；
+- `codex-session-resources.test.mjs`：命名空间 session、reset/agent/runtime 清理，以及同进程外部 pi-ai session 隔离；
+- `sdk-contract.test.mjs`：真实 pi-ai OAuth/模型目录、DSH profile schema，以及 PNG 穿过真实 attachment seam；
+- `bundle-contract.test.mjs`：bundle 保留通用 `llm-pi-ai` 配置、插入 `dsh-codex`，且图片预算完整；
+- `codex-route-adapter.test.mjs`：外部 `dsh-codex` route 与内部 canonical provider 的映射、replay 和 tool-call ID；
+- `codex-provider-runtime.test.mjs`：专用 route、设置热更新、模型筛选与同 profile 共存；
+- `authorization-commit-tracker.test.mjs`、`authorization-commit-integration.test.mjs`、`codex-credential-store.test.mjs` 与 `codex-authorization.test.mjs`：专用 OAuth 范围、串行 refresh、非法记录失败关闭、登录事件脱敏、generation 隔离和取消线性化点；真实 Cordis `AuthorizationService + Bridge` 回归还验证 flow owner 卸载在提交选择前取消、提交选择后等待最终写入、提交失败后释放、退出最终删除，以及一个进程取消时不会删除另一进程已排队的新登录；
+- `oauth-refresh-logout-race.test.mjs`：使用公开 PiAiAdapter 请求链验证 refresh/delete 锁顺序，保证退出登录后凭据不会复活；
+- `codex-pi-provider.test.mjs`：默认 payload、当前会话 Fast、transport 和不自动降级；
+- `session-preferences.test.mjs` 与 `session-preference-command.test.mjs`：当前会话隔离、容量限制、重置和命令错误边界；
+- `authorization-bridge.test.mjs`：登录交互限额、凭据不出 RPC、退出登录和命令输出；不支持类型或结构损坏的已存记录必须返回独立的 `invalid` 状态，不能显示为已登录，也不能跨 RPC 暴露 secret；
+- `quota-observer.test.mjs`：三态、reset/stale 到期、乱序观测、严格输入与冻结脱敏快照；
+- `client-bundle.test.mjs`：Web 登录页、额度展示、模型启用写入、登录操作互斥、组件卸载安全、样式节点多实例/热重载生命周期、窄屏布局与 loopback RPC 调用边界；模型设置回归从真实 section 组件发出公开 settings mutation，并把返回配置交给真实 provider runtime 验证 route 模型目录；
+- `remote-image-input.test.mjs`：URL、DNS、重定向、响应大小、MIME、超时、2 个活动任务、32 个排队任务、队列满拒绝、排队取消、插件卸载时的队列封口/活动任务收敛、保存阶段取消边界，以及真实 ToolRuntime 和正式 `read_image` renderer 的端到端执行；模型能力预检位于同一限流器内，阻塞或忽略 abort 的 resolver 也不能绕过活动与排队上限；
+- `generate-sbom.test.mjs`、`release-evidence.test.mjs` 与 `release-workflow.test.mjs`：离线确定性参考依赖图、产物/两套锁文件哈希绑定、DSH smoke 运行环境、实际安装树和生产依赖审计取证、精确 SRI、签名/attestation 审计、Action SHA 固定、最小权限、draft/tag 目标预检和可恢复发布；
+- `release-maintainability.test.mjs`：直接运行依赖声明覆盖、Apache-2.0 贡献许可、双语隐私模板、根/夹具 DSH 版本一致性与协调 Dependabot 配置；
+- `dsh-runtime-fixture.test.mjs`：夹具为 private、精确固定 DSH `0.1.1-rc.2` 且提交完整 pnpm lock；CI、兼容性和发布工作流只能用 `--frozen-lockfile --ignore-scripts` 安装该图，并禁止直接交给 npm 重新解算无界 DSH peer 图；
+- `types-consumer.ts`：从 npm package exports 消费公开 `.d.ts`，并以严格 TypeScript 配置编译；
+- `host-load.test.mjs`：Host export、Config、waterfall 与动态服务注册；配额纵向回归把真实 stream listener 的结构化/模糊 429 观测贯通到脱敏状态 RPC 和 `/codex-usage` 命令，并验证成功请求恢复近期成功状态。
+
+## 验收层级
+
+1. 单元：纯函数与 stream fixture；
+2. SDK 合同：锁定发布包的 public exports；
+3. 隔离安装：从 `.tgz` 安装到空目录并导入 Host；
+4. Harness smoke：先从 `test/fixtures/dsh-runtime/pnpm-lock.yaml` 冻结安装精确 DSH runtime，再从本地 `.tgz` 安装到隔离 profile、确认通用 pi-ai provider 配置未改变、启动 Web，并读取登录状态 RPC 与 client bundle；模型发现由 SDK 合同和 Host runtime 测试覆盖；
+5. 真实网络：由仓库所有者使用受控测试账号逐项验证 Web OAuth、模型目录、文本/reasoning 流、终态 usage、安全工具闭环、两轮 replay、`maxPixels=4194304` 图片路径、四种 transport 与 Fast；验收 JSON 的固定布尔断言全部为真后才能通过；
+6. 发布读回：npm `dist.integrity` 与候选 SRI 精确一致，签名/attestation 审计通过，GitHub 资产与本地 tarball 逐字节一致。
+
+真实 OAuth、配额或网络 smoke 不应要求贡献者在 CI 提交秘密，也不能使用外部 PR 可访问的 secret。

@@ -1,0 +1,17 @@
+name: 安全私下联络 / Private security contact
+description: 仅在 Private vulnerability reporting 不可用时请求私下渠道 / Request a private channel only when Private vulnerability reporting is unavailable
+title: "[Security contact] Private channel requested"
+labels: ["security", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: "不要在此公开 Issue 中描述漏洞、复现、影响、凭据或私人数据。优先返回 Security 页面使用 Private vulnerability reporting。 / Do not disclose vulnerability details, reproduction steps, impact, credentials, or private data in this public issue. Prefer Private vulnerability reporting on the Security page."
+  - type: checkboxes
+    id: confirmation
+    attributes:
+      label: 联络确认 / Contact confirmation
+      options:
+        - label: Private vulnerability reporting 当前不可用，我只请求维护者提供私下联络渠道。 / Private vulnerability reporting is unavailable; I am only asking maintainers for a private contact channel.
+          required: true
+        - label: 此 Issue 不包含任何技术细节、秘密或私人数据。 / This issue contains no technical details, secrets, or private data.
+          required: true

@@ -1,0 +1,24 @@
+name: 功能建议 / Feature request
+description: 提议一个有公开合同和清晰边界的能力 / Propose a capability with a public contract and clear boundary
+title: "[Feature] "
+labels: ["enhancement", "triage"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 用户问题 / User problem
+    validations:
+      required: true
+  - type: textarea
+    id: public_seam
+    attributes:
+      label: 公开接口或可复现证据 / Public seam or reproducible evidence
+      description: 请链接 DSH、pi-ai 或 OpenAI 的官方公开合同，并提供可复现证据。 / Link the official public DSH, pi-ai, or OpenAI contract and include reproducible evidence.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 可测试验收标准 / Testable acceptance criteria
+    validations:
+      required: true

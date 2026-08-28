@@ -1,0 +1,518 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Exact package version without v
+        required: true
+        type: string
+      publish:
+        description: Publish the verified npm artifact and GitHub Release
+        required: true
+        default: false
+        type: boolean
+
+permissions: {}
+
+concurrency:
+  group: release-${{ github.repository }}-${{ inputs.version }}
+  cancel-in-progress: false
+
+jobs:
+  candidate:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      PACKAGE_FILE: release/dsh-codex-community-${{ inputs.version }}.tgz
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify immutable source and requested version
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          set -eu
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$(git rev-parse HEAD)" = "$(git rev-parse refs/remotes/origin/main)"
+          node --input-type=module -e '
+            import fs from "node:fs"
+            const manifest = JSON.parse(fs.readFileSync("package.json", "utf8"))
+            const requested = process.env.REQUESTED_VERSION
+            if (!/^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?$/u.test(requested)) process.exit(1)
+            if (manifest.name !== "dsh-codex-community" || manifest.version !== requested) process.exit(1)
+          '
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 10.34.5
+          run_install: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            test/fixtures/dsh-runtime/pnpm-lock.yaml
+      - name: Install the committed dependency graph without lifecycle scripts
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Install the exact supported DSH CLI in isolation
+        run: pnpm --dir test/fixtures/dsh-runtime install --frozen-lockfile --ignore-scripts
+      - name: Verify source, tests, package boundary, and draft release metadata
+        run: |
+          pnpm run check
+          pnpm run verify:release
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+      - name: Install and verify the candidate packaging npm toolchain
+        run: |
+          set -eu
+          mkdir -p release
+          npm install --global --ignore-scripts --no-audit --no-fund npm@11.16.0
+          npm --version > release/npm-cli-version.txt
+          node --input-type=module -e '
+            import fs from "node:fs"
+            const candidateVersion = fs.readFileSync("release/npm-cli-version.txt", "utf8")
+            if (candidateVersion !== "11.16.0\n") process.exit(1)
+          '
+      - name: Build the candidate tarball exactly once without rerunning lifecycle scripts
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          set -eu
+          mkdir -p release
+          npm pack --ignore-scripts --json --pack-destination release > release/pack.json
+          node --input-type=module -e '
+            import fs from "node:fs"
+            import path from "node:path"
+            const [result] = JSON.parse(fs.readFileSync("release/pack.json", "utf8"))
+            if (result?.filename !== path.basename(process.env.PACKAGE_FILE)) process.exit(1)
+            if (result?.name !== "dsh-codex-community" || result?.version !== process.env.REQUESTED_VERSION) process.exit(1)
+          '
+      - name: Generate deterministic verification assets
+        run: |
+          set -eu
+          node --input-type=module -e '
+            import crypto from "node:crypto"
+            import fs from "node:fs"
+            import path from "node:path"
+            const artifact = process.env.PACKAGE_FILE
+            const bytes = fs.readFileSync(artifact)
+            const sha256 = crypto.createHash("sha256").update(bytes).digest("hex")
+            const sri = `sha512-${crypto.createHash("sha512").update(bytes).digest("base64")}`
+            fs.writeFileSync(`${artifact}.sha256`, `${sha256}  ${path.basename(artifact)}\n`)
+            fs.writeFileSync(`${artifact}.sri`, `${sri}\n`)
+          '
+          node scripts/generate-sbom.mjs "$PACKAGE_FILE" "$PACKAGE_FILE.cdx.json"
+      - name: Record the exact supported DSH dependency tree
+        run: |
+          set -eu
+          pnpm --dir test/fixtures/dsh-runtime list --depth Infinity --json > release/dsh-runtime-dependency-tree.json
+      - name: Install the exact candidate tarball and boot a disposable DSH Web profile
+        env:
+          DSH_CLI_ROOT: ${{ github.workspace }}/test/fixtures/dsh-runtime
+          DSH_PLUGIN_PACKAGE: ${{ env.PACKAGE_FILE }}
+        run: pnpm run smoke:dsh-profile
+      - name: Record the frozen DSH runtime environment after successful smoke
+        run: |
+          set -eu
+          node --input-type=module -e '
+            import crypto from "node:crypto"
+            import { execFileSync } from "node:child_process"
+            import fs from "node:fs"
+            const runtimeManifest = JSON.parse(fs.readFileSync("test/fixtures/dsh-runtime/node_modules/@deepseek-ai/dsh/package.json", "utf8"))
+            const fixtureManifest = JSON.parse(fs.readFileSync("test/fixtures/dsh-runtime/package.json", "utf8"))
+            const expectedPnpmVersion = /^pnpm@(.+)$/u.exec(fixtureManifest.packageManager ?? "")?.[1]
+            const pnpmVersion = execFileSync("pnpm", ["--version"], { encoding: "utf8" }).trim()
+            if (runtimeManifest.name !== "@deepseek-ai/dsh" || runtimeManifest.version !== fixtureManifest.dependencies?.["@deepseek-ai/dsh"]) process.exit(1)
+            if (pnpmVersion !== expectedPnpmVersion) process.exit(1)
+            const fixtureLockSha256 = crypto.createHash("sha256")
+              .update(fs.readFileSync("test/fixtures/dsh-runtime/pnpm-lock.yaml"))
+              .digest("hex")
+            const environment = {
+              schemaVersion: 1,
+              runtimePackage: runtimeManifest.name,
+              runtimeVersion: runtimeManifest.version,
+              fixtureLockSha256,
+              nodeVersion: process.version,
+              pnpmVersion,
+              platform: process.platform,
+              arch: process.arch,
+              lifecycleScripts: "disabled",
+            }
+            fs.writeFileSync("release/dsh-runtime-environment.json", `${JSON.stringify(environment, null, 2)}\n`)
+          '
+      - name: Install and import the exact candidate in isolation
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          set -eu
+          mkdir isolated
+          cd isolated
+          npm init -y
+          npm install --ignore-scripts --no-audit --no-fund "../$PACKAGE_FILE"
+          node --input-type=module -e 'const plugin = await import("dsh-codex-community"); if (plugin.name !== "dsh-codex") process.exit(1)'
+          npm ls --all --json > ../release/isolated-dependency-tree.json
+          npm audit --omit=dev --audit-level=high --json > ../release/npm-audit.json
+          cd ..
+          node --input-type=module -e '
+            import crypto from "node:crypto"
+            import fs from "node:fs"
+            const hash = (file) => crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex")
+            const evidence = {
+              status: "passed",
+              packageName: "dsh-codex-community",
+              version: process.env.REQUESTED_VERSION,
+              sourceCommit: process.env.GITHUB_SHA,
+              dshProfileSmoke: "passed",
+              artifactSha256: hash(process.env.PACKAGE_FILE),
+              lockSha256: hash("pnpm-lock.yaml"),
+              sbomSha256: hash(`${process.env.PACKAGE_FILE}.cdx.json`),
+              dshRuntimeDependencyTreeSha256: hash("release/dsh-runtime-dependency-tree.json"),
+              dshRuntimeEnvironmentSha256: hash("release/dsh-runtime-environment.json"),
+              isolatedDependencyTreeSha256: hash("release/isolated-dependency-tree.json"),
+              npmAuditSha256: hash("release/npm-audit.json"),
+              npmCliVersionSha256: hash("release/npm-cli-version.txt"),
+            }
+            fs.writeFileSync("release/isolated-import.json", `${JSON.stringify(evidence, null, 2)}\n`)
+          '
+      - name: Upload the immutable candidate and evidence
+        id: upload-candidate
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: dsh-codex-community-${{ inputs.version }}-${{ github.sha }}-candidate
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 90
+          path: release/
+
+  publish:
+    if: inputs.publish && github.ref == 'refs/heads/main'
+    needs: candidate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: npm-release
+    permissions:
+      contents: write
+      id-token: write
+    env:
+      PACKAGE_FILE: release/dsh-codex-community-${{ inputs.version }}.tgz
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - name: Recheck the protected source boundary
+        run: |
+          set -eu
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 10.34.5
+          run_install: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: pnpm
+          registry-url: https://registry.npmjs.org/
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: dsh-codex-community-${{ inputs.version }}-${{ github.sha }}-candidate
+          path: release
+      - name: Install and verify the npm Trusted Publishing toolchain
+        run: |
+          set -eu
+          npm install --global --ignore-scripts --no-audit --no-fund npm@11.16.0
+          actual_npm_version="$(npm --version)"
+          ACTUAL_NPM_VERSION="$actual_npm_version" node --input-type=module -e '
+            import fs from "node:fs"
+            const candidateVersion = fs.readFileSync("release/npm-cli-version.txt", "utf8")
+            if (candidateVersion !== "11.16.0\n") process.exit(1)
+            if (`${process.env.ACTUAL_NPM_VERSION}\n` !== candidateVersion) process.exit(1)
+          '
+      - name: Install verifier dependencies without lifecycle scripts
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Enforce the strict publication gate against the downloaded candidate
+        env:
+          RELEASE_PACKAGE_FILE: ${{ env.PACKAGE_FILE }}
+          RELEASE_ISOLATED_IMPORT_EVIDENCE: release/isolated-import.json
+          RELEASE_SOURCE_COMMIT: ${{ github.sha }}
+        run: pnpm run verify:release:publish
+      - name: Detect an existing immutable npm version
+        id: registry
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          set -eu
+          mkdir -p registry/preflight
+          set +e
+          npm view "dsh-codex-community@$REQUESTED_VERSION" version --json > registry/preflight/version.json 2> registry/preflight/view-error.log
+          view_status=$?
+          set -e
+          if [ "$view_status" -eq 0 ]; then
+            node --input-type=module -e '
+              import fs from "node:fs"
+              const found = JSON.parse(fs.readFileSync("registry/preflight/version.json", "utf8"))
+              if (found !== process.env.REQUESTED_VERSION) process.exit(1)
+            '
+            npm pack "dsh-codex-community@$REQUESTED_VERSION" --pack-destination registry/preflight
+            cmp "$PACKAGE_FILE" "registry/preflight/dsh-codex-community-$REQUESTED_VERSION.tgz"
+            printf 'state=identical\n' >> "$GITHUB_OUTPUT"
+          elif grep -Eq 'E404|404 Not Found' registry/preflight/view-error.log; then
+            printf 'state=absent\n' >> "$GITHUB_OUTPUT"
+          else
+            cat registry/preflight/view-error.log >&2
+            exit "$view_status"
+          fi
+      - name: Publish the exact candidate with npm Trusted Publisher
+        if: steps.registry.outputs.state == 'absent'
+        run: npm publish "$PACKAGE_FILE" --access public --provenance
+      - name: Verify Registry bytes, metadata, and provenance
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          set -eu
+          verified=false
+          for attempt in 1 2 3 4 5 6; do
+            destination="registry/readback-$attempt"
+            mkdir -p "$destination"
+            if npm pack "dsh-codex-community@$REQUESTED_VERSION" --pack-destination "$destination"; then
+              cmp "$PACKAGE_FILE" "$destination/dsh-codex-community-$REQUESTED_VERSION.tgz"
+              verified=true
+              break
+            fi
+            sleep 5
+          done
+          test "$verified" = true
+          metadata_verified=false
+          for attempt in 1 2 3 4 5 6; do
+            if npm view "dsh-codex-community@$REQUESTED_VERSION" repository.url --json > release/registry-repository.json \
+              && npm view "dsh-codex-community@$REQUESTED_VERSION" dist.integrity --json > release/registry-integrity.json \
+              && npm view "dsh-codex-community@$REQUESTED_VERSION" dist.attestations --json > release/registry-attestations.json \
+              && node --input-type=module -e '
+                import { Buffer } from "node:buffer"
+                import fs from "node:fs"
+                const repository = JSON.parse(fs.readFileSync("release/registry-repository.json", "utf8"))
+                const integrity = JSON.parse(fs.readFileSync("release/registry-integrity.json", "utf8"))
+                const attestations = JSON.parse(fs.readFileSync("release/registry-attestations.json", "utf8"))
+                const expectedIntegrity = fs.readFileSync(`${process.env.PACKAGE_FILE}.sri`, "utf8").trim()
+                if (repository !== "git+https://github.com/yoshino-xiao7/dsh-codex.git") process.exit(1)
+                if (integrity !== expectedIntegrity) process.exit(1)
+                if (
+                  typeof attestations?.url !== "string"
+                  || attestations?.provenance?.predicateType !== "https://slsa.dev/provenance/v1"
+                ) process.exit(1)
+                const attestationUrl = new URL(attestations.url)
+                const expectedAttestationPath = `/-/npm/v1/attestations/dsh-codex-community@${process.env.REQUESTED_VERSION}`
+                if (
+                  attestationUrl.origin !== "https://registry.npmjs.org"
+                  || attestationUrl.pathname !== expectedAttestationPath
+                  || attestationUrl.search !== ""
+                  || attestationUrl.hash !== ""
+                  || attestationUrl.username !== ""
+                  || attestationUrl.password !== ""
+                ) process.exit(1)
+                const response = await fetch(attestationUrl, { redirect: "error" })
+                if (!response.ok) process.exit(1)
+                const maxAttestationBytes = 4 * 1024 * 1024
+                const contentLength = response.headers.get("content-length")
+                if (contentLength !== null) {
+                  const declaredBytes = Number(contentLength)
+                  if (
+                    !/^\d+$/u.test(contentLength)
+                    || !Number.isSafeInteger(declaredBytes)
+                    || declaredBytes > maxAttestationBytes
+                  ) process.exit(1)
+                }
+                if (!response.body) process.exit(1)
+                const chunks = []
+                let receivedBytes = 0
+                for await (const chunk of response.body) {
+                  if (!(chunk instanceof Uint8Array)) process.exit(1)
+                  if (chunk.byteLength === 0) continue
+                  receivedBytes += chunk.byteLength
+                  if (receivedBytes > maxAttestationBytes) process.exit(1)
+                  chunks.push(chunk)
+                }
+                const attestationBundle = Buffer.concat(chunks, receivedBytes).toString("utf8")
+                JSON.parse(attestationBundle)
+                fs.writeFileSync(
+                  "release/npm-attestations.json",
+                  attestationBundle.endsWith("\n") ? attestationBundle : `${attestationBundle}\n`,
+                )
+                fs.writeFileSync("release/registry-readback.json", `${JSON.stringify({ repository, integrity, attestations }, null, 2)}\n`)
+              '
+            then
+              metadata_verified=true
+              break
+            fi
+            sleep 5
+          done
+          test "$metadata_verified" = true
+      - name: Verify Registry signatures and provenance attestations
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          set -eu
+          signature_dir="$RUNNER_TEMP/npm-signature-audit"
+          test ! -e "$signature_dir"
+          mkdir "$signature_dir"
+          cd "$signature_dir"
+          npm init -y > /dev/null
+          npm install --ignore-scripts --no-audit --no-fund "dsh-codex-community@$REQUESTED_VERSION"
+          node --input-type=module -e '
+            import fs from "node:fs"
+            const installed = JSON.parse(fs.readFileSync("node_modules/dsh-codex-community/package.json", "utf8"))
+            if (installed.name !== "dsh-codex-community" || installed.version !== process.env.REQUESTED_VERSION) process.exit(1)
+          '
+          npm audit signatures --json --include-attestations > "$GITHUB_WORKSPACE/release/npm-signatures.json"
+          node --input-type=module -e '
+            import fs from "node:fs"
+            const report = JSON.parse(fs.readFileSync(`${process.env.GITHUB_WORKSPACE}/release/npm-signatures.json`, "utf8"))
+            if (!Array.isArray(report.verified)) process.exit(1)
+            const target = report.verified.find((entry) => (
+              entry?.name === "dsh-codex-community" && entry?.version === process.env.REQUESTED_VERSION
+            ))
+            if (!target) process.exit(1)
+            if (target.attestations?.provenance?.predicateType !== "https://slsa.dev/provenance/v1") process.exit(1)
+            if (!Array.isArray(target.attestations?.bundles) || target.attestations.bundles.length === 0) process.exit(1)
+          '
+      - name: Create, verify, and publish the bilingual GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          set -eu
+          tag="v$REQUESTED_VERSION"
+          set +e
+          gh release view "$tag" --json isDraft > release/existing-release.json 2> release/existing-release-error.log
+          release_status=$?
+          set -e
+          if [ "$release_status" -eq 0 ]; then
+            release_state="$(node --input-type=module -e '
+              import fs from "node:fs"
+              const release = JSON.parse(fs.readFileSync("release/existing-release.json", "utf8"))
+              if (release.isDraft === true) process.stdout.write("draft")
+              else if (release.isDraft === false) process.stdout.write("published")
+              else process.exit(1)
+            ')"
+          elif grep -Eqi 'release not found|HTTP 404' release/existing-release-error.log; then
+            release_state="absent"
+          else
+            cat release/existing-release-error.log >&2
+            exit "$release_status"
+          fi
+
+          if [ "$release_state" = "published" ]; then
+            published_commit="$(gh api "repos/$GITHUB_REPOSITORY/commits/$tag" --jq .sha)"
+            test "$published_commit" = "$GITHUB_SHA"
+          elif [ "$release_state" = "draft" ]; then
+            gh release edit "$tag" \
+              --draft \
+              --target "$GITHUB_SHA" \
+              --title "v$REQUESTED_VERSION 社区版本 / Community Release" \
+              --notes-file "docs/releases/v$REQUESTED_VERSION.md"
+          else
+            gh release create "$tag" \
+              --draft \
+              --target "$GITHUB_SHA" \
+              --title "v$REQUESTED_VERSION 社区版本 / Community Release" \
+              --notes-file "docs/releases/v$REQUESTED_VERSION.md"
+          fi
+
+          assets=(
+            "$PACKAGE_FILE"
+            "$PACKAGE_FILE.sha256"
+            "$PACKAGE_FILE.sri"
+            "$PACKAGE_FILE.cdx.json"
+            "release/dsh-runtime-dependency-tree.json"
+            "release/dsh-runtime-environment.json"
+            "release/isolated-dependency-tree.json"
+            "release/isolated-import.json"
+            "release/npm-audit.json"
+            "release/npm-cli-version.txt"
+            "release/npm-attestations.json"
+            "release/npm-signatures.json"
+            "release/registry-readback.json"
+            "docs/releases/v$REQUESTED_VERSION.acceptance.json"
+          )
+          if [ "$release_state" != "published" ]; then
+            gh release upload "$tag" "${assets[@]}" --clobber
+          fi
+
+          gh release view "$tag" --json assets,body,isDraft,name > release/github-release-assets.json
+          EXPECTED_VERSION="$REQUESTED_VERSION" RELEASE_STATE="$release_state" node --input-type=module -e '
+            import fs from "node:fs"
+            const release = JSON.parse(fs.readFileSync("release/github-release-assets.json", "utf8"))
+            const base = `dsh-codex-community-${process.env.EXPECTED_VERSION}.tgz`
+            const expectedTitle = `v${process.env.EXPECTED_VERSION} 社区版本 / Community Release`
+            const notes = fs.readFileSync(`docs/releases/v${process.env.EXPECTED_VERSION}.md`, "utf8")
+            const normalize = (value) => value.replaceAll("\r\n", "\n").trimEnd()
+            const expected = [
+              base,
+              `${base}.sha256`,
+              `${base}.sri`,
+              `${base}.cdx.json`,
+              "dsh-runtime-dependency-tree.json",
+              "dsh-runtime-environment.json",
+              "isolated-dependency-tree.json",
+              "isolated-import.json",
+              "npm-audit.json",
+              "npm-cli-version.txt",
+              "npm-attestations.json",
+              "npm-signatures.json",
+              "registry-readback.json",
+              `v${process.env.EXPECTED_VERSION}.acceptance.json`,
+            ].sort()
+            const actual = release.assets.map(({ name }) => name).sort()
+            if (JSON.stringify(actual) !== JSON.stringify(expected)) process.exit(1)
+            if (release.name !== expectedTitle || normalize(release.body) !== normalize(notes)) process.exit(1)
+            if (release.isDraft !== (process.env.RELEASE_STATE !== "published")) process.exit(1)
+          '
+          download_dir="$RUNNER_TEMP/github-release-assets"
+          mkdir "$download_dir"
+          gh release download "$tag" --dir "$download_dir"
+          for asset in "${assets[@]}"; do
+            cmp "$asset" "$download_dir/$(basename "$asset")"
+          done
+
+          if [ "$release_state" != "published" ]; then
+            gh release view "$tag" --json isDraft,tagName,targetCommitish > release/prepublish-release.json
+            node --input-type=module -e '
+              import fs from "node:fs"
+              const release = JSON.parse(fs.readFileSync("release/prepublish-release.json", "utf8"))
+              if (
+                release.isDraft !== true
+                || release.tagName !== `v${process.env.REQUESTED_VERSION}`
+                || release.targetCommitish !== process.env.GITHUB_SHA
+              ) process.exit(1)
+            '
+            set +e
+            existing_tag_commit="$(gh api "repos/$GITHUB_REPOSITORY/commits/$tag" --jq .sha 2> release/prepublish-tag-error.log)"
+            tag_status=$?
+            set -e
+            if [ "$tag_status" -eq 0 ]; then
+              test "$existing_tag_commit" = "$GITHUB_SHA"
+            elif grep -Eqi 'HTTP 404|Not Found' release/prepublish-tag-error.log; then
+              :
+            else
+              cat release/prepublish-tag-error.log >&2
+              exit "$tag_status"
+            fi
+            gh release edit "$tag" --draft=false
+          fi
+          gh release view "$tag" --json isDraft,tagName > release/published-release.json
+          node --input-type=module -e '
+            import fs from "node:fs"
+            const release = JSON.parse(fs.readFileSync("release/published-release.json", "utf8"))
+            if (release.isDraft !== false || release.tagName !== `v${process.env.REQUESTED_VERSION}`) process.exit(1)
+          '
+          published_commit="$(gh api "repos/$GITHUB_REPOSITORY/commits/$tag" --jq .sha)"
+          test "$published_commit" = "$GITHUB_SHA"

@@ -1,0 +1,13 @@
+- insert:
+    - id: authorization
+      name: '@deepseek-ai/dsh-authorization'
+
+    - id: dsh-codex
+      name: 'dsh-codex-community'
+      config:
+        partialResponseRecovery: true
+        cacheRetention: short
+        streamIdleTimeoutMs: 300000
+        maxRequestImageBytes: 20971520
+        requestImagePixelBudget: 4194304
+        requestImageMaxBytes: 1048576

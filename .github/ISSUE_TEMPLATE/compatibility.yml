@@ -1,0 +1,39 @@
+name: 兼容性报告 / Compatibility report
+description: 报告新的 DSH、Node 或平台组合 / Report a new DSH, Node, or platform combination
+title: "[Compatibility] "
+labels: ["compatibility", "triage"]
+body:
+  - type: input
+    id: versions
+    attributes:
+      label: 精确版本 / Exact versions
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: 操作系统与架构 / OS and architecture
+    validations:
+      required: true
+  - type: textarea
+    id: commands
+    attributes:
+      label: 执行的命令 / Commands run
+      description: 只粘贴脱敏命令；删除 token、OAuth code、cookie、凭据路径和私人参数。 / Paste sanitized commands only; remove tokens, OAuth codes, cookies, credential paths, and private arguments.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: results
+    attributes:
+      label: 结果与未验证边界 / Results and unverified boundaries
+      description: 只提供脱敏的最小结果，不要粘贴完整 provider 响应或私人内容。 / Include only sanitized minimal results; never paste complete provider responses or private content.
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: 隐私确认 / Privacy confirmation
+      options:
+        - label: 我已移除所有凭据、账户信息、私人内容、图片和机器专属秘密。 / I removed all credentials, account data, private content, images, and machine-specific secrets.
+          required: true

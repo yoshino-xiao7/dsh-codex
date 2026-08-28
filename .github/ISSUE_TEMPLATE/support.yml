@@ -1,0 +1,30 @@
+name: 使用支持 / Usage support
+description: 提交脱敏的安装或使用问题 / Ask a sanitized installation or usage question
+title: "[Support] "
+labels: ["support", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: "不要提交 token、OAuth code、cookie、凭据文件、完整提示词、原图或完整 provider 响应。 / Never submit tokens, OAuth codes, cookies, credential files, complete prompts, source images, or complete provider responses."
+  - type: input
+    id: versions
+    attributes:
+      label: 精确版本 / Exact versions
+      description: dsh-codex-community, DSH, pi-ai, Node.js and operating system
+      placeholder: "0.0.1; DSH 0.1.1-rc.2; pi-ai 0.82.1; Node 22.22.2; macOS 15 arm64"
+    validations:
+      required: true
+  - type: textarea
+    id: question
+    attributes:
+      label: 问题与已尝试步骤 / Question and attempted steps
+      description: 只提供脱敏的最小信息，并说明已阅读的排错步骤。 / Include only sanitized minimal details and the troubleshooting steps already tried.
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: 隐私确认 / Privacy confirmation
+      options:
+        - label: 我已移除所有凭据、账户信息、私人内容、图片和机器专属秘密。 / I removed all credentials, account data, private content, images, and machine-specific secrets.
+          required: true

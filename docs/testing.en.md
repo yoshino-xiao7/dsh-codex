@@ -1,0 +1,56 @@
+# Testing strategy
+
+[简体中文](testing.md) | [English](testing.en.md)
+
+## Local gate
+
+```sh
+corepack enable
+pnpm install --frozen-lockfile
+pnpm --dir test/fixtures/dsh-runtime install --frozen-lockfile --ignore-scripts
+pnpm run check
+pnpm run verify:release
+```
+
+`pnpm run check` runs syntax/source-boundary checks, strict TypeScript consumption of the public declarations, the complete test suite, build, language-pair validation, and npm-pack allowlist validation. The complete suite includes the real frozen DSH AgentLoop/Retry composition, so local development, CI, compatibility monitoring, and release candidates must install the committed DSH runtime fixture first.
+
+Both the root `pnpm-lock.yaml` and the fixture's `test/fixtures/dsh-runtime/pnpm-lock.yaml` must remain reviewed. An upgrade to DSH, pi-ai, or another runtime dependency updates both lockfiles and repeats complete CI, profile smoke, and controlled live acceptance.
+
+The fixture disables lifecycle scripts, so this level verifies DSH Web/profile integration with the plugin; it does not claim to validate native terminal or native-build capabilities in DSH dependencies that require install scripts.
+
+## Failure regressions
+
+- `failure-normalizer.test.mjs`: exact `AccountQuotaExceeded`, canonical DSH `QUOTA`, five-hour reset, request ID, ordinary/ambiguous 429, narrow transport classification, and secret-field suppression; nested request metadata and other independent JSON envelopes cannot impersonate or inject facts into the matched provider `error` envelope, while canonical `QUOTA` may retain valid reset/request ID from one independently matching envelope;
+- `image-policy.test.mjs`: complete defaults and every invalid numeric class;
+- `stream-resilience.test.mjs`: partial text preservation, pre-output quota, transient/ambiguous 429, directly thrown quota/usage-limit/`STREAM_CLOSED`, incomplete tool calls, fail-closed tool-only streams, and non-Codex routes; an exception from the `onRecovery` observer cannot break the recovered text, recovery notice, or normal terminal event;
+- `provider-reliability-public-api.test.mjs`: public pi-ai → PiAiAdapter → route → resilience chains for successful text/reasoning/usage, a tool call with two-turn replay, native image limits, text-only image rejection, 429, `STREAM_CLOSED`, and WebSocket failure;
+- `llm-runtime-integration.test.mjs`: the real frozen DSH `LlmRuntime + AgentLoop + Retry` composition proves that a transient `RATE_LIMIT` retries once while normalized `QUOTA` and `QUOTA_OR_RATE_LIMIT` each call the provider only once; it also proves the waterfall publishes non-retryable `QUOTA` before recovery policy reads the result;
+- `codex-session-resources.test.mjs`: namespaced sessions, reset/agent/runtime cleanup, and isolation from an external in-process pi-ai session;
+- `sdk-contract.test.mjs`: real pi-ai OAuth/catalog contracts, DSH profile schema, and a PNG through the real attachment seam;
+- `bundle-contract.test.mjs`: preservation of the general `llm-pi-ai` configuration, insertion of `dsh-codex`, and complete image limits;
+- `codex-route-adapter.test.mjs`: mapping between the external `dsh-codex` route and the internal canonical provider, including replay and tool-call IDs;
+- `codex-provider-runtime.test.mjs`: the scoped route, settings updates, model filtering, and same-profile coexistence;
+- `authorization-commit-tracker.test.mjs`, `authorization-commit-integration.test.mjs`, `codex-credential-store.test.mjs`, and `codex-authorization.test.mjs`: scoped OAuth, serialized refresh, fail-closed invalid records, sanitized sign-in events, generation isolation, and the cancellation linearization point; real Cordis `AuthorizationService + Bridge` regressions also cover flow-owner disposal cancelling before commit selection, waiting for a selected commit's final write, releasing after commit failure, sign-out as the final delete, and proving that one process cancelling cannot delete another process's already queued sign-in;
+- `oauth-refresh-logout-race.test.mjs`: refresh/delete lock ordering through the public PiAiAdapter request path, proving that credentials cannot reappear after sign-out;
+- `codex-pi-provider.test.mjs`: default payload, per-session Fast, transport, and no automatic downgrade;
+- `session-preferences.test.mjs` and `session-preference-command.test.mjs`: session isolation, capacity bounds, reset, and command-error boundaries;
+- `authorization-bridge.test.mjs`: interaction bounds, no credentials across RPC, sign-out, and command output; an unsupported or malformed stored record has a distinct `invalid` state, is never presented as signed in, and never exposes its secret across RPC;
+- `quota-observer.test.mjs`: three states, reset/stale expiry, out-of-order observations, strict inputs, and frozen sanitized snapshots;
+- `client-bundle.test.mjs`: Web sign-in, quota presentation, model-enablement writes, mutually exclusive sign-in actions, unmount safety, multi-instance/hot-reload style-node lifecycle, narrow-screen layout, and the loopback RPC boundary; the model-settings regression starts from the real section component, sends the public settings mutation, and passes the resulting config to the real provider runtime to verify the route model directory;
+- `remote-image-input.test.mjs`: URL, DNS, redirect, response-size, MIME, timeout, two active jobs, 32 queued jobs, full-queue rejection, queued cancellation, queue closure and active-job convergence during plugin disposal, and persistence-stage cancellation boundaries, plus end-to-end execution through the real ToolRuntime and published `read_image` renderer; model-capability preflight runs inside the same limiter, so a blocked resolver that ignores abort cannot bypass active or queued bounds;
+- `generate-sbom.test.mjs`, `release-evidence.test.mjs`, and `release-workflow.test.mjs`: offline deterministic reference dependency graphs, artifact/both-lockfile hash binding, the DSH smoke runtime environment, actual-install-tree and production-audit evidence, exact SRI, signature/attestation audit, Action SHA pinning, least privilege, draft/tag target preflight, and recoverable publication;
+- `release-maintainability.test.mjs`: direct runtime-dependency notice coverage, the Apache-2.0 contribution license, bilingual privacy templates, root/fixture DSH version alignment, and coordinated Dependabot configuration;
+- `dsh-runtime-fixture.test.mjs`: the fixture is private, pins exact DSH `0.1.1-rc.2`, and commits its complete pnpm lock; CI, compatibility, and release workflows may install that graph only with `--frozen-lockfile --ignore-scripts`, and must not hand the unbounded DSH peer graph back to direct npm resolution;
+- `types-consumer.ts`: imports public `.d.ts` files through npm package exports and compiles them under strict TypeScript settings;
+- `host-load.test.mjs`: Host exports, Config, waterfall registration, and dynamic service registration; its quota vertical regression carries structured and ambiguous 429 observations from the real stream listener through the sanitized status RPC and `/codex-usage` command, then verifies a successful request restores recent-success state.
+
+## Acceptance levels
+
+1. Unit: pure functions and stream fixtures;
+2. SDK contract: public exports from locked published packages;
+3. Isolated install: install the `.tgz` into an empty directory and import Host;
+4. Harness smoke: first install the exact DSH runtime from the frozen `test/fixtures/dsh-runtime/pnpm-lock.yaml`, then install the local `.tgz` into an isolated profile, confirm the general pi-ai provider configuration is unchanged, start Web, and read the sign-in-status RPC plus client bundle; SDK-contract and Host-runtime tests cover model discovery;
+5. Real network: the repository owner uses a controlled test account to verify Web OAuth, the model catalog, text/reasoning streams, terminal usage, a safe tool round trip, two-turn replay, the `maxPixels=4194304` image path, all four transports, and Fast; every fixed boolean assertion in the acceptance JSON must be true;
+6. Release readback: exact equality between npm `dist.integrity` and the candidate SRI, a passing signature/attestation audit, and byte equality between GitHub assets and the locally built tarball.
+
+Real OAuth, quota, and network smoke must not require contributors to place secrets in CI, and secrets must never be exposed to external pull requests.

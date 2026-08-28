@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 安全问题 / Security issue
+    url: https://github.com/yoshino-xiao7/dsh-codex/security/advisories/new
+    about: 请私下报告，绝不要公开凭据或私人数据 / Report privately; never disclose credentials or private data.
+  - name: 使用支持 / Usage support
+    url: https://github.com/yoshino-xiao7/dsh-codex/issues/new?template=support.yml
+    about: 阅读支持范围和故障排查后提交脱敏问题 / Ask a sanitized question after reading support scope and troubleshooting.
+  - name: 安全私下联络回退 / Private security contact fallback
+    url: https://github.com/yoshino-xiao7/dsh-codex/issues/new?template=security-contact.yml
+    about: 仅在 Private vulnerability reporting 不可用时使用，禁止公开技术细节 / Use only if Private vulnerability reporting is unavailable; disclose no technical details.
