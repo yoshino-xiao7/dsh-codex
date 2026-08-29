@@ -543,16 +543,20 @@ test("classic web bundle registers the package id and Codex settings section", a
   assert.equal(typeof fastProps.preferenceClient.setFast, "function")
   assert.equal(typeof fastProps.selectModel, "function")
   assert.equal(fastProps.hooks.modelDirectory.getSnapshot().current, null)
-  assert.match(dictionaries[0].value.zh.modelsDescription, /模型选择器.*已有会话.*继续使用/)
-  assert.match(dictionaries[0].value.en.modelsDescription, /model selector.*existing conversations.*exact model/)
-  assert.match(dictionaries[0].value.zh.modelsDescription, /当前安装.*provider catalog.*不推测/u)
-  assert.match(dictionaries[0].value.en.modelsDescription, /installed Codex provider catalog.*not inferred/u)
+  assert.match(dictionaries[0].value.zh.modelsDescription, /模型选择器.*provider catalog.*已有会话/u)
+  assert.match(dictionaries[0].value.en.modelsDescription, /model selector.*installed provider catalog.*existing conversations/iu)
   assert.equal(dictionaries[0].value.zh.modelsTitle, "当前安装的 Codex 模型")
   assert.equal(dictionaries[0].value.en.modelsTitle, "Codex models in this installation")
-  assert.match(dictionaries[0].value.zh.modelsAllEnabledFollow, /清除覆盖.*未来新增/)
-  assert.match(dictionaries[0].value.zh.modelsAllEnabledPreserve, /保留现有模型参数.*不会自动启用/)
-  assert.match(dictionaries[0].value.en.modelsAllEnabledFollow, /clear it.*future catalog additions/)
-  assert.match(dictionaries[0].value.en.modelsAllEnabledPreserve, /preserve existing model parameters.*will not be enabled automatically/)
+  assert.match(dictionaries[0].value.zh.modelsAllEnabledFollow, /清除列表覆盖.*未来新增模型/u)
+  assert.match(dictionaries[0].value.zh.modelsAllEnabledPreserve, /保留其他模型参数.*未来新增模型/u)
+  assert.match(dictionaries[0].value.en.modelsAllEnabledFollow, /clears the list override.*future models/iu)
+  assert.match(dictionaries[0].value.en.modelsAllEnabledPreserve, /preserve other model settings.*future models/iu)
+  assert.equal(dictionaries[0].value.zh.refreshing, "刷新中…")
+  assert.equal(dictionaries[0].value.en.refreshing, "Refreshing…")
+  assert.equal(dictionaries[0].value.zh.modelsShowMore, "显示未选择的 {count} 个模型")
+  assert.equal(dictionaries[0].value.en.modelsShowMore, "Show {count} unselected models")
+  assert.equal(dictionaries[0].value.zh.modelsSummary, "已选择 {selected}/{total} · 当前显示 {visible}/{total}")
+  assert.equal(dictionaries[0].value.en.modelsSummary, "Selected {selected}/{total} · Showing {visible}/{total}")
 })
 
 test("settings page keeps one hero above the authorization and model cards", async () => {
@@ -1352,6 +1356,11 @@ test("authorization and model mutations do not update state after unmount", asyn
   })
   await settle()
   modelHarness.flush()
+  findElement(
+    modelHarness.tree(),
+    (element) => element.props.className === "dshCodexButton dshCodexModelToggle",
+  ).props.onClick()
+  modelHarness.flush()
   const checkboxes = findElements(modelHarness.tree(), (element) => element.type === "input" && element.props.type === "checkbox")
   checkboxes[1].props.onChange()
   modelHarness.flush()
@@ -1385,12 +1394,12 @@ test("client style reload refreshes CSS and survives disposal of the old module"
     { document: harness.document, source },
   )
   const disposeOld = applyClientModule(oldModule)
-  assert.match(harness.styles[0].textContent, /gap:14px/u)
+  assert.match(harness.styles[0].textContent, /gap:12px/u)
 
   const reloadedModule = await loadClientModule(
     { createElement: () => undefined },
     {},
-    { document: harness.document, source: source.replace("gap:14px", "gap:15px") },
+    { document: harness.document, source: source.replace("gap:12px", "gap:15px") },
   )
   const disposeReloaded = applyClientModule(reloadedModule)
   assert.equal(harness.styles.length, 1)
@@ -1419,6 +1428,113 @@ test("multiple client instances keep one stylesheet until the last unload", asyn
   assert.equal(harness.styles.length, 0)
 })
 
+test("the client replaces only the unique Codex settings gear with its code icon and cleans up", async () => {
+  const createButton = (text, validStructure = true) => {
+    const attributes = new Set()
+    const label = validStructure ? { localName: "span", textContent: text } : undefined
+    const icon = validStructure ? { localName: "svg", nextElementSibling: label } : undefined
+    return {
+      firstElementChild: icon,
+      hasAttribute: (name) => attributes.has(name),
+      removeAttribute: (name) => attributes.delete(name),
+      setAttribute: (name) => attributes.add(name),
+      setText(next) {
+        if (label) label.textContent = next
+      },
+    }
+  }
+  const codexButton = createButton("OpenAI Codex")
+  const duplicateButton = createButton("Other")
+  const themeButton = createButton("Theme / 外观")
+  const malformedButton = createButton("OpenAI Codex", false)
+  const buttons = [codexButton, duplicateButton, themeButton, malformedButton]
+  const styles = []
+  const document = {
+    body: {},
+    head: {
+      appendChild(style) {
+        style.parentNode = this
+        styles.push(style)
+      },
+      removeChild(style) {
+        const index = styles.indexOf(style)
+        if (index !== -1) styles.splice(index, 1)
+        style.parentNode = null
+      },
+    },
+    createElement(tag) {
+      assert.equal(tag, "style")
+      return {
+        dataset: {},
+        textContent: "",
+        parentNode: null,
+        remove() { this.parentNode?.removeChild(this) },
+      }
+    },
+    querySelector(selector) {
+      if (selector === 'style[data-plugin-css="dsh-codex-community/authorization-settings.css"]') {
+        return styles.find((style) => style.dataset.pluginCss === "dsh-codex-community/authorization-settings.css") ?? null
+      }
+      if (selector === 'style[data-plugin-nav-icon="dsh-codex-community"]') {
+        return styles.find((style) => style.dataset.pluginNavIcon === "dsh-codex-community") ?? null
+      }
+      return null
+    },
+    querySelectorAll(selector) {
+      if (selector === '[role="dialog"][aria-modal="true"] > nav button') return buttons
+      if (selector === "[data-dsh-codex-community-nav-icon]") {
+        return buttons.filter((button) => button.hasAttribute("data-dsh-codex-community-nav-icon"))
+      }
+      return []
+    },
+  }
+  const observers = []
+  class FakeMutationObserver {
+    constructor(callback) {
+      this.callback = callback
+      this.disconnected = false
+      observers.push(this)
+    }
+
+    disconnect() { this.disconnected = true }
+    observe(target, options) { this.observed = { target, options } }
+  }
+  const clientModule = await loadClientModule(
+    { createElement: () => undefined },
+    { MutationObserver: FakeMutationObserver },
+    { document },
+  )
+  const dispose = applyClientModule(clientModule)
+
+  assert.equal(observers.length, 1)
+  assert.equal(codexButton.hasAttribute("data-dsh-codex-community-nav-icon"), true)
+  assert.equal(themeButton.hasAttribute("data-dsh-codex-community-nav-icon"), false)
+  assert.equal(malformedButton.hasAttribute("data-dsh-codex-community-nav-icon"), false)
+  const navStyle = styles.find((style) => style.dataset.pluginNavIcon === "dsh-codex-community")
+  assert.ok(navStyle)
+  assert.match(navStyle.textContent, /data-dsh-codex-community-nav-icon/u)
+  assert.match(navStyle.textContent, />svg:first-child\{display:none!important\}/u)
+  assert.match(decodeURIComponent(navStyle.textContent), /M5\.25 3\.25 1\.5 8l3\.75 4\.75/u)
+  assert.doesNotMatch(decodeURIComponent(navStyle.textContent), /M8\.00192 6\.64454/u)
+
+  duplicateButton.setText("OpenAI Codex")
+  observers[0].callback([{
+    addedNodes: [],
+    removedNodes: [],
+    target: {
+      nodeType: 1,
+      closest: (selector) => selector === '[role="dialog"][aria-modal="true"] > nav' ? {} : null,
+    },
+  }])
+  await Promise.resolve()
+  assert.equal(codexButton.hasAttribute("data-dsh-codex-community-nav-icon"), false)
+  assert.equal(duplicateButton.hasAttribute("data-dsh-codex-community-nav-icon"), false)
+
+  dispose()
+  assert.equal(observers[0].disconnected, true)
+  assert.equal(styles.some((style) => style.dataset.pluginNavIcon === "dsh-codex-community"), false)
+})
+
 test("client styles bound narrow-screen provider text and actions", async () => {
   const harness = styleDocumentHarness()
   const clientModule = await loadClientModule(
@@ -1440,7 +1556,7 @@ test("client styles bound narrow-screen provider text and actions", async () => 
   assert.match(css, /\.dshCodexHero h2\{font-size:16px;font-weight:500;line-height:24px\}/u)
   assert.match(css, /\.dshCodexCard\{[^}]*var\(--dsw-alias-bg-module-platform/u)
   assert.match(css, /\.dshCodexModelList\{[^}]*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/u)
-  assert.match(css, /@media\(max-width:760px\)\{\.dshCodexModelList\{grid-template-columns:1fr\}/u)
+  assert.match(css, /@media\(max-width:760px\)\{\.dshCodexQuotaWindows,\.dshCodexModelList\{grid-template-columns:1fr\}/u)
   assert.match(css, /\.dshCodexButton:focus-visible,[^{]+input:focus-visible/u)
   assert.match(css, /\.dshCodexModelId\{[^}]*font-family:inherit/u)
   assert.match(css, /\.dshCodexModelCapabilities\{[^}]*flex-wrap:wrap/u)
@@ -1448,6 +1564,13 @@ test("client styles bound narrow-screen provider text and actions", async () => 
   assert.match(css, /\.dshCodexFastToggle\{[^}]*width:28px[^}]*font:inherit/u)
   assert.match(css, /\.dshCodexFastToggle\[data-fast=true\]/u)
   assert.match(css, /\.dshCodexQuotaWindow progress\{[^}]*width:100%[^}]*height:8px/u)
+  assert.match(css, /\.dshCodexQuotaWindows\{[^}]*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/u)
+  assert.match(css, /\.dshCodexQuota \.dshCodexQuotaUpdated\{[^}]*font-size:12px[^}]*line-height:18px/u)
+  assert.match(css, /\.dshCodexRefreshButton\[data-loading=true\] \.dshCodexRefreshIcon\{animation:/u)
+  assert.match(css, /@media\(prefers-reduced-motion:reduce\)/u)
+  assert.match(css, /\.dshCodexModelOption\[data-selected=true\]/u)
+  assert.match(css, /\.dshCodexModelToggle\{[^}]*align-self:center/u)
+  assert.match(css, /\.dshCodexModelSummary\{[^}]*font-size:12px[^}]*white-space:nowrap/u)
   dispose()
 })
 
@@ -1561,12 +1684,12 @@ test("authorization watcher settling after unmount cannot refresh or publish eve
 
 test("quota UI renders an exhausted observation with a validated reset in Chinese and English", async () => {
   const observedAt = Date.now() - 1_000
-  const resetAt = Date.now() + 60 * 60_000
+  const resetAt = Date.now() + 2 * 60 * 60_000
   const requestId = "req_quota_ui_fixture"
   const extra = "secret_quota_ui_fixture"
 
   for (const language of ["zh", "en"]) {
-    const { dictionaries, text } = await renderQuotaView({
+    const { dictionaries, text, tree } = await renderQuotaView({
       status: "exhausted",
       observedAt,
       resetAt,
@@ -1579,10 +1702,13 @@ test("quota UI renders an exhausted observation with a validated reset in Chines
     assert.ok(text.includes(messages.quotaObservedAt))
     assert.ok(text.includes(new Date(observedAt).toLocaleString(messages.locale)))
     assert.ok(text.includes(messages.quotaResetAt))
-    assert.ok(text.includes(new Date(resetAt).toLocaleString(messages.locale)))
-    assert.ok(text.includes(messages.quotaResetIn))
-    assert.ok(text.includes(messages.quotaMinutes))
-    assert.match(text, language === "zh" ? /账户额度已用尽.*重置时间/u : /account quota was exhausted.*reset time/iu)
+    assert.equal(text.includes(new Date(resetAt).toLocaleString(messages.locale)), false)
+    assert.match(text, language === "zh" ? /账户额度已用尽.*2 小时后重置/u : /account quota was exhausted.*Resets in 2 hours/iu)
+    const resetTime = findElement(tree, (element) => element.type === "time")
+    assert.ok(resetTime)
+    assert.equal(resetTime.props.dateTime, new Date(resetAt).toISOString())
+    assert.match(resetTime.props.title, new RegExp(new Date(resetAt).toLocaleString(messages.locale).replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "u"))
+    assert.match(resetTime.props["aria-label"], language === "zh" ? /2 小时后重置.*重置时间/u : /Resets in 2 hours.*Resets/iu)
     assert.equal(text.includes(messages.quotaUnknown), false)
     assert.equal(text.includes(messages.quotaNoReset), false)
     assert.equal(text.includes(requestId), false)
@@ -1657,12 +1783,32 @@ test("quota UI never invents percentages or progress bars", async () => {
   }
 })
 
-test("signed-in settings fetch real five-hour and weekly usage on entry and manual refresh", async () => {
+test("quota reset distance is concise and localized without exposing the exact timestamp as visible text", async () => {
+  const clientModule = await loadClientModule({ createElement: () => undefined })
+  const dictionaries = registeredClientDictionaries(clientModule)
+  const now = Date.UTC(2026, 7, 29, 8, 0)
+  const zh = (key) => dictionaries.zh[key] ?? key
+  const en = (key) => dictionaries.en[key] ?? key
+
+  assert.equal(clientModule.formatResetDistance(now + 30_000, zh, now), "即将重置")
+  assert.equal(clientModule.formatResetDistance(now + 6 * 60_000, zh, now), "6 分钟后重置")
+  assert.equal(clientModule.formatResetDistance(now + 3 * 60 * 60_000, zh, now), "3 小时后重置")
+  assert.equal(clientModule.formatResetDistance(now + 6 * 24 * 60 * 60_000, zh, now), "6 天后重置")
+  assert.equal(clientModule.formatResetDistance(now + 60_000, en, now), "Resets soon")
+  assert.equal(clientModule.formatResetDistance(now + 61_000, en, now), "Resets in 2 minutes")
+  assert.equal(clientModule.formatResetDistance(now + 60 * 60_000, en, now), "Resets in 1 hour")
+  assert.equal(clientModule.formatResetDistance(now + 6 * 24 * 60 * 60_000, en, now), "Resets in 6 days")
+})
+
+test("signed-in settings shows the five-hour exact reset and a distant weekly relative reset", async () => {
   const harness = hookHarness()
   const clientModule = await loadClientModule(harness.React)
   const dictionaries = registeredClientDictionaries(clientModule)
   let usageCalls = 0
-  const observedAt = Date.UTC(2026, 7, 29, 6, 30)
+  const now = Date.now()
+  const observedAt = now - 60_000
+  const primaryReset = now + 3 * 60 * 60_000
+  const secondaryReset = now + 6 * 24 * 60 * 60_000
   const usage = {
     observedAt,
     rateLimits: [{
@@ -1671,12 +1817,12 @@ test("signed-in settings fetch real five-hour and weekly usage on entry and manu
       primary: {
         usedPercent: 25,
         windowDurationMins: 300,
-        resetsAt: Date.UTC(2026, 7, 29, 9, 30),
+        resetsAt: primaryReset,
       },
       secondary: {
         usedPercent: 7.5,
         windowDurationMins: 10_080,
-        resetsAt: Date.UTC(2026, 8, 4, 2, 29),
+        resetsAt: secondaryReset,
       },
     }],
   }
@@ -1703,6 +1849,21 @@ test("signed-in settings fetch real five-hour and weekly usage on entry and manu
   assert.match(text, /每周额度/u)
   assert.match(text, /剩余 75%/u)
   assert.match(text, /剩余 92\.5%/u)
+  assert.doesNotMatch(text, /已使用/u)
+  assert.doesNotMatch(text, /3 小时后重置/u)
+  assert.match(text, /6 天后重置/u)
+  assert.equal(text.includes(`${dictionaries.zh.quotaResetsAt}：${new Date(primaryReset).toLocaleString(dictionaries.zh.locale)}`), true)
+  assert.equal(text.includes(new Date(secondaryReset).toLocaleString(dictionaries.zh.locale)), false)
+  const resetTimes = findElements(harness.tree(), (element) => element.type === "time")
+  assert.deepEqual(resetTimes.map(({ props }) => props.dateTime), [
+    new Date(primaryReset).toISOString(),
+    new Date(secondaryReset).toISOString(),
+  ])
+  for (const resetTime of resetTimes) {
+    assert.match(resetTime.props.title, /重置时间/u)
+  }
+  assert.equal(resetTimes[0].props["aria-label"], `${dictionaries.zh.quotaResetsAt}：${new Date(primaryReset).toLocaleString(dictionaries.zh.locale)}`)
+  assert.match(resetTimes[1].props["aria-label"], /6 天后重置.*重置时间/u)
   assert.equal(text.match(/Codex/gu)?.length, 1)
 
   const refresh = findElement(
@@ -1714,6 +1875,118 @@ test("signed-in settings fetch real five-hour and weekly usage on entry and manu
   harness.flush()
   assert.equal(usageCalls, 2)
   harness.unmount()
+})
+
+test("weekly usage switches from a relative day count to the exact reset below 24 hours", async () => {
+  for (const language of ["zh", "en"]) {
+    const harness = hookHarness()
+    const clientModule = await loadClientModule(harness.React)
+    const dictionaries = registeredClientDictionaries(clientModule)
+    const messages = dictionaries[language]
+    const now = Date.now()
+    const primaryReset = now + 4 * 60 * 60_000
+    const weeklyReset = now + 23 * 60 * 60_000
+    const client = {
+      describe: async () => authorizationStatus(true),
+      usage: async () => ({
+        observedAt: now,
+        rateLimits: [{
+          limitId: "codex",
+          primary: {
+            usedPercent: 1,
+            windowDurationMins: 300,
+            resetsAt: primaryReset,
+          },
+          secondary: {
+            usedPercent: 2,
+            windowDurationMins: 10_080,
+            resetsAt: weeklyReset,
+          },
+        }],
+      }),
+    }
+
+    harness.mount(clientModule.AuthorizationSettings, {
+      client,
+      t: (key) => messages[key] ?? key,
+    })
+    await settle()
+    harness.flush()
+
+    const text = textContent(harness.tree())
+    const separator = messages.locale.toLowerCase().startsWith("zh") ? "：" : ": "
+    const primaryExact = `${messages.quotaResetsAt}${separator}${new Date(primaryReset).toLocaleString(messages.locale)}`
+    const weeklyExact = `${messages.quotaResetsAt}${separator}${new Date(weeklyReset).toLocaleString(messages.locale)}`
+    assert.ok(text.includes(primaryExact))
+    assert.ok(text.includes(weeklyExact))
+    assert.equal(text.includes(clientModule.formatResetDistance(weeklyReset, (key) => messages[key] ?? key, now)), false)
+    const resetTimes = findElements(harness.tree(), (element) => element.type === "time")
+    assert.deepEqual(resetTimes.map((element) => element.props["aria-label"]), [primaryExact, weeklyExact])
+    harness.unmount()
+  }
+})
+
+test("usage refresh button exposes an icon and a localized busy state", async () => {
+  for (const language of ["zh", "en"]) {
+    const harness = hookHarness()
+    const clientModule = await loadClientModule(harness.React)
+    const dictionaries = registeredClientDictionaries(clientModule)
+    const pendingUsage = deferred()
+    const client = {
+      describe: async () => authorizationStatus(true),
+      usage: async () => pendingUsage.promise,
+    }
+
+    harness.mount(clientModule.AuthorizationSettings, {
+      client,
+      t: (key) => dictionaries[language][key] ?? key,
+    })
+    await settle()
+    harness.flush()
+
+    let refresh = findElement(
+      harness.tree(),
+      (element) => element.type === "button" && element.props.className === "dshCodexButton dshCodexRefreshButton",
+    )
+    assert.equal(textContent(refresh), dictionaries[language].refreshing)
+    assert.equal(refresh.props.disabled, true)
+    assert.equal(refresh.props["aria-busy"], "true")
+    assert.equal(refresh.props["data-loading"], "true")
+    const icon = findElement(refresh, (element) => element.type === "svg" && element.props.className === "dshCodexRefreshIcon")
+    assert.ok(icon)
+    assert.equal(icon.props["aria-hidden"], "true")
+    assert.equal(icon.props.focusable, "false")
+    const quota = findElement(harness.tree(), (element) => element.props.className === "dshCodexQuota")
+    assert.equal(quota.props["aria-busy"], "true")
+
+    pendingUsage.resolve({
+      observedAt: Date.now(),
+      rateLimits: [{
+        limitId: "codex",
+        primary: {
+          usedPercent: 10,
+          windowDurationMins: 300,
+          resetsAt: Date.now() + 60 * 60_000,
+        },
+      }],
+    })
+    await settle()
+    harness.flush()
+
+    refresh = findElement(
+      harness.tree(),
+      (element) => element.type === "button" && element.props.className === "dshCodexButton dshCodexRefreshButton",
+    )
+    assert.equal(textContent(refresh), dictionaries[language].refresh)
+    assert.equal(refresh.props.disabled, false)
+    assert.equal(refresh.props["aria-busy"], undefined)
+    assert.equal(refresh.props["data-loading"], undefined)
+    assert.equal(
+      findElement(harness.tree(), (element) => element.props.className === "dshCodexQuota").props["aria-busy"],
+      undefined,
+    )
+    harness.unmount()
+  }
 })
 
 test("usage refresh failure preserves the last verified percentages and marks them stale", async () => {
@@ -1933,6 +2206,86 @@ test("model settings shows exact catalog context and output metadata without inf
     assert.equal(findElements(harness.tree(), (element) => element.props.className === "dshCodexModelBadge").length, 2)
     harness.unmount()
   }
+})
+
+test("selected models stay above a collapsible group of unselected models", async () => {
+  const harness = hookHarness()
+  const clientModule = await loadClientModule(harness.React)
+  const dictionaries = registeredClientDictionaries(clientModule)
+  const models = Array.from({ length: 7 }, (_, index) => ({
+    id: `gpt-codex-${index + 1}`,
+    name: `GPT Codex ${index + 1}`,
+    contextWindow: 272_000,
+    maxTokens: 128_000,
+  }))
+  const ready = {
+    kind: "ready",
+    writable: true,
+    revision: 1,
+    settingsNs: "dsh-codex",
+    settingsPath: [],
+    models,
+    catalogIds: models.map(({ id }) => id),
+    selectedIds: models.slice(3).map(({ id }) => id),
+    configuredModels: [],
+  }
+
+  harness.mount(clientModule.ModelEnablementSettings, {
+    client: {
+      available: true,
+      load: async () => ready,
+      save: async () => ready,
+      subscribe: () => () => undefined,
+    },
+    t: (key) => dictionaries.zh[key] ?? key,
+  })
+  await settle()
+  harness.flush()
+
+  let list = findElement(harness.tree(), (element) => element.props.id === "dsh-codex-model-list")
+  assert.ok(list)
+  assert.equal(list.type, "ul")
+  assert.equal(list.props["aria-labelledby"], "dsh-codex-models-title")
+  let checkboxes = findElements(list, (element) => element.type === "input" && element.props.type === "checkbox")
+  assert.equal(checkboxes.length, 4)
+  assert.deepEqual(checkboxes.map(({ props }) => props.checked), [true, true, true, true])
+  assert.deepEqual(list.children.map(textContent), ["GPT Codex 4gpt-codex-4上下文 272K最大输出 128K", "GPT Codex 5gpt-codex-5上下文 272K最大输出 128K", "GPT Codex 6gpt-codex-6上下文 272K最大输出 128K", "GPT Codex 7gpt-codex-7上下文 272K最大输出 128K"])
+  assert.equal(findElements(list, (element) => element.type === "button").length, 0)
+  let summary = findElement(harness.tree(), (element) => element.props.className === "dshCodexModelSummary")
+  assert.equal(textContent(summary), "已选择 4/7 · 当前显示 4/7")
+  let toggle = findElement(harness.tree(), (element) => element.props.className === "dshCodexButton dshCodexModelToggle")
+  assert.equal(textContent(toggle), "显示未选择的 3 个模型")
+  assert.equal(toggle.props["aria-expanded"], "false")
+  assert.equal(toggle.props["aria-controls"], "dsh-codex-model-list")
+
+  toggle.props.onClick()
+  harness.flush()
+  list = findElement(harness.tree(), (element) => element.props.id === "dsh-codex-model-list")
+  checkboxes = findElements(list, (element) => element.type === "input" && element.props.type === "checkbox")
+  assert.equal(checkboxes.length, 7)
+  assert.deepEqual(checkboxes.map(({ props }) => props.checked), [true, true, true, true, false, false, false])
+  assert.deepEqual(list.children.map(textContent).map((value) => value.match(/GPT Codex \d+/u)?.[0]), ["GPT Codex 4", "GPT Codex 5", "GPT Codex 6", "GPT Codex 7", "GPT Codex 1", "GPT Codex 2", "GPT Codex 3"])
+  summary = findElement(harness.tree(), (element) => element.props.className === "dshCodexModelSummary")
+  assert.equal(textContent(summary), "已选择 4/7 · 当前显示 7/7")
+  toggle = findElement(harness.tree(), (element) => element.props.className === "dshCodexButton dshCodexModelToggle")
+  assert.equal(textContent(toggle), "收起未选择的模型")
+  assert.equal(toggle.props["aria-expanded"], "true")
+  assert.ok(findElement(harness.tree(), (element) => element.props.className === "dshCodexActions dshCodexModelActions"))
+
+  toggle.props.onClick()
+  harness.flush()
+  list = findElement(harness.tree(), (element) => element.props.id === "dsh-codex-model-list")
+  assert.equal(findElements(list, (element) => element.type === "input" && element.props.type === "checkbox").length, 4)
+
+  toggle = findElement(harness.tree(), (element) => element.props.className === "dshCodexButton dshCodexModelToggle")
+  let focusCalls = 0
+  toggle.props.ref.current = { focus: () => { focusCalls += 1 } }
+  const firstSelected = findElement(list, (element) => element.type === "input" && element.props.type === "checkbox")
+  firstSelected.props.onChange()
+  harness.flush()
+  assert.equal(focusCalls, 1)
+  assert.equal(textContent(findElement(harness.tree(), (element) => element.props.className === "dshCodexButton dshCodexModelToggle")), "显示未选择的 4 个模型")
+  harness.unmount()
 })
 
 test("an explicit empty plugin model list remains empty instead of looking unset", async () => {

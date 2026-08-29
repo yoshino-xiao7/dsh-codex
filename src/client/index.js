@@ -28,6 +28,7 @@ window.__ModuleLoader__.load({
       unavailable: "当前环境没有可用的 Codex 登录流程。",
       writableNo: "当前凭据存储不可写。",
       refresh: "刷新",
+      refreshing: "刷新中…",
       signIn: "登录",
       signInWithChatGPT: "使用 ChatGPT 登录",
       signInAgain: "重新登录",
@@ -60,19 +61,22 @@ window.__ModuleLoader__.load({
       quotaWeekly: "每周额度",
       quotaMinuteWindow: "分钟额度",
       quotaRemaining: "剩余",
-      quotaUsed: "已使用",
       quotaResetsAt: "重置时间",
       quotaUpdatedAt: "数据更新时间",
+      quotaResetSoon: "即将重置",
+      quotaResetPrefix: "",
+      quotaResetSuffix: "后重置",
+      quotaResetMinute: "分钟",
+      quotaResetHour: "小时",
+      quotaResetDay: "天",
       quotaRecentSuccess: "最近一次 Codex 请求成功",
       quotaSuccessCaution: "这只表示最近一次请求成功，不代表账户剩余额度。",
       quotaExhausted: "最近观测到 Codex 账户额度已用尽。",
       quotaObservedAt: "观测时间",
       quotaResetAt: "观测到的重置时间",
-      quotaResetIn: "预计还有约",
-      quotaMinutes: "分钟",
       quotaNoReset: "未获得通过校验的重置时间；状态会在有限时间后自动回到未知。",
       modelsTitle: "当前安装的 Codex 模型",
-      modelsDescription: "选择要在模型选择器中显示的 Codex 模型。当前目录条目的名称、上下文窗口和最大输出直接来自当前安装的 Codex provider catalog，不推测目录未提供的能力；隐藏后，已有会话中保存的精确模型仍可继续使用。",
+      modelsDescription: "选择在模型选择器中显示的 Codex 模型。名称、上下文和最大输出来自当前安装的 provider catalog；隐藏模型不影响已有会话。",
       modelsContextWindow: "上下文",
       modelsMaxOutput: "最大输出",
       modelsLoading: "正在读取 Codex 模型目录…",
@@ -83,8 +87,11 @@ window.__ModuleLoader__.load({
       modelsSaving: "正在保存…",
       modelsSaved: "模型启用设置已保存。",
       modelsAtLeastOne: "至少需要启用一个 Codex 模型。",
-      modelsAllEnabledFollow: "已启用全部当前目录模型；当前覆盖不含额外模型字段，保存后会清除覆盖并自动启用未来新增的目录模型。",
-      modelsAllEnabledPreserve: "已启用全部当前目录模型；为保留现有模型参数，保存后会固定当前模型列表，未来新增的目录模型不会自动启用。",
+      modelsAllEnabledFollow: "已启用全部当前目录模型；保存后将清除列表覆盖，未来新增模型会自动显示。",
+      modelsAllEnabledPreserve: "已启用全部当前目录模型；为保留其他模型参数，保存后会固定当前列表，未来新增模型不会自动显示。",
+      modelsShowMore: "显示未选择的 {count} 个模型",
+      modelsCollapse: "收起未选择的模型",
+      modelsSummary: "已选择 {selected}/{total} · 当前显示 {visible}/{total}",
       modelsRetry: "重新读取",
       modelsLoadFailed: "读取 Codex 模型目录失败。",
       modelsSaveFailed: "保存模型启用设置失败。",
@@ -112,6 +119,7 @@ window.__ModuleLoader__.load({
       unavailable: "No Codex sign-in flow is available in this environment.",
       writableNo: "The credential store is currently read-only.",
       refresh: "Refresh",
+      refreshing: "Refreshing…",
       signIn: "Sign in",
       signInWithChatGPT: "Sign in with ChatGPT",
       signInAgain: "Sign in again",
@@ -144,19 +152,22 @@ window.__ModuleLoader__.load({
       quotaWeekly: "Weekly limit",
       quotaMinuteWindow: "minute limit",
       quotaRemaining: "Remaining",
-      quotaUsed: "Used",
       quotaResetsAt: "Resets",
       quotaUpdatedAt: "Data updated",
+      quotaResetSoon: "Resets soon",
+      quotaResetPrefix: "Resets in",
+      quotaResetSuffix: "",
+      quotaResetMinute: "minute",
+      quotaResetHour: "hour",
+      quotaResetDay: "day",
       quotaRecentSuccess: "The latest Codex request succeeded",
       quotaSuccessCaution: "This only describes the latest request; it does not represent remaining account quota.",
       quotaExhausted: "Codex account quota was exhausted in the latest observation.",
       quotaObservedAt: "Observed at",
       quotaResetAt: "Observed reset time",
-      quotaResetIn: "Approximately",
-      quotaMinutes: "minutes remaining",
       quotaNoReset: "No reset time passed validation; this state automatically returns to unknown after a bounded interval.",
       modelsTitle: "Codex models in this installation",
-      modelsDescription: "Choose which Codex models appear in the model selector. For current catalog entries, names, context windows, and maximum output values come directly from the installed Codex provider catalog; capabilities omitted by the catalog are not inferred. Hidden models remain available to existing conversations that saved an exact model.",
+      modelsDescription: "Choose which Codex models appear in the model selector. Names, context windows, and maximum output values come from the installed provider catalog; hidden models do not affect existing conversations.",
       modelsContextWindow: "Context",
       modelsMaxOutput: "Max output",
       modelsLoading: "Reading the Codex model catalog…",
@@ -167,8 +178,11 @@ window.__ModuleLoader__.load({
       modelsSaving: "Saving…",
       modelsSaved: "Enabled models saved.",
       modelsAtLeastOne: "At least one Codex model must remain enabled.",
-      modelsAllEnabledFollow: "All current catalog models are enabled. Because the override has no additional model fields, saving will clear it and automatically enable future catalog additions.",
-      modelsAllEnabledPreserve: "All current catalog models are enabled. To preserve existing model parameters, saving will keep the current model list; future catalog additions will not be enabled automatically.",
+      modelsAllEnabledFollow: "All current catalog models are enabled. Saving clears the list override, so future models appear automatically.",
+      modelsAllEnabledPreserve: "All current catalog models are enabled. To preserve other model settings, saving fixes the current list and future models will not appear automatically.",
+      modelsShowMore: "Show {count} unselected models",
+      modelsCollapse: "Hide unselected models",
+      modelsSummary: "Selected {selected}/{total} · Showing {visible}/{total}",
       modelsRetry: "Reload",
       modelsLoadFailed: "Could not read the Codex model catalog.",
       modelsSaveFailed: "Could not save the enabled models.",
@@ -183,6 +197,23 @@ window.__ModuleLoader__.load({
       legacyReasoningRepairRetry: "Retry repair and set as future default",
       legacyReasoningRepairHelp: "This conversation saved an unsupported Off/Minimal level. Click to switch to this model's current default. Like using the model selector, this also saves it as the default model for future conversations.",
     }
+
+    const NAV_ICON_MARKER = "data-dsh-codex-community-nav-icon"
+    const NAV_ICON_STYLE_SELECTOR = 'style[data-plugin-nav-icon="dsh-codex-community"]'
+    const NAV_ICON_STATE_KEY = Symbol.for("dsh-codex-community.settings-nav-icon.v1")
+    const NAV_ICON_LABELS = new Set([zh.nav.trim(), en.nav.trim()])
+    const SETTINGS_DIALOG_SELECTOR = '[role="dialog"][aria-modal="true"]'
+    const SETTINGS_NAV_SELECTOR = `${SETTINGS_DIALOG_SELECTOR} > nav`
+    const SETTINGS_NAV_BUTTON_SELECTOR = `${SETTINGS_NAV_SELECTOR} button`
+    // settings.section has no icon slot in Harness 0.1.1-rc.2. This original code-brackets glyph is applied only to the unique Codex nav entry.
+    const CODE_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
+      <path d="M5.25 3.25 1.5 8l3.75 4.75M10.75 3.25 14.5 8l-3.75 4.75M9.25 2.5l-2.5 11" fill="none" stroke="black" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>`
+    const CODE_ICON_MASK = `data:image/svg+xml,${encodeURIComponent(CODE_ICON_SVG).replace(/[!'()*]/gu, (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`)}`
+    const NAV_ICON_CSS = [
+      `[${NAV_ICON_MARKER}]>svg:first-child{display:none!important}`,
+      `[${NAV_ICON_MARKER}]::before{content:"";width:16px;height:16px;flex:none;background:currentColor;-webkit-mask:url("${CODE_ICON_MASK}") center/contain no-repeat;mask:url("${CODE_ICON_MASK}") center/contain no-repeat}`,
+    ].join("")
 
     function createAuthorizationClient(connection) {
       const call = async (endpoint, payload, signal) => {
@@ -421,7 +452,9 @@ window.__ModuleLoader__.load({
         return { status: "unknown" }
       }
       if (value.resetAt === undefined) return { status: value.status, observedAt: value.observedAt }
-      if (!Number.isSafeInteger(value.resetAt) || value.resetAt <= now) return { status: "unknown" }
+      if (!Number.isSafeInteger(value.resetAt) || value.resetAt <= now || !Number.isFinite(new Date(value.resetAt).getTime())) {
+        return { status: "unknown" }
+      }
       return {
         status: value.status,
         observedAt: value.observedAt,
@@ -458,7 +491,7 @@ window.__ModuleLoader__.load({
       if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined
       if (typeof value.usedPercent !== "number" || !Number.isFinite(value.usedPercent) || value.usedPercent < 0 || value.usedPercent > 100) return undefined
       if (!Number.isSafeInteger(value.windowDurationMins) || value.windowDurationMins < 1 || value.windowDurationMins > 525_600) return undefined
-      if (!Number.isSafeInteger(value.resetsAt) || value.resetsAt < 0) return undefined
+      if (!Number.isSafeInteger(value.resetsAt) || value.resetsAt < 0 || !Number.isFinite(new Date(value.resetsAt).getTime())) return undefined
       return {
         usedPercent: value.usedPercent,
         windowDurationMins: value.windowDurationMins,
@@ -476,6 +509,65 @@ window.__ModuleLoader__.load({
       return `${window.windowDurationMins} ${t("quotaMinuteWindow")}`
     }
 
+    function formatResetDistance(resetsAt, t, now = Date.now()) {
+      if (!Number.isSafeInteger(resetsAt) || !Number.isSafeInteger(now) || resetsAt < 0 || now < 0) {
+        return t("quotaResetSoon")
+      }
+      const remaining = resetsAt - now
+      if (remaining <= 60_000) return t("quotaResetSoon")
+      let count
+      let unit
+      if (remaining < 60 * 60_000) {
+        count = Math.ceil(remaining / 60_000)
+        unit = t("quotaResetMinute")
+      } else if (remaining < 24 * 60 * 60_000) {
+        count = Math.ceil(remaining / (60 * 60_000))
+        unit = t("quotaResetHour")
+      } else {
+        count = Math.ceil(remaining / (24 * 60 * 60_000))
+        unit = t("quotaResetDay")
+      }
+      if (t("locale").toLowerCase().startsWith("zh")) {
+        return `${count} ${unit}${t("quotaResetSuffix")}`
+      }
+      return `${t("quotaResetPrefix")} ${count} ${unit}${count === 1 ? "" : "s"}`
+    }
+
+    function renderResetTime(resetsAt, t, { showExact = false, now = Date.now() } = {}) {
+      const exact = new Date(resetsAt).toLocaleString(t("locale"))
+      const relative = formatResetDistance(resetsAt, t, now)
+      const separator = t("locale").toLowerCase().startsWith("zh") ? "：" : ": "
+      const exactLabel = `${t("quotaResetsAt")}${separator}${exact}`
+      return h("time", {
+        dateTime: new Date(resetsAt).toISOString(),
+        title: exactLabel,
+        "aria-label": showExact ? exactLabel : `${relative} · ${exactLabel}`,
+      }, showExact ? exactLabel : relative)
+    }
+
+    function refreshIcon() {
+      return h("svg", {
+        className: "dshCodexRefreshIcon",
+        viewBox: "0 0 16 16",
+        fill: "none",
+        "aria-hidden": "true",
+        focusable: "false",
+      },
+      h("path", {
+        d: "M13.25 5.75A5.5 5.5 0 1 0 13.1 10.6",
+        stroke: "currentColor",
+        strokeWidth: "1.4",
+        strokeLinecap: "round",
+      }),
+      h("path", {
+        d: "M10.25 5.75h3v-3",
+        stroke: "currentColor",
+        strokeWidth: "1.4",
+        strokeLinecap: "round",
+        strokeLinejoin: "round",
+      }))
+    }
+
     function renderObservedQuota(quota, t) {
       if (quota.status === "recent-success") {
         return h(React.Fragment, null,
@@ -488,7 +580,9 @@ window.__ModuleLoader__.load({
           h("p", { className: "dshCodexMuted" }, `${t("quotaObservedAt")} · ${new Date(quota.observedAt).toLocaleString(t("locale"))}`),
           quota.resetAt === undefined
             ? h("p", { className: "dshCodexMuted" }, t("quotaNoReset"))
-            : h("p", { className: "dshCodexMuted" }, `${t("quotaResetAt")} · ${new Date(quota.resetAt).toLocaleString(t("locale"))} · ${t("quotaResetIn")} ${quota.remainingMinutes} ${t("quotaMinutes")}`))
+            : h("p", { className: "dshCodexMuted" },
+                `${t("quotaResetAt")} · `,
+                renderResetTime(quota.resetAt, t)))
       }
       return h(React.Fragment, null,
         h("p", { className: "dshCodexQuotaState dshCodexQuotaUnknown" }, t("quotaUnknown")),
@@ -496,6 +590,7 @@ window.__ModuleLoader__.load({
     }
 
     function renderAccountUsage(usage, t) {
+      const now = Date.now()
       return h(React.Fragment, null,
         ...usage.rateLimits.map((limit) => {
           const windows = [limit.primary, limit.secondary].filter((window) => window !== undefined)
@@ -504,26 +599,30 @@ window.__ModuleLoader__.load({
             : limit.limitName ?? limit.limitId
           return h("section", { key: limit.limitId, className: "dshCodexQuotaGroup" },
             h("p", { className: "dshCodexQuotaProduct" }, limitLabel),
-            ...windows.map((window) => {
-              const remaining = Math.max(0, Math.min(100, 100 - window.usedPercent))
-              const remainingText = percentText(remaining)
-              const usedText = percentText(window.usedPercent)
-              const label = usageWindowLabel(window, t)
-              return h("div", { key: `${limit.limitId}-${window.windowDurationMins}`, className: "dshCodexQuotaWindow" },
-                h("div", { className: "dshCodexQuotaWindowHeader" },
-                  h("span", null, label),
-                  h("strong", null, `${t("quotaRemaining")} ${remainingText}%`)),
-                h("progress", {
-                  max: 100,
-                  value: remaining,
-                  "aria-label": `${limitLabel} · ${label} · ${t("quotaRemaining")} ${remainingText}%`,
-                }),
-                h("div", { className: "dshCodexQuotaMeta" },
-                  h("span", null, `${t("quotaUsed")} ${usedText}%`),
-                  h("span", null, `${t("quotaResetsAt")}：${new Date(window.resetsAt).toLocaleString(t("locale"))}`)))
-            }))
+            h("div", { className: "dshCodexQuotaWindows" },
+              ...windows.map((window) => {
+                const remaining = Math.max(0, Math.min(100, 100 - window.usedPercent))
+                const remainingText = percentText(remaining)
+                const label = usageWindowLabel(window, t)
+                const resetDistance = window.resetsAt - now
+                const showExactReset = window.windowDurationMins === 300
+                  || (window.windowDurationMins === 10_080
+                    && resetDistance > 0
+                    && resetDistance < 24 * 60 * 60_000)
+                return h("div", { key: `${limit.limitId}-${window.windowDurationMins}`, className: "dshCodexQuotaWindow" },
+                  h("div", { className: "dshCodexQuotaWindowHeader" },
+                    h("span", null, label),
+                    h("strong", null, `${t("quotaRemaining")} ${remainingText}%`)),
+                  h("progress", {
+                    max: 100,
+                    value: remaining,
+                    "aria-label": `${limitLabel} · ${label} · ${t("quotaRemaining")} ${remainingText}%`,
+                  }),
+                  h("div", { className: "dshCodexQuotaMeta" },
+                    renderResetTime(window.resetsAt, t, { showExact: showExactReset, now })))
+              })))
         }),
-        h("p", { className: "dshCodexMuted dshCodexQuotaUpdated" }, `${t("quotaUpdatedAt")}：${new Date(usage.observedAt).toLocaleString(t("locale"))}`))
+        h("p", { className: "dshCodexMuted dshCodexQuotaUpdated" }, `${t("quotaUpdatedAt")}${t("locale").toLowerCase().startsWith("zh") ? "：" : ": "}${new Date(usage.observedAt).toLocaleString(t("locale"))}`))
     }
 
     function objectAtPath(root, path) {
@@ -1103,6 +1202,7 @@ window.__ModuleLoader__.load({
         h("section", {
           className: "dshCodexQuota",
           "data-quota-status": quota.status,
+          "aria-busy": usageSnapshot.status === "loading" ? "true" : undefined,
           "aria-live": "polite",
           "aria-labelledby": "dsh-codex-quota-title",
         },
@@ -1111,9 +1211,13 @@ window.__ModuleLoader__.load({
           h("button", {
             type: "button",
             className: "dshCodexButton dshCodexRefreshButton",
+            "data-loading": usageSnapshot.status === "loading" ? "true" : undefined,
+            "aria-busy": usageSnapshot.status === "loading" ? "true" : undefined,
             disabled: actionBusy || usageSnapshot.status === "loading",
             onClick: refresh,
-          }, t("refresh"))),
+          },
+          refreshIcon(),
+          h("span", null, usageSnapshot.status === "loading" ? t("refreshing") : t("refresh")))),
         liveUsage === undefined
           ? h("p", { className: "dshCodexQuotaProduct" }, t("quotaProduct"))
           : null,
@@ -1133,13 +1237,17 @@ window.__ModuleLoader__.load({
       const [saving, setSaving] = React.useState(false)
       const [saved, setSaved] = React.useState(false)
       const [failure, setFailure] = React.useState(null)
+      const [expanded, setExpanded] = React.useState(false)
       const generationRef = React.useRef(0)
       const mountedRef = React.useRef(false)
+      const modelToggleRef = React.useRef(null)
+      const focusModelToggleRef = React.useRef(false)
 
       const refresh = React.useCallback(async () => {
         const generation = ++generationRef.current
         setSaved(false)
         setFailure(null)
+        setExpanded(false)
         setSnapshot({ kind: "loading" })
         try {
           const next = await client.load()
@@ -1164,6 +1272,12 @@ window.__ModuleLoader__.load({
         }
       }, [client, refresh])
 
+      React.useEffect(() => {
+        if (!focusModelToggleRef.current) return
+        focusModelToggleRef.current = false
+        if (typeof modelToggleRef.current?.focus === "function") modelToggleRef.current.focus()
+      }, [expanded, selectedIds])
+
       const toggle = (id) => {
         const selected = selectedIds.includes(id)
         if (selected && selectedIds.length === 1) {
@@ -1172,6 +1286,7 @@ window.__ModuleLoader__.load({
         }
         setSaved(false)
         setFailure(null)
+        if (selected && !expanded) focusModelToggleRef.current = true
         setSelectedIds(selected
           ? selectedIds.filter((candidate) => candidate !== id)
           : [...selectedIds, id])
@@ -1204,6 +1319,7 @@ window.__ModuleLoader__.load({
       }
 
       let content
+      let modelSummary = null
       if (snapshot.kind === "loading") {
         content = h("p", { className: "dshCodexMuted", "aria-busy": "true" }, t("modelsLoading"))
       } else if (snapshot.kind === "unavailable") {
@@ -1223,7 +1339,17 @@ window.__ModuleLoader__.load({
         const original = new Set(snapshot.selectedIds)
         const dirty = selected.size !== original.size || [...selected].some((id) => !original.has(id))
         const plan = modelSavePlan(snapshot, selectedIds)
-        const modelItems = snapshot.models.map((model) => {
+        const selectedModels = snapshot.models.filter((model) => selected.has(model.id))
+        const unselectedModels = snapshot.models.filter((model) => !selected.has(model.id))
+        const hiddenModelCount = unselectedModels.length
+        const visibleModels = expanded
+          ? [...selectedModels, ...unselectedModels]
+          : selectedModels
+        modelSummary = t("modelsSummary")
+          .replace("{selected}", String(selected.size))
+          .replaceAll("{total}", String(snapshot.models.length))
+          .replace("{visible}", String(visibleModels.length))
+        const modelItems = visibleModels.map((model) => {
           const metadata = [
             ...(model.contextWindow === undefined
               ? []
@@ -1260,9 +1386,21 @@ window.__ModuleLoader__.load({
         content = h(React.Fragment, null,
           snapshot.writable ? null : h("p", { className: "dshCodexMuted" }, t("modelsReadOnly")),
           h("ul", {
+            id: "dsh-codex-model-list",
             className: "dshCodexModelList",
             "aria-labelledby": "dsh-codex-models-title",
           }, ...modelItems),
+          hiddenModelCount === 0 ? null : h("button", {
+            type: "button",
+            className: "dshCodexButton dshCodexModelToggle",
+            "aria-controls": "dsh-codex-model-list",
+            "aria-expanded": expanded ? "true" : "false",
+            ref: modelToggleRef,
+            disabled: saving,
+            onClick: () => setExpanded((current) => !current),
+          }, expanded
+            ? t("modelsCollapse")
+            : t("modelsShowMore").replace("{count}", String(hiddenModelCount))),
           plan.allCatalogSelected ? h("p", { className: "dshCodexMuted" }, t(plan.unsetOverride
             ? "modelsAllEnabledFollow"
             : "modelsAllEnabledPreserve")) : null,
@@ -1286,7 +1424,11 @@ window.__ModuleLoader__.load({
       return h("section", { className: "dshCodexPanel dshCodexCard dshCodexModelPanel" },
         h("header", { className: "dshCodexHeader" },
           h("div", null,
-            h("h3", { id: "dsh-codex-models-title" }, t("modelsTitle")),
+            h("div", { className: "dshCodexModelTitleRow" },
+              h("h3", { id: "dsh-codex-models-title" }, t("modelsTitle")),
+              modelSummary === null
+                ? null
+                : h("span", { className: "dshCodexModelSummary" }, modelSummary)),
             h("p", { className: "dshCodexWarning" }, t("modelsDescription")))),
         content)
     }
@@ -1304,6 +1446,7 @@ window.__ModuleLoader__.load({
 
     function apply(ctx) {
       ctx.effect(installStyle, "dsh-codex: client styles")
+      ctx.effect(installSettingsNavIcon, "dsh-codex: settings nav icon")
       ctx.effect(() => ctx.locale.register(NS, { zh, en }), "dsh-codex: client dictionaries")
       const t = ctx.locale.bind(NS)
       const client = createAuthorizationClient(ctx.connection)
@@ -1338,6 +1481,96 @@ window.__ModuleLoader__.load({
       })
     }
 
+    function installSettingsNavIcon() {
+      if (typeof document === "undefined" || typeof window === "undefined") return undefined
+      const Observer = typeof window.MutationObserver === "function"
+        ? window.MutationObserver
+        : typeof MutationObserver === "function" ? MutationObserver : undefined
+      if (!document.body || typeof document.querySelectorAll !== "function" || Observer === undefined) return undefined
+
+      const isInsideSettingsNav = (target) => {
+        const element = target?.nodeType === 1 ? target : target?.parentElement
+        return typeof element?.closest === "function" && element.closest(SETTINGS_NAV_SELECTOR) !== null
+      }
+      const matchesOrContains = (node, selector) => (
+        (typeof node?.matches === "function" && node.matches(selector))
+        || (typeof node?.querySelector === "function" && node.querySelector(selector) !== null)
+      )
+      const mutationTouchesSettingsNav = (records) => Array.from(records ?? []).some((record) => {
+        if (isInsideSettingsNav(record.target)) return true
+        return [...Array.from(record.addedNodes ?? []), ...Array.from(record.removedNodes ?? [])]
+          .some((node) => matchesOrContains(node, SETTINGS_DIALOG_SELECTOR) || matchesOrContains(node, SETTINGS_NAV_SELECTOR))
+      })
+      const enqueueMicrotask = typeof window.queueMicrotask === "function"
+        ? (callback) => window.queueMicrotask(callback)
+        : (callback) => Promise.resolve().then(callback)
+
+      let state = window[NAV_ICON_STATE_KEY]
+      if (state === undefined) {
+        let style = document.querySelector(NAV_ICON_STYLE_SELECTOR)
+        if (style === null) {
+          style = document.createElement("style")
+          style.dataset.pluginNavIcon = "dsh-codex-community"
+          document.head.appendChild(style)
+        }
+        style.dataset.plugin = "dsh-codex-community"
+        const clearMarkers = () => {
+          for (const button of document.querySelectorAll(`[${NAV_ICON_MARKER}]`)) button.removeAttribute(NAV_ICON_MARKER)
+        }
+        state = {
+          active: true,
+          refs: 0,
+          scheduled: false,
+          style,
+          clearMarkers,
+          scheduleSync() {
+            if (!state.active || state.scheduled) return
+            state.scheduled = true
+            enqueueMicrotask(() => {
+              state.scheduled = false
+              state.sync()
+            })
+          },
+          sync() {
+            if (!state.active) return
+            clearMarkers()
+            const candidates = []
+            for (const button of document.querySelectorAll(SETTINGS_NAV_BUTTON_SELECTOR)) {
+              const icon = button.firstElementChild
+              const labelElement = icon?.nextElementSibling
+              if (icon?.localName !== "svg" || labelElement?.localName !== "span") continue
+              const label = String(labelElement.textContent ?? "").replace(/\s+/gu, " ").trim()
+              if (NAV_ICON_LABELS.has(label)) candidates.push(button)
+            }
+            if (candidates.length === 1) candidates[0].setAttribute(NAV_ICON_MARKER, "")
+          },
+        }
+        state.observer = new Observer((records) => {
+          if (mutationTouchesSettingsNav(records)) state.scheduleSync()
+        })
+        state.observer.observe(document.body, { childList: true, subtree: true, characterData: true })
+        window[NAV_ICON_STATE_KEY] = state
+      }
+
+      state.refs += 1
+      state.style.textContent = NAV_ICON_CSS
+      state.sync()
+      let active = true
+      return () => {
+        if (!active) return
+        active = false
+        if (window[NAV_ICON_STATE_KEY] !== state) return
+        state.refs -= 1
+        if (state.refs > 0) return
+        state.active = false
+        state.observer.disconnect()
+        state.clearMarkers()
+        if (typeof state.style.remove === "function") state.style.remove()
+        else state.style.parentNode?.removeChild(state.style)
+        delete window[NAV_ICON_STATE_KEY]
+      }
+    }
+
     function installStyle() {
       if (typeof document === "undefined") return undefined
       let style = document.querySelector(`style[data-plugin-css="${STYLE_ID}"]`)
@@ -1348,15 +1581,15 @@ window.__ModuleLoader__.load({
         document.head.appendChild(style)
       }
       style.textContent = [
-        ".dshCodexPage{box-sizing:border-box;display:flex;width:100%;min-width:0;flex-direction:column;gap:14px;padding:6px 0 32px;color:var(--dsw-alias-label-primary);font:inherit}",
+        ".dshCodexPage{box-sizing:border-box;display:flex;width:100%;min-width:0;flex-direction:column;gap:12px;padding:4px 0 20px;color:var(--dsw-alias-label-primary);font:inherit}",
         ".dshCodexPage *{box-sizing:border-box}",
         ".dshCodexHero{display:flex;min-width:0;flex-direction:column;gap:8px}",
         ".dshCodexHero h2,.dshCodexHero p{margin:0}",
         ".dshCodexHero h2{font-size:16px;font-weight:500;line-height:24px}",
         ".dshCodexHero p{max-width:760px;color:var(--dsw-alias-label-tertiary);font-size:14px;line-height:22px}",
-        ".dshCodexPanel{display:flex;width:100%;min-width:0;color:var(--dsw-alias-label-primary);flex-direction:column;gap:14px}",
+        ".dshCodexPanel{display:flex;width:100%;min-width:0;color:var(--dsw-alias-label-primary);flex-direction:column;gap:12px}",
         ".dshCodexPanel p,.dshCodexPanel label{overflow-wrap:anywhere;word-break:break-word}",
-        ".dshCodexCard{border:1px solid var(--dsw-alias-border-l2);border-radius:18px;background:var(--dsw-alias-bg-module-platform,var(--dsw-alias-bg-layer-3));padding:20px}",
+        ".dshCodexCard{border:1px solid var(--dsw-alias-border-l2);border-radius:18px;background:var(--dsw-alias-bg-module-platform,var(--dsw-alias-bg-layer-3));padding:18px}",
         ".dshCodexHeader{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}",
         ".dshCodexHeader>div{min-width:0}",
         ".dshCodexHeader h3,.dshCodexHeader p,.dshCodexNotices p,.dshCodexQuota p{margin:0}",
@@ -1368,7 +1601,7 @@ window.__ModuleLoader__.load({
         ".dshCodexStatus[data-state=active] .dshCodexStatusDot{background:var(--dsw-alias-state-success-primary)}",
         ".dshCodexStatus[data-state=invalid] .dshCodexStatusDot{background:var(--dsw-alias-state-error-primary)}",
         ".dshCodexStatus[data-state=busy] .dshCodexStatusDot{background:var(--dsw-alias-state-business-primary)}",
-        ".dshCodexQuota{display:flex;min-width:0;flex-direction:column;gap:10px;border-top:1px solid var(--dsw-alias-border-l2);padding-top:18px}",
+        ".dshCodexQuota{display:flex;min-width:0;flex-direction:column;gap:10px;border-top:1px solid var(--dsw-alias-border-l2);padding-top:16px}",
         ".dshCodexQuotaHeader{display:flex;min-width:0;align-items:center;justify-content:space-between;gap:12px}",
         ".dshCodexQuota h3{margin:0;font-size:16px;font-weight:500;line-height:24px}",
         ".dshCodexQuotaProduct{font-size:14px;font-weight:500;line-height:22px}",
@@ -1377,25 +1610,29 @@ window.__ModuleLoader__.load({
         ".dshCodexQuotaUnknown::before{background:var(--dsw-alias-label-tertiary)}",
         ".dshCodexQuotaExhausted::before{background:var(--dsw-alias-state-error-primary)}",
         ".dshCodexQuotaExhausted{color:var(--dsw-alias-state-error-primary)}",
-        ".dshCodexQuotaGroup{display:flex;min-width:0;flex-direction:column;gap:10px}",
+        ".dshCodexQuotaGroup{display:flex;min-width:0;flex-direction:column;gap:8px}",
         ".dshCodexQuotaGroup+.dshCodexQuotaGroup{border-top:1px solid var(--dsw-alias-border-l2);padding-top:14px}",
-        ".dshCodexQuotaWindow{display:flex;min-width:0;flex-direction:column;gap:7px}",
-        ".dshCodexQuotaWindow+.dshCodexQuotaWindow{margin-top:4px}",
+        ".dshCodexQuotaWindows{display:grid;min-width:0;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}",
+        ".dshCodexQuotaWindow{display:flex;min-width:0;flex-direction:column;gap:8px;border:1px solid var(--dsw-alias-border-l2);border-radius:12px;background:var(--dsw-alias-bg-layer-1);padding:11px 12px}",
         ".dshCodexQuotaWindowHeader,.dshCodexQuotaMeta{display:flex;min-width:0;align-items:center;justify-content:space-between;gap:12px}",
         ".dshCodexQuotaWindowHeader{font-size:14px;line-height:22px}",
-        ".dshCodexQuotaWindowHeader strong{font-weight:400;color:var(--dsw-alias-label-secondary)}",
-        ".dshCodexQuotaMeta{color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:18px}",
+        ".dshCodexQuotaWindowHeader strong{font-weight:500;color:var(--dsw-alias-label-secondary)}",
+        ".dshCodexQuotaMeta{justify-content:flex-end;color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:18px}",
+        ".dshCodexQuotaMeta time{cursor:help}",
         ".dshCodexQuotaWindow progress{display:block;width:100%;height:8px;overflow:hidden;border:0;border-radius:999px;appearance:none;-webkit-appearance:none;background:var(--dsw-alias-bg-layer-1)}",
         ".dshCodexQuotaWindow progress::-webkit-progress-bar{border-radius:999px;background:var(--dsw-alias-bg-layer-1)}",
         ".dshCodexQuotaWindow progress::-webkit-progress-value{border-radius:999px;background:var(--dsw-alias-state-business-primary)}",
         ".dshCodexQuotaWindow progress::-moz-progress-bar{border-radius:999px;background:var(--dsw-alias-state-business-primary)}",
-        ".dshCodexQuotaUpdated{margin-top:2px!important}",
         ".dshCodexMuted{color:var(--dsw-alias-label-tertiary);font-size:14px;line-height:22px}",
+        ".dshCodexQuota .dshCodexQuotaUpdated{margin-top:2px;color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:18px}",
         ".dshCodexWarning{max-width:820px;color:var(--dsw-alias-label-secondary);font-size:14px;line-height:22px}",
         ".dshCodexActions{display:flex;min-width:0;flex-wrap:wrap;gap:8px}",
         ".dshCodexAuthActions{margin-left:auto;justify-content:flex-end}",
         ".dshCodexAuthActions .dshCodexButton{height:36px;min-height:36px;border-radius:18px;padding:0 14px;font-size:14px;line-height:22px}",
-        ".dshCodexQuotaHeader .dshCodexRefreshButton{min-height:28px;border:none;border-radius:14px;background:transparent;color:var(--dsw-alias-label-tertiary);padding:0 10px;font-size:12px;line-height:18px}",
+        ".dshCodexQuotaHeader .dshCodexRefreshButton{display:inline-flex;min-height:30px;align-items:center;gap:6px;border:1px solid var(--dsw-alias-border-l2);border-radius:15px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-secondary);padding:0 10px;font-size:12px;line-height:18px;white-space:nowrap}",
+        ".dshCodexRefreshIcon{width:14px;height:14px;flex:none}",
+        ".dshCodexRefreshButton[data-loading=true] .dshCodexRefreshIcon{animation:dshCodexRefreshSpin .8s linear infinite}",
+        "@keyframes dshCodexRefreshSpin{to{transform:rotate(360deg)}}",
         ".dshCodexButton{box-sizing:border-box;max-width:100%;white-space:normal;overflow-wrap:anywhere;word-break:break-word;border:1px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit;cursor:pointer;padding:8px 14px;transition:background-color .15s ease,border-color .15s ease}",
         ".dshCodexButton:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover,var(--dsw-alias-bg-layer-2))}",
         ".dshCodexButton:focus-visible,.dshCodexModelOption:has(input:focus-visible){outline:2px solid var(--dsw-alias-brand-primary,var(--dsw-alias-border-l3));outline-offset:2px}",
@@ -1411,19 +1648,23 @@ window.__ModuleLoader__.load({
         ".dshCodexLegacyRepair:disabled{cursor:not-allowed;opacity:.55}",
         ".dshCodexPrimary{border-color:var(--dsw-alias-button-primary-fill,var(--dsw-alias-state-business-primary));background:var(--dsw-alias-button-primary-fill,var(--dsw-alias-state-business-primary));color:var(--dsw-alias-label-primary-foreground,#fff)}",
         ".dshCodexPrimary:hover:not(:disabled){background:var(--dsw-alias-button-primary-hover,var(--dsw-alias-state-business-primary))}",
-        ".dshCodexModelList{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:36px;row-gap:8px;margin:0;padding:0;list-style:none}",
-        ".dshCodexModelOption{display:flex;min-width:0;align-items:flex-start;gap:12px;border-radius:10px;padding:10px 8px;cursor:pointer;transition:background-color .15s ease}",
+        ".dshCodexModelList{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:0;padding:0;list-style:none}",
+        ".dshCodexModelTitleRow{display:flex;min-width:0;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:4px 12px}",
+        ".dshCodexModelSummary{color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:18px;white-space:nowrap}",
+        ".dshCodexModelOption{display:flex;min-width:0;height:100%;align-items:flex-start;gap:10px;border:1px solid var(--dsw-alias-border-l2);border-radius:11px;background:var(--dsw-alias-bg-layer-1);padding:9px 10px;cursor:pointer;transition:background-color .15s ease,border-color .15s ease}",
         ".dshCodexModelOption:hover{background:var(--dsw-alias-interactive-bg-hover,var(--dsw-alias-bg-layer-2))}",
+        ".dshCodexModelOption[data-selected=true]{border-color:var(--dsw-alias-state-business-primary)}",
         ".dshCodexModelOption:has(input:disabled){cursor:not-allowed;opacity:.65}",
         ".dshCodexModelOption:has(input:disabled):hover{background:transparent}",
         ".dshCodexModelOption input{width:18px;height:18px;flex:none;margin:2px 0 0;accent-color:var(--dsw-alias-state-business-primary)}",
-        ".dshCodexModelCopy{display:flex;min-width:0;flex:1;flex-direction:column;gap:7px}",
-        ".dshCodexModelHeading{display:flex;min-width:0;flex-direction:column;gap:1px}",
+        ".dshCodexModelCopy{display:flex;min-width:0;flex:1;flex-direction:column;gap:5px}",
+        ".dshCodexModelHeading{display:flex;min-width:0;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:1px 8px}",
         ".dshCodexModelOption strong{overflow-wrap:anywhere;font-size:14px;font-weight:500;line-height:22px}",
         ".dshCodexModelId{overflow-wrap:anywhere;color:var(--dsw-alias-label-tertiary);font-family:inherit;font-size:12px;line-height:18px}",
         ".dshCodexModelCapabilities{display:flex;min-width:0;flex-wrap:wrap;gap:6px}",
-        ".dshCodexModelBadge{display:inline-flex;align-items:center;border-radius:999px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-secondary);font-family:inherit;font-size:12px;line-height:18px;padding:2px 8px}",
-        ".dshCodexModelActions{justify-content:flex-end;border-top:1px solid var(--dsw-alias-border-l2);padding-top:20px}",
+        ".dshCodexModelBadge{display:inline-flex;align-items:center;border-radius:999px;background:var(--dsw-alias-bg-layer-2,var(--dsw-alias-bg-module-platform));color:var(--dsw-alias-label-secondary);font-family:inherit;font-size:12px;line-height:18px;padding:1px 7px}",
+        ".dshCodexModelToggle{align-self:center;border-radius:999px;padding:6px 12px;font-size:12px;line-height:18px}",
+        ".dshCodexModelActions{justify-content:flex-end;border-top:1px solid var(--dsw-alias-border-l2);padding-top:16px}",
         ".dshCodexNotices{display:flex;min-width:0;flex-direction:column;gap:10px;margin:0;padding:0;list-style:none}",
         ".dshCodexNotices li,.dshCodexPrompt{box-sizing:border-box;min-width:0;border:1px solid var(--dsw-alias-border-l2);border-radius:12px;background:var(--dsw-alias-bg-layer-1);padding:14px 16px}",
         ".dshCodexNotices a{display:inline-block;max-width:100%;margin-top:8px;color:var(--dsw-alias-state-business-primary)}",
@@ -1434,9 +1675,10 @@ window.__ModuleLoader__.load({
         ".dshCodexPrompt input,.dshCodexPrompt select{box-sizing:border-box;width:100%;min-width:0;height:38px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit;padding:0 10px}",
         ".dshCodexError{margin:0;color:var(--dsw-alias-state-error-primary);font-size:12px;line-height:18px}",
         ".dshCodexSuccess{margin:0;color:var(--dsw-alias-state-success-primary);font-size:12px;line-height:18px}",
-        "@media(max-width:760px){.dshCodexModelList{grid-template-columns:1fr}.dshCodexModelActions{justify-content:flex-start}}",
+        "@media(prefers-reduced-motion:reduce){.dshCodexRefreshButton[data-loading=true] .dshCodexRefreshIcon{animation:none}}",
+        "@media(max-width:760px){.dshCodexQuotaWindows,.dshCodexModelList{grid-template-columns:1fr}.dshCodexModelActions{justify-content:flex-start}}",
         "@media(max-width:640px){.dshCodexAuthToolbar,.dshCodexHeader{align-items:stretch;flex-direction:column}.dshCodexAuthActions{margin-left:0;justify-content:flex-start}}",
-        "@media(max-width:480px){.dshCodexPage{gap:12px;padding:0 0 24px}.dshCodexCard{border-radius:14px;padding:16px}.dshCodexQuotaWindowHeader,.dshCodexQuotaMeta{align-items:flex-start;flex-direction:column;gap:2px}.dshCodexActions{align-items:stretch;flex-direction:column}.dshCodexButton{width:100%}}",
+        "@media(max-width:480px){.dshCodexPage{gap:10px;padding:0 0 16px}.dshCodexCard{border-radius:14px;padding:16px}.dshCodexActions{align-items:stretch;flex-direction:column}.dshCodexButton{width:100%}.dshCodexQuotaHeader .dshCodexRefreshButton{width:auto}.dshCodexQuotaWindowHeader{gap:8px}}",
       ].join("")
       const references = style[STYLE_REF_KEY]
       style[STYLE_REF_KEY] = Number.isSafeInteger(references) && references > 0
@@ -1468,7 +1710,9 @@ window.__ModuleLoader__.load({
     exports.createAuthorizationClient = createAuthorizationClient
     exports.createModelEnablementClient = createModelEnablementClient
     exports.createSessionPreferenceClient = createSessionPreferenceClient
+    exports.formatResetDistance = formatResetDistance
     exports.inject = inject
+    exports.installSettingsNavIcon = installSettingsNavIcon
     exports.safeQuotaSnapshot = safeQuotaSnapshot
     return module.exports
   },
