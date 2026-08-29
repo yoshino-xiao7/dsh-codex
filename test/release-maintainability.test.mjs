@@ -4,7 +4,9 @@ import test from "node:test"
 
 import {
   assertReleaseVersion,
+  compareReleaseVersions,
   releaseDocumentPaths,
+  releaseVersionHasBuildMetadata,
 } from "../scripts/release-version.mjs"
 
 async function readText(url) {
@@ -24,6 +26,31 @@ test("release versions start at 0.0.1 and remain future-version compatible", () 
   for (const version of ["0.0.0", "00.0.1", "0.01.0", "1.0", "v1.0.0", "1.0.0-"]) {
     assert.throws(() => assertReleaseVersion(version), /release version/u)
   }
+})
+
+test("release version ordering follows SemVer precedence", () => {
+  const ordered = [
+    "0.0.1-alpha",
+    "0.0.1-alpha.1",
+    "0.0.1-alpha.beta",
+    "0.0.1-beta",
+    "0.0.1-beta.2",
+    "0.0.1-beta.11",
+    "0.0.1-rc.1",
+    "0.0.1",
+    "0.0.2",
+  ]
+  for (let index = 1; index < ordered.length; index += 1) {
+    assert.equal(compareReleaseVersions(ordered[index - 1], ordered[index]), -1)
+    assert.equal(compareReleaseVersions(ordered[index], ordered[index - 1]), 1)
+  }
+  assert.equal(compareReleaseVersions("1.0.0+build.1", "1.0.0+build.2"), 0)
+  assert.equal(
+    compareReleaseVersions("99999999999999999999.0.0", "100000000000000000000.0.0"),
+    -1,
+  )
+  assert.equal(releaseVersionHasBuildMetadata("1.0.0+build.1"), true)
+  assert.equal(releaseVersionHasBuildMetadata("1.0.0"), false)
 })
 
 test("release document paths follow the current package version", () => {

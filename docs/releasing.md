@@ -13,6 +13,14 @@
 5. 合并前让 CI 在 Linux、macOS、Windows 通过；
 6. 用受控测试账号完成本版本要求的真实验收，不能把 token、OAuth code、Cookie 或账号凭据写入记录。
 
+可以用离线准备脚本建立下一版本的发布骨架：
+
+```sh
+pnpm run release:prepare -- 0.0.2
+```
+
+它只创建或补齐 `package.json` 版本、双语 `CHANGELOG.md` 草稿、双语 Release 草稿和全新的 schema v3 draft 验收记录。脚本幂等，不访问 Git 或网络，也不会伪造日期、提交或通过证据；已有有效人工内容不会被覆盖，任何冲突都会在写入前失败。README、兼容性文档、lockfile、发布分支、提交和标签仍需人工处理。
+
 ## 两级门禁
 
 普通 CI 使用草稿模式。它允许 `TBD` 和 `pending`，但会检查版本、双语 Release 结构及验收记录结构，因此未发布版本可以持续集成：

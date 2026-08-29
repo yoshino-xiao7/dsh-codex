@@ -13,6 +13,14 @@ Versioning begins at `0.0.1`. The `0.0.x` line is a technical preview, and every
 5. require green Linux, macOS, and Windows CI before merge;
 6. use a controlled test account for required real acceptance without recording tokens, OAuth codes, cookies, or account credentials.
 
+Use the offline preparation script to establish the next release skeleton:
+
+```sh
+pnpm run release:prepare -- 0.0.2
+```
+
+It only creates or completes the `package.json` version, bilingual `CHANGELOG.md` draft, bilingual Release draft, and a fresh schema v3 draft acceptance record. The script is idempotent, accesses neither Git nor the network, and never fabricates dates, commits, or passing evidence. Existing valid human-authored content is preserved, and any conflict fails before writing. The README, compatibility documents, lockfiles, release branch, commit, and tag still require manual handling.
+
 ## Two gate levels
 
 Regular CI uses draft mode. It permits `TBD` and `pending`, while checking the version, bilingual Release structure, and acceptance-record shape so unreleased work remains continuously testable:

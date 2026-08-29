@@ -22,6 +22,7 @@ This project follows the Keep a Changelog structure; `0.0.x` is a technical prev
 - 冻结的 DSH 兼容性 smoke 运行时夹具，提交独立 `pnpm-lock.yaml` 并在 CI、兼容性监测与发布候选中使用 `--frozen-lockfile --ignore-scripts` 安装。
 - 发布候选在 Web/profile smoke 成功后记录 DSH 版本、夹具 lock SHA-256、Node、pnpm、平台、架构与生命周期脚本状态，并由严格门禁重新验证。
 - 中英文文档、社区治理、Issue/PR、跨平台 CI，以及最小权限、SHA 固定、离线确定性 SBOM 和可恢复重跑的发布流程。
+- 幂等且离线的 `release:prepare` 命令，用于生成下一版本的双语 CHANGELOG/Release 草稿和全新 schema v3 验收记录；它会保护人工内容、在冲突发生时写入前失败，并拒绝受管文件或父目录符号链接。
 
 #### 修复
 
@@ -56,6 +57,7 @@ This project follows the Keep a Changelog structure; `0.0.x` is a technical prev
 - A frozen DSH compatibility-smoke runtime fixture with its own committed `pnpm-lock.yaml`, installed through `--frozen-lockfile --ignore-scripts` in CI, compatibility monitoring, and release candidates.
 - Release candidates record the DSH version, fixture-lock SHA-256, Node, pnpm, platform, architecture, and lifecycle-script state only after Web/profile smoke succeeds, and the strict gate re-verifies them.
 - Chinese and English documentation, governance, issue/PR templates, cross-platform CI, and a least-privilege release flow with pinned Actions, an offline deterministic SBOM, and recoverable reruns.
+- An idempotent offline `release:prepare` command that creates the next bilingual CHANGELOG/Release drafts and a fresh schema-v3 acceptance record, preserves human-authored content, fails before writing on conflicts, and rejects managed-file or parent-directory symlinks.
 
 #### Fixed
 

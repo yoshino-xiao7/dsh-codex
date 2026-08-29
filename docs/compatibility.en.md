@@ -10,7 +10,7 @@ Last updated: 2026-08-29.
 | pi-ai | OAuth, catalog, Codex payload, and replay contract tests against `@earendil-works/pi-ai@0.82.1` | Public contract verified; real sign-in pending |
 | Node.js | Complete local suite on `22.22.2`; [CI run 33224023141](https://github.com/yoshino-xiao7/dsh-codex/actions/runs/33224023141) covers 22 and 24 on all three operating systems | `>=22.19.0 <25` |
 | macOS arm64 | Local tests, build, attachment seam, and isolated profile startup; `macos-latest` CI passes on Node 22 and 24 | Local and CI automation verified |
-| Windows x64 | `windows-latest` CI on Node 22 and 24 completes the frozen DSH install, 299 checks, release-draft verification, exact-candidate install, and disposable Web/profile startup | CI automation verified; real user environment pending |
+| Windows x64 | `windows-latest` CI on Node 22 and 24 completes the frozen DSH install, 314 checks, release-draft verification, exact-candidate install, and disposable Web/profile startup | CI automation verified; real user environment pending |
 | Linux x64 | `ubuntu-latest` CI on Node 22 and 24 completes the same checks and Web/profile smoke | CI automation verified |
 | Real ChatGPT OAuth login | Automation does not read or modify a user's real grant | Controlled acceptance pending |
 | Real Codex conversation | Automation does not consume user account quota | Controlled acceptance pending |

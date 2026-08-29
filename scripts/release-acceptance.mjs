@@ -55,6 +55,36 @@ export const LIVE_ACCEPTANCE_ASSERTIONS = Object.freeze({
   ]),
 })
 
+export function createDraftAcceptanceRecord(version) {
+  const record = {
+    schemaVersion: 3,
+    version,
+    releaseStatus: "draft",
+    testedCommit: "TBD",
+    approvedBy: "TBD",
+    approvedAt: "TBD",
+    approvalEvidenceUrl: "TBD",
+    platforms: Object.fromEntries(PLATFORM_NAMES.map((platform) => [platform, {
+      status: "pending",
+      testedAt: "TBD",
+      runner: "TBD",
+      nodeVersion: "TBD",
+      dshVersion: SUPPORTED_DSH_VERSION,
+      profileSmoke: "pending",
+      evidenceUrl: "TBD",
+    }])),
+    liveAcceptance: Object.fromEntries(Object.entries(LIVE_ACCEPTANCE_ASSERTIONS)
+      .map(([check, assertionNames]) => [check, {
+        status: "pending",
+        testedAt: "TBD",
+        evidenceUrl: "TBD",
+        assertions: Object.fromEntries(assertionNames.map((assertionName) => [assertionName, false])),
+      }])),
+  }
+  assertAcceptanceRecord(record, { version })
+  return record
+}
+
 const ROOT_KEYS = Object.freeze([
   "approvalEvidenceUrl",
   "approvedAt",

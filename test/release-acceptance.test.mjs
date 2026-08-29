@@ -4,6 +4,7 @@ import test from "node:test"
 
 import {
   assertAcceptanceRecord,
+  createDraftAcceptanceRecord,
   LIVE_ACCEPTANCE_ASSERTIONS,
 } from "../scripts/release-acceptance.mjs"
 
@@ -16,6 +17,22 @@ test("draft acceptance enumerates every release-critical live capability", () =>
     Object.keys(draft.liveAcceptance).sort(),
     Object.keys(LIVE_ACCEPTANCE_ASSERTIONS).sort(),
   )
+})
+
+test("new release acceptance starts from a fresh schema-v3 draft", () => {
+  const generated = createDraftAcceptanceRecord("0.0.2")
+  assert.doesNotThrow(() => assertAcceptanceRecord(generated, { version: "0.0.2" }))
+  assert.equal(generated.releaseStatus, "draft")
+  assert.equal(generated.testedCommit, "TBD")
+  for (const platform of Object.values(generated.platforms)) {
+    assert.equal(platform.status, "pending")
+    assert.equal(platform.profileSmoke, "pending")
+    assert.equal(platform.dshVersion, "0.1.1-rc.2")
+  }
+  for (const result of Object.values(generated.liveAcceptance)) {
+    assert.equal(result.status, "pending")
+    assert.ok(Object.values(result.assertions).every((value) => value === false))
+  }
 })
 
 test("obsolete acceptance schemas cannot omit reasoning, tools, or replay", () => {
