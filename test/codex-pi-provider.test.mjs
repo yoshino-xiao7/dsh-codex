@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 
+import { getSupportedThinkingLevels } from "@earendil-works/pi-ai"
 import { openaiCodexProvider } from "@earendil-works/pi-ai/providers/openai-codex"
 
 import { createCodexPiProvider } from "../src/internal/codex-pi-provider.mjs"
@@ -22,8 +23,8 @@ function fakeAccessToken() {
   return `e30.${payload}.probe`
 }
 
-async function capturePayload(provider, options = {}) {
-  const model = provider.getModels().find((candidate) => candidate.id === "gpt-5.4")
+async function capturePayload(provider, options = {}, modelId = "gpt-5.4") {
+  const model = provider.getModels().find((candidate) => candidate.id === modelId)
     ?? provider.getModels()[0]
   let captured
   const stream = provider.streamSimple(model, CONTEXT, {
@@ -58,7 +59,12 @@ test("keeps the published Codex provider catalog and OAuth owner", () => {
   assert.equal(typeof wrapped.auth.oauth?.login, "function")
   assert.equal(typeof wrapped.auth.oauth?.refresh, "function")
   assert.equal(typeof wrapped.auth.oauth?.toAuth, "function")
-  assert.deepEqual(wrapped.getModels(), published.getModels())
+  assert.deepEqual(
+    wrapped.getModels().map(({ thinkingLevelMap: _thinkingLevelMap, ...model }) => model),
+    published.getModels().map(({ thinkingLevelMap: _thinkingLevelMap, ...model }) => model),
+  )
+  assert.ok(wrapped.getModels().every((model) => model.thinkingLevelMap.off === null))
+  assert.ok(wrapped.getModels().every((model) => model.thinkingLevelMap.minimal === null))
 })
 
 test("defaults to the published streamSimple payload without a service tier", async () => {
@@ -97,6 +103,34 @@ test("resolves Fast per session and changes only service_tier", async () => {
   assert.deepEqual(seen, ["session-fast"])
   assert.equal(actual.service_tier, "priority")
   assert.deepEqual(withoutTier, expected)
+})
+
+test("enables Fast only for the officially supported GPT-5.4, GPT-5.5, and GPT-5.6 families", async () => {
+  const wrapped = createCodexPiProvider({
+    resolveSessionPreferences: () => ({ fast: true, transport: "sse" }),
+  })
+
+  for (const modelId of ["gpt-5.4", "gpt-5.5", "gpt-5.6-sol"]) {
+    const payload = await capturePayload(wrapped, {}, modelId)
+    assert.equal(payload.service_tier, "priority", modelId)
+  }
+  for (const modelId of ["gpt-5.3-codex-spark", "gpt-5.4-mini"]) {
+    const payload = await capturePayload(wrapped, {}, modelId)
+    assert.equal(payload.service_tier, undefined, modelId)
+  }
+})
+
+test("keeps only verified plain Codex reasoning levels", async () => {
+  const wrapped = createCodexPiProvider()
+
+  for (const model of wrapped.getModels()) {
+    const levels = getSupportedThinkingLevels(model)
+    assert.equal(levels.includes("off"), false, model.id)
+    assert.equal(levels.includes("minimal"), false, model.id)
+  }
+
+  const max = await capturePayload(wrapped, { reasoning: "max" }, "gpt-5.6-sol")
+  assert.equal(max.reasoning?.effort, "max")
 })
 
 test("keeps preference lookup on the DSH id and namespaces only pi-ai transport state", async () => {

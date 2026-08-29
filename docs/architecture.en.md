@@ -8,16 +8,17 @@ This plugin registers the Codex route, settings namespace, OAuth flow, session p
 
 ```text
 DSH Web settings ── loopback RPC ── AuthorizationBridge
-                                           │
-                              dsh-codex/openai-codex
-                                           │
-                              CodexCredentialStore
-                                           │
-                                  ChatGPT OAuth grant
+        │                                  │
+        │ page entry / manual refresh      │
+        ▼                                  ▼
+AccountUsageReader ─────────────── CodexCredentialStore
+        │                                  │
+        ▼                                  ▼
+Codex Web usage endpoint           ChatGPT OAuth grant
 
 Harness Agent Loop
         │
-        ├── SessionPreferences ── Fast / transport
+        ├── SessionPreferences ── lightning button, Fast / transport
         │
         ▼
 StreamResilience ── CodexRouteAdapter (`dsh-codex`)
@@ -48,15 +49,21 @@ The Host starts, cancels, and observes sign-in through the DSH authorization ser
 
 `/codex-login status|cancel|logout` uses the same boundary and prevents command input from entering conversation history.
 
+## AccountUsageReader
+
+Whenever the settings page mounts or the user clicks Refresh, the Host-side `AccountUsageReader` uses the current OAuth grant to request the Web-backend usage compatibility endpoint used by the official Codex client. It strictly parses used percentages, window durations, and reset times, then converts the five-hour and weekly windows into a minimal credential-free snapshot. Access tokens, refresh tokens, account IDs, raw responses, and arbitrary response headers never cross the loopback RPC.
+
+This endpoint is treated as a Web-backend compatibility boundary, not as a stable plugin public API. Requests have timeout, response-size, and numeric-range limits. A network failure, authentication failure, or schema change is never rendered as zero remaining usage and does not erase the latest verified reading. When no live reading can be retained, the page safely falls back to recent-request `QuotaObserver` state or “unknown” instead of inferring usage.
+
 ## SessionPreferences
 
-`/codex` changes only the session that receives the command:
+The lightning button to the left of the model selector and `/codex` update the same current-session state:
 
-- `fast on|off` controls whether the priority service tier is requested and defaults to off;
+- the lightning button or `fast on|off` controls whether the Fast priority service tier is requested and defaults to off;
 - `transport` accepts `auto`, `sse`, `websocket`, or `websocket-cached` and defaults to `auto`;
 - `reset` restores that session's defaults.
 
-Preferences live in a capacity-bounded in-memory table that returns immutable snapshots; they do not change global provider settings. A failed Fast request is not replayed automatically on another service tier, avoiding duplicate tool side effects. Real account entitlement for this tier must be confirmed by release acceptance.
+Preferences live in a capacity-bounded in-memory table that returns immutable snapshots; they do not change global provider settings and return to their defaults after a process restart. Fast applies only to GPT-5.4, GPT-5.5, GPT-5.6 Luna, Sol, and Terra, using the official priority service tier to target 1.5× speed while consuming more usage. Other models never carry that tier. A toggle affects the next request, not one already in flight. A failed Fast request is not replayed automatically on another service tier, avoiding duplicate tool side effects.
 
 The raw DSH session ID is used only for preference lookup and message/replay provenance. The transport/cache session ID passed to pi-ai is namespaced with `dsh-codex:`. `/codex reset`, `agent/disposed`, and runtime disposal use pi-ai's public exact-session APIs to clear only this plugin's WebSocket connection, fallback, and debug state. They never invoke no-argument global cleanup and do not affect sessions owned by another in-process pi-ai consumer. The namespace enters only pi-ai stream options; it does not rewrite history messages or replay envelopes.
 
@@ -65,6 +72,8 @@ The raw DSH session ID is used only for preference lookup and message/replay pro
 This plugin's settings page uses `llm.discoverModels` to display requestable models from the current pi-ai catalog and stores its selection under the `dsh-codex` settings namespace. The runtime registers only a direct discovery handler for that namespace, not a general configurable-provider directory, avoiding interference with DSH's general model editor.
 
 The settings page requires at least one selected model. Selecting all removes the `models` override only when entries have no custom fields, allowing the directory to follow pi-ai version updates. Partial selections, extra fields, and custom parameters retain explicit configuration. Catalog filtering affects discovery only; exact hidden models remain resolvable, so older sessions are not invalidated merely because a model is hidden.
+
+Model names, context windows, and input capabilities come from the installed provider catalog and are not presented as a dynamic account directory. `CodexRouteAdapter` projects reasoning controls from the verified subscription-Codex model catalog: it removes generic `Default`, `Off`, and `Minimal` entries, supplies each model's default, and exposes only Low through Max, which the Provider request layer can represent truthfully. Codex `Ultra` combines the highest plain reasoning level with proactive task delegation and is therefore an Agent orchestration mode. This plugin neither sends a fabricated `ultra` wire value nor silently degrades it to `Max`. Unknown models receive no inferred controls, and the route boundary rejects direct injection of an unverified effort.
 
 ## ImagePolicy
 
@@ -80,7 +89,7 @@ Each plugin instance runs at most two remote-image jobs and queues at most 32; a
 
 `QUOTA`, `QUOTA_OR_RATE_LIMIT`, and confirmed transport failures are rebuilt as minimal failures containing a fixed sanitized message, code, and optional valid HTTP status/safe-character request ID. Arbitrary provider fields and WebSocket close reasons are never reflected. `QUOTA_OR_RATE_LIMIT` is not written to `QuotaObserver`: it fails without retry when no partial output exists and only preserves already safe plain text when partial output exists.
 
-`QuotaObserver` records only successful completion, `QUOTA`, and a reset timestamp accepted by strict format and bounded-horizon checks. Snapshots have three states: `unknown`, `recent-success`, and `exhausted`. It does not poll an account, display a balance or percentage, or call undocumented plan-quota endpoints.
+`QuotaObserver` records only successful completion, `QUOTA`, and a reset timestamp accepted by strict format and bounded-horizon checks. Snapshots have three states: `unknown`, `recent-success`, and `exhausted`. It neither polls an account nor displays a balance or percentage. Instead, it is the request-observation fallback when `AccountUsageReader` has no usable live snapshot; the two evidence types never masquerade as each other.
 
 ## StreamResilience
 

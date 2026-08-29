@@ -45,6 +45,7 @@ export class CodexAuthorizationBridge {
   #credentials
   #commitTracker
   #quotaObserver
+  #accountUsageReader
   #attempts = new Map()
   #closed = false
   #retentionMs
@@ -55,6 +56,7 @@ export class CodexAuthorizationBridge {
     this.#credentials = credentials
     this.#commitTracker = options.commitTracker
     this.#quotaObserver = options.quotaObserver
+    this.#accountUsageReader = options.accountUsageReader
     this.#retentionMs = options.retentionMs ?? ATTEMPT_RETENTION_MS
     this.#waitMs = options.waitMs ?? STATUS_WAIT_MS
   }
@@ -203,6 +205,15 @@ export class CodexAuthorizationBridge {
     return { signedOut: true }
   }
 
+  async usage(payload = {}, signal) {
+    const input = objectInput(payload)
+    assertOnlyKeys(input, [])
+    if (this.#accountUsageReader?.read === undefined) {
+      throw new RpcInputError("Codex account usage is unavailable")
+    }
+    return this.#accountUsageReader.read({ signal })
+  }
+
   dispatch(endpoint, payload, signal) {
     switch (endpoint) {
       case "status": return this.status(payload, signal)
@@ -210,6 +221,7 @@ export class CodexAuthorizationBridge {
       case "respond": return this.respond(payload)
       case "cancel": return this.cancel(payload)
       case "logout": return this.logout(payload)
+      case "usage": return this.usage(payload, signal)
       default: throw new RpcInputError("Unknown dsh-codex RPC endpoint")
     }
   }

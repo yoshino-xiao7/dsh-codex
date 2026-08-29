@@ -1,5 +1,6 @@
 import { PiAiAdapter } from "@deepseek-ai/dsh-llm-pi-ai"
 import { resolveRetryPolicy } from "@deepseek-ai/dsh-llm"
+import { createModels } from "@earendil-works/pi-ai"
 import {
   installSettingsSection,
   settingsNamespace,
@@ -7,6 +8,7 @@ import {
 import Schema from "@deepseek-ai/schemastery"
 
 import { registerCodexAuthorizationFlow } from "./codex-authorization.mjs"
+import { createCodexAccountUsageReader } from "./codex-account-usage.mjs"
 import {
   CODEX_PROVIDER_ID,
   createCodexCredentialStore,
@@ -141,6 +143,27 @@ export function installCodexProviderRuntime(ctx, entryConfig = {}, options = {})
     env: async () => undefined,
     fileExists: async () => false,
   })
+  const authModels = createModels({ credentials: credentialStore, authContext })
+  authModels.setProvider(provider)
+  const accountUsageReader = createCodexAccountUsageReader({
+    baseUrl: provider.baseUrl,
+    ...(options.accountUsageFetch === undefined ? {} : { fetch: options.accountUsageFetch }),
+    ...(options.accountUsageClock === undefined ? {} : { clock: options.accountUsageClock }),
+    resolveAuth: async ({ signal }) => {
+      if (signal.aborted) throw signal.reason
+      const resolved = await authModels.getAuth(provider.id)
+      if (signal.aborted) throw signal.reason
+      const credential = await credentialStore.read(provider.id)
+      if (
+        resolved?.auth?.apiKey === undefined
+        || credential?.type !== "oauth"
+        || resolved.auth.apiKey !== credential.access
+      ) {
+        throw new Error("Codex OAuth credential is unavailable")
+      }
+      return { access: credential.access, accountId: credential.accountId }
+    },
+  })
 
   let source = () => entry
   let previousConfig
@@ -211,7 +234,10 @@ export function installCodexProviderRuntime(ctx, entryConfig = {}, options = {})
     },
   })
 
-  return Object.freeze({ getConfig: () => source() })
+  return Object.freeze({
+    accountUsageReader,
+    getConfig: () => source(),
+  })
 }
 
 function configuredModels(configured, catalog) {

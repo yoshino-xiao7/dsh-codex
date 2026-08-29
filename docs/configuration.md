@@ -52,10 +52,32 @@ models:
 
 模型 ID 与能力随锁定的运行时目录变化。修改前请以设置页面发现的目录为准，不要从示例推断某个 ID 一定可用。
 
+## 模型能力与推理档位
+
+设置页展示的模型名称、上下文窗口和最大输出来自当前安装的 provider catalog，不是账号动态模型目录。会话模型选择器的推理档位和默认值按 Codex 一方模型目录逐模型核验，不沿用 pi-ai 的通用推理档位推断。当前映射如下：
+
+| 模型 | 可选推理档位 | 默认值 |
+| --- | --- | --- |
+| GPT-5.3 Codex Spark | Low、Medium、High、Xhigh | High |
+| GPT-5.4、GPT-5.4 mini、GPT-5.5 | Low、Medium、High、Xhigh | Medium |
+| GPT-5.6 Luna | Low、Medium、High、Xhigh、Max | Medium |
+| GPT-5.6 Sol | Low、Medium、High、Xhigh、Max | Low |
+| GPT-5.6 Terra | Low、Medium、High、Xhigh、Max | Medium |
+
+选择器不再显示并非订阅 Codex 目录档位的 `Default`、`Off` 或 `Minimal`。Codex 产品目录中的 `Ultra` 还会开启主动任务委派，并不是可由模型 Provider 单独发送的普通推理档位；本插件尚未接管 Harness 的 Agent 编排，因此不会把 `Ultra` 伪装成 `Max` 或任意 wire value。未来新增但尚未核验的模型仍可使用服务端默认推理行为，但不会得到插件推断出来的档位按钮。
+
+如果旧会话仍保存了 `Off` 或 `Minimal`，输入框旁会显示“修复旧推理档位”。插件不会在打开会话时静默改写选择；只有点击该按钮后，才会切换到该模型当前默认档位。该操作沿用 Harness 模型选择器的保存语义，因此也会把该模型保存为未来新会话的默认模型。
+
+## 会话 Fast 偏好
+
+会话模型选择器左侧的闪电按钮与 `/codex set fast on|off` 修改同一份当前会话偏好。GPT-5.4、GPT-5.5、GPT-5.6 Luna、Sol 和 Terra 开启后，从下一次请求起使用官方 Fast 的 priority service tier；关闭后，从下一次请求起恢复默认速度。Fast 目标速度为 1.5 倍，并会消耗更多额度。GPT-5.3 Codex Spark 与 GPT-5.4 mini 不会发送 Fast service tier。
+
+Fast 状态只保存在当前进程的当前会话中；进程重启后恢复关闭。传输偏好同样不持久化。正在进行的请求不会因切换而改变，也不会因 Fast 失败自动降级重放。
+
 ## 校验与生效
 
 - 省略或写成 `null` 的布尔值、枚举、超时和图片限制会回填各自默认值；`models: null` 不表示默认目录，应省略 `models`。
 - 类型错误、未知枚举、超出范围的普通数值、图片限制的小数，以及模型的未知或重复 ID 会在插件加载或设置保存时被拒绝；被拒绝的更新不会替换最后一次有效配置。
 - 只应使用上表列出的有限 JSON/YAML 数值。`NaN`、无穷值和未列出的字段不属于受支持的配置接口。
 - 配置更新从下一次适配器操作生效；正在进行的操作继续使用启动时捕获的不可变配置快照。
-- `/codex` 的 Fast 与传输偏好是当前进程、当前会话的临时状态，不是 bundle 配置键。
+- Fast 与传输偏好是当前进程、当前会话的临时状态，不是 bundle 配置键；既可通过 `/codex` 修改，也可通过模型选择器左侧的闪电按钮切换 Fast。

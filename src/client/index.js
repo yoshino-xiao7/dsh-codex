@@ -7,6 +7,7 @@ window.__ModuleLoader__.load({
     const h = React.createElement
 
     const CHANNEL = "/dsh-codex"
+    const SESSION_CHANNEL = "/dsh-codex-session"
     const NS = "settings.codex"
     const CODEX_PROVIDER = "dsh-codex"
     const CODEX_SETTINGS_NS = "dsh-codex"
@@ -47,10 +48,21 @@ window.__ModuleLoader__.load({
       logoutFailed: "退出登录失败，请重试。",
       responseFailed: "提交登录信息失败，请重试。",
       requestFailed: "暂时无法连接本机授权服务。",
+      locale: "zh-CN",
       quotaTitle: "使用额度",
       quotaProduct: "Codex",
-      quotaUnknown: "尚无可验证的额度观测。",
-      quotaUnknownHelp: "完成一次 Codex 请求后，此处会更新可验证状态；插件不会调用未公开的账户额度接口。",
+      quotaLoading: "正在读取账户额度…",
+      quotaLoadFailed: "暂时无法刷新账户额度。",
+      quotaStaleHelp: "继续显示上一次验证成功的数据。",
+      quotaUnknown: "尚无可验证的额度数据。",
+      quotaUnknownHelp: "登录后会在每次进入此页面和手动刷新时读取；读取失败时保留最近的安全观测。",
+      quotaFiveHour: "5 小时额度",
+      quotaWeekly: "每周额度",
+      quotaMinuteWindow: "分钟额度",
+      quotaRemaining: "剩余",
+      quotaUsed: "已使用",
+      quotaResetsAt: "重置时间",
+      quotaUpdatedAt: "数据更新时间",
       quotaRecentSuccess: "最近一次 Codex 请求成功",
       quotaSuccessCaution: "这只表示最近一次请求成功，不代表账户剩余额度。",
       quotaExhausted: "最近观测到 Codex 账户额度已用尽。",
@@ -59,8 +71,10 @@ window.__ModuleLoader__.load({
       quotaResetIn: "预计还有约",
       quotaMinutes: "分钟",
       quotaNoReset: "未获得通过校验的重置时间；状态会在有限时间后自动回到未知。",
-      modelsTitle: "模型选择器中显示的模型",
-      modelsDescription: "选择要在模型选择器中显示的 Codex 模型。隐藏后，已有会话中保存的精确模型仍可继续使用。",
+      modelsTitle: "当前安装的 Codex 模型",
+      modelsDescription: "选择要在模型选择器中显示的 Codex 模型。当前目录条目的名称、上下文窗口和最大输出直接来自当前安装的 Codex provider catalog，不推测目录未提供的能力；隐藏后，已有会话中保存的精确模型仍可继续使用。",
+      modelsContextWindow: "上下文",
+      modelsMaxOutput: "最大输出",
       modelsLoading: "正在读取 Codex 模型目录…",
       modelsUnavailable: "当前环境没有可用的 Codex 模型管理接口。",
       modelsReadOnly: "当前设置存储为只读，无法修改启用模型。",
@@ -74,6 +88,16 @@ window.__ModuleLoader__.load({
       modelsRetry: "重新读取",
       modelsLoadFailed: "读取 Codex 模型目录失败。",
       modelsSaveFailed: "保存模型启用设置失败。",
+      fastEnable: "启用 Fast（1.5×）",
+      fastDisable: "关闭 Fast，恢复默认速度",
+      fastUnsupported: "当前模型不支持 Fast（1.5×）",
+      fastLoading: "正在读取 Fast 状态",
+      fastUnavailable: "暂时无法读取 Fast 状态，点击重试",
+      legacyReasoningRepair: "修复并设为新会话默认模型",
+      legacyReasoningRepairing: "正在修复…",
+      legacyReasoningRepaired: "已修复并设为新会话默认模型",
+      legacyReasoningRepairRetry: "重试修复并设为新会话默认模型",
+      legacyReasoningRepairHelp: "旧会话保存了当前不支持的 Off/Minimal。点击后会切换到此模型当前默认档位；与模型选择器相同，此操作也会把该模型保存为未来新会话的默认模型。",
     }
     const en = {
       nav: "OpenAI Codex",
@@ -108,10 +132,21 @@ window.__ModuleLoader__.load({
       logoutFailed: "Could not sign out. Please try again.",
       responseFailed: "Could not submit the sign-in response. Please try again.",
       requestFailed: "The local authorization service is temporarily unavailable.",
+      locale: "en-US",
       quotaTitle: "Usage",
       quotaProduct: "Codex",
-      quotaUnknown: "No verifiable quota observation yet.",
-      quotaUnknownHelp: "This area updates after a Codex request; the plugin does not call undocumented account-quota endpoints.",
+      quotaLoading: "Reading account usage…",
+      quotaLoadFailed: "Account usage could not be refreshed.",
+      quotaStaleHelp: "The last successfully verified data remains visible.",
+      quotaUnknown: "No verifiable usage data is available yet.",
+      quotaUnknownHelp: "After sign-in, usage is read whenever this page opens and when you refresh it; the latest safe observation remains available if the read fails.",
+      quotaFiveHour: "5-hour limit",
+      quotaWeekly: "Weekly limit",
+      quotaMinuteWindow: "minute limit",
+      quotaRemaining: "Remaining",
+      quotaUsed: "Used",
+      quotaResetsAt: "Resets",
+      quotaUpdatedAt: "Data updated",
       quotaRecentSuccess: "The latest Codex request succeeded",
       quotaSuccessCaution: "This only describes the latest request; it does not represent remaining account quota.",
       quotaExhausted: "Codex account quota was exhausted in the latest observation.",
@@ -120,8 +155,10 @@ window.__ModuleLoader__.load({
       quotaResetIn: "Approximately",
       quotaMinutes: "minutes remaining",
       quotaNoReset: "No reset time passed validation; this state automatically returns to unknown after a bounded interval.",
-      modelsTitle: "Models shown in the model selector",
-      modelsDescription: "Choose which Codex models appear in the model selector. Hidden models remain available to existing conversations that saved an exact model.",
+      modelsTitle: "Codex models in this installation",
+      modelsDescription: "Choose which Codex models appear in the model selector. For current catalog entries, names, context windows, and maximum output values come directly from the installed Codex provider catalog; capabilities omitted by the catalog are not inferred. Hidden models remain available to existing conversations that saved an exact model.",
+      modelsContextWindow: "Context",
+      modelsMaxOutput: "Max output",
       modelsLoading: "Reading the Codex model catalog…",
       modelsUnavailable: "Codex model management is unavailable in this environment.",
       modelsReadOnly: "The settings store is read-only, so enabled models cannot be changed.",
@@ -135,6 +172,16 @@ window.__ModuleLoader__.load({
       modelsRetry: "Reload",
       modelsLoadFailed: "Could not read the Codex model catalog.",
       modelsSaveFailed: "Could not save the enabled models.",
+      fastEnable: "Enable Fast (1.5×)",
+      fastDisable: "Turn off Fast and restore standard speed",
+      fastUnsupported: "The current model does not support Fast (1.5×)",
+      fastLoading: "Reading Fast status",
+      fastUnavailable: "Fast status is temporarily unavailable; click to retry",
+      legacyReasoningRepair: "Repair and set as future default",
+      legacyReasoningRepairing: "Repairing…",
+      legacyReasoningRepaired: "Repaired and set as future default",
+      legacyReasoningRepairRetry: "Retry repair and set as future default",
+      legacyReasoningRepairHelp: "This conversation saved an unsupported Off/Minimal level. Click to switch to this model's current default. Like using the model selector, this also saves it as the default model for future conversations.",
     }
 
     function createAuthorizationClient(connection) {
@@ -164,7 +211,197 @@ window.__ModuleLoader__.load({
         }),
         cancel: (attemptId) => call("cancel", attemptId === undefined ? {} : { attemptId }),
         logout: () => call("logout", {}),
+        usage: (signal) => call("usage", {}, signal),
       })
+    }
+
+    function createSessionPreferenceClient(connection) {
+      const call = async (endpoint, payload, signal) => {
+        const result = await connection.rpc.call(SESSION_CHANNEL, endpoint, payload, signal)
+        if (!result.ok) {
+          const error = new Error(result.error.message)
+          error.code = result.error.code
+          throw error
+        }
+        return result.value
+      }
+      return Object.freeze({
+        forSession(sessionId) {
+          return Object.freeze({
+            get: (signal) => call("get", { sessionId }, signal),
+            setFast: (fast, signal) => call("set-fast", { sessionId, fast }, signal),
+          })
+        },
+      })
+    }
+
+    function supportsFastModel(modelId) {
+      return modelId === "gpt-5.4"
+        || modelId === "gpt-5.5"
+        || modelId === "gpt-5.6-luna"
+        || modelId === "gpt-5.6-sol"
+        || modelId === "gpt-5.6-terra"
+    }
+
+    function CodexFastToggle({
+      session,
+      useModelDirectory,
+      preferenceClient,
+      selectModel,
+      t,
+    }) {
+      const current = useModelDirectory((state) => state.current ?? null)
+      const [preference, setPreference] = React.useState({ status: "loading", fast: false })
+      const [repair, setRepair] = React.useState({ key: null, status: "idle" })
+      const mountedRef = React.useRef(false)
+      const generationRef = React.useRef(0)
+      const controllerRef = React.useRef(null)
+      const repairAttemptRef = React.useRef(null)
+      const isCodex = current?.provider === CODEX_PROVIDER
+      const supported = isCodex && supportsFastModel(current?.model)
+
+      const refreshPreference = React.useCallback(async () => {
+        if (!mountedRef.current || !isCodex) return
+        const generation = ++generationRef.current
+        controllerRef.current?.abort()
+        const controller = new AbortController()
+        controllerRef.current = controller
+        setPreference((value) => ({ status: "loading", fast: value.fast }))
+        try {
+          const value = await preferenceClient.get(controller.signal)
+          if (!mountedRef.current || generation !== generationRef.current || controller.signal.aborted) return
+          setPreference({ status: "ready", fast: value?.fast === true })
+        } catch {
+          if (!mountedRef.current || generation !== generationRef.current || controller.signal.aborted) return
+          setPreference((value) => ({ status: "error", fast: value.fast }))
+        } finally {
+          if (controllerRef.current === controller) controllerRef.current = null
+        }
+      }, [isCodex, preferenceClient])
+
+      React.useEffect(() => {
+        mountedRef.current = true
+        if (isCodex) void refreshPreference()
+        return () => {
+          mountedRef.current = false
+          generationRef.current += 1
+          controllerRef.current?.abort()
+          controllerRef.current = null
+        }
+      }, [isCodex, preferenceClient, refreshPreference])
+
+      const legacySelection = isCodex
+        && (current?.reasoningEffort === "off" || current?.reasoningEffort === "minimal")
+      const legacyKey = legacySelection ? `${current.model}:${current.reasoningEffort}` : null
+      const repairStatus = repair.key === legacyKey ? repair.status : "idle"
+
+      const repairLegacySelection = async () => {
+        if (
+          !mountedRef.current
+          || !legacySelection
+          || typeof selectModel !== "function"
+          || session?.removed === true
+          || repairStatus === "saving"
+          || repairStatus === "done"
+          || repairAttemptRef.current === legacyKey
+        ) return
+        const key = legacyKey
+        repairAttemptRef.current = key
+        setRepair({ key, status: "saving" })
+        try {
+          await selectModel({
+            provider: CODEX_PROVIDER,
+            model: current.model,
+          })
+          if (mountedRef.current) setRepair({ key, status: "done" })
+        } catch {
+          if (repairAttemptRef.current === key) repairAttemptRef.current = null
+          if (mountedRef.current) setRepair({ key, status: "error" })
+        }
+      }
+
+      const toggleFast = async () => {
+        if (!mountedRef.current || !supported || session?.removed === true) return
+        if (preference.status === "error") {
+          void refreshPreference()
+          return
+        }
+        if (preference.status !== "ready") return
+        const generation = ++generationRef.current
+        controllerRef.current?.abort()
+        const controller = new AbortController()
+        controllerRef.current = controller
+        const nextFast = !preference.fast
+        setPreference({ status: "saving", fast: preference.fast })
+        try {
+          const value = await preferenceClient.setFast(nextFast, controller.signal)
+          if (!mountedRef.current || generation !== generationRef.current || controller.signal.aborted) return
+          setPreference({ status: "ready", fast: value?.fast === true })
+        } catch {
+          if (!mountedRef.current || generation !== generationRef.current || controller.signal.aborted) return
+          setPreference({ status: "error", fast: preference.fast })
+        } finally {
+          if (controllerRef.current === controller) controllerRef.current = null
+        }
+      }
+
+      if (!isCodex) return null
+      const label = !supported
+        ? t("fastUnsupported")
+        : preference.status === "loading" || preference.status === "saving"
+          ? t("fastLoading")
+          : preference.status === "error"
+            ? t("fastUnavailable")
+            : preference.fast
+              ? t("fastDisable")
+              : t("fastEnable")
+      const disabled = !supported
+        || session?.removed === true
+        || preference.status === "loading"
+        || preference.status === "saving"
+
+      const fastButton = h("button", {
+        type: "button",
+        className: "dshCodexFastToggle",
+        "data-fast": preference.fast ? "true" : undefined,
+        "aria-label": label,
+        "aria-pressed": preference.fast,
+        "aria-busy": preference.status === "loading" || preference.status === "saving" ? "true" : undefined,
+        title: label,
+        disabled,
+        onClick: () => void toggleFast(),
+      }, h("svg", {
+        viewBox: "0 0 24 24",
+        width: 16,
+        height: 16,
+        fill: "none",
+        stroke: "currentColor",
+        strokeWidth: 2,
+        strokeLinecap: "round",
+        strokeLinejoin: "round",
+        "aria-hidden": "true",
+      }, h("path", { d: "M13 2 4.5 13h7L11 22l8.5-11h-7L13 2Z" })))
+
+      if (!legacySelection || typeof selectModel !== "function") return fastButton
+      const repairLabel = repairStatus === "saving"
+        ? t("legacyReasoningRepairing")
+        : repairStatus === "done"
+          ? t("legacyReasoningRepaired")
+          : repairStatus === "error"
+            ? t("legacyReasoningRepairRetry")
+            : t("legacyReasoningRepair")
+      return h(React.Fragment, null,
+        h("button", {
+          type: "button",
+          className: "dshCodexLegacyRepair",
+          "data-status": repairStatus,
+          "aria-label": repairLabel,
+          "aria-busy": repairStatus === "saving" ? "true" : undefined,
+          title: t("legacyReasoningRepairHelp"),
+          disabled: session?.removed === true || repairStatus === "saving" || repairStatus === "done",
+          onClick: () => void repairLegacySelection(),
+        }, repairLabel),
+        fastButton)
     }
 
     function resultValue(response) {
@@ -193,6 +430,102 @@ window.__ModuleLoader__.load({
       }
     }
 
+    function safeAccountUsage(value) {
+      if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined
+      if (!Number.isSafeInteger(value.observedAt) || value.observedAt < 0) return undefined
+      if (!Array.isArray(value.rateLimits) || value.rateLimits.length > 16) return undefined
+      const rateLimits = []
+      for (const candidate of value.rateLimits) {
+        if (typeof candidate !== "object" || candidate === null || Array.isArray(candidate)) continue
+        if (typeof candidate.limitId !== "string" || candidate.limitId.length < 1 || candidate.limitId.length > 128) continue
+        const primary = safeUsageWindow(candidate.primary)
+        const secondary = safeUsageWindow(candidate.secondary)
+        if (primary === undefined && secondary === undefined) continue
+        rateLimits.push({
+          limitId: candidate.limitId,
+          ...(typeof candidate.limitName === "string" && candidate.limitName.length > 0 && candidate.limitName.length <= 256
+            ? { limitName: candidate.limitName }
+            : {}),
+          ...(primary === undefined ? {} : { primary }),
+          ...(secondary === undefined ? {} : { secondary }),
+        })
+      }
+      if (rateLimits.length === 0) return undefined
+      return { observedAt: value.observedAt, rateLimits }
+    }
+
+    function safeUsageWindow(value) {
+      if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined
+      if (typeof value.usedPercent !== "number" || !Number.isFinite(value.usedPercent) || value.usedPercent < 0 || value.usedPercent > 100) return undefined
+      if (!Number.isSafeInteger(value.windowDurationMins) || value.windowDurationMins < 1 || value.windowDurationMins > 525_600) return undefined
+      if (!Number.isSafeInteger(value.resetsAt) || value.resetsAt < 0) return undefined
+      return {
+        usedPercent: value.usedPercent,
+        windowDurationMins: value.windowDurationMins,
+        resetsAt: value.resetsAt,
+      }
+    }
+
+    function percentText(value) {
+      return String(Math.round(value * 10) / 10)
+    }
+
+    function usageWindowLabel(window, t) {
+      if (window.windowDurationMins === 300) return t("quotaFiveHour")
+      if (window.windowDurationMins === 10_080) return t("quotaWeekly")
+      return `${window.windowDurationMins} ${t("quotaMinuteWindow")}`
+    }
+
+    function renderObservedQuota(quota, t) {
+      if (quota.status === "recent-success") {
+        return h(React.Fragment, null,
+          h("p", { className: "dshCodexQuotaState" }, `${t("quotaRecentSuccess")} · ${new Date(quota.observedAt).toLocaleString(t("locale"))}`),
+          h("p", { className: "dshCodexMuted" }, t("quotaSuccessCaution")))
+      }
+      if (quota.status === "exhausted") {
+        return h(React.Fragment, null,
+          h("p", { className: "dshCodexQuotaState dshCodexQuotaExhausted" }, t("quotaExhausted")),
+          h("p", { className: "dshCodexMuted" }, `${t("quotaObservedAt")} · ${new Date(quota.observedAt).toLocaleString(t("locale"))}`),
+          quota.resetAt === undefined
+            ? h("p", { className: "dshCodexMuted" }, t("quotaNoReset"))
+            : h("p", { className: "dshCodexMuted" }, `${t("quotaResetAt")} · ${new Date(quota.resetAt).toLocaleString(t("locale"))} · ${t("quotaResetIn")} ${quota.remainingMinutes} ${t("quotaMinutes")}`))
+      }
+      return h(React.Fragment, null,
+        h("p", { className: "dshCodexQuotaState dshCodexQuotaUnknown" }, t("quotaUnknown")),
+        h("p", { className: "dshCodexMuted" }, t("quotaUnknownHelp")))
+    }
+
+    function renderAccountUsage(usage, t) {
+      return h(React.Fragment, null,
+        ...usage.rateLimits.map((limit) => {
+          const windows = [limit.primary, limit.secondary].filter((window) => window !== undefined)
+          const limitLabel = limit.limitId === "codex"
+            ? t("quotaProduct")
+            : limit.limitName ?? limit.limitId
+          return h("section", { key: limit.limitId, className: "dshCodexQuotaGroup" },
+            h("p", { className: "dshCodexQuotaProduct" }, limitLabel),
+            ...windows.map((window) => {
+              const remaining = Math.max(0, Math.min(100, 100 - window.usedPercent))
+              const remainingText = percentText(remaining)
+              const usedText = percentText(window.usedPercent)
+              const label = usageWindowLabel(window, t)
+              return h("div", { key: `${limit.limitId}-${window.windowDurationMins}`, className: "dshCodexQuotaWindow" },
+                h("div", { className: "dshCodexQuotaWindowHeader" },
+                  h("span", null, label),
+                  h("strong", null, `${t("quotaRemaining")} ${remainingText}%`)),
+                h("progress", {
+                  max: 100,
+                  value: remaining,
+                  "aria-label": `${limitLabel} · ${label} · ${t("quotaRemaining")} ${remainingText}%`,
+                }),
+                h("div", { className: "dshCodexQuotaMeta" },
+                  h("span", null, `${t("quotaUsed")} ${usedText}%`),
+                  h("span", null, `${t("quotaResetsAt")}：${new Date(window.resetsAt).toLocaleString(t("locale"))}`)))
+            }))
+        }),
+        h("p", { className: "dshCodexMuted dshCodexQuotaUpdated" }, `${t("quotaUpdatedAt")}：${new Date(usage.observedAt).toLocaleString(t("locale"))}`))
+    }
+
     function objectAtPath(root, path) {
       let current = root
       for (const key of path) {
@@ -217,9 +550,26 @@ window.__ModuleLoader__.load({
         rows.push({
           id: candidate.id,
           ...(typeof candidate.name === "string" && candidate.name.length > 0 ? { name: candidate.name } : {}),
+          ...(Number.isSafeInteger(candidate.contextWindow) && candidate.contextWindow > 0
+            ? { contextWindow: candidate.contextWindow }
+            : {}),
+          ...(Number.isSafeInteger(candidate.maxTokens) && candidate.maxTokens > 0
+            ? { maxTokens: candidate.maxTokens }
+            : {}),
         })
       }
       return rows
+    }
+
+    function formatModelTokenCount(value, locale) {
+      const divisor = value >= 1_000_000 ? 1_000_000 : value >= 1_000 ? 1_000 : 1
+      const suffix = divisor === 1_000_000 ? "M" : divisor === 1_000 ? "K" : ""
+      const compact = value / divisor
+      try {
+        return `${compact.toLocaleString(locale, { maximumFractionDigits: 1 })}${suffix}`
+      } catch {
+        return `${Math.round(compact * 10) / 10}${suffix}`
+      }
     }
 
     function modelSavePlan(snapshot, selectedIds) {
@@ -340,6 +690,7 @@ window.__ModuleLoader__.load({
 
     function AuthorizationSettings({ client, t }) {
       const [snapshot, setSnapshot] = React.useState({ status: "loading" })
+      const [usageSnapshot, setUsageSnapshot] = React.useState({ status: "idle" })
       const [attempt, setAttempt] = React.useState(null)
       const [notices, setNotices] = React.useState([])
       const [prompt, setPrompt] = React.useState(null)
@@ -368,6 +719,29 @@ window.__ModuleLoader__.load({
           const value = await client.describe(controller.signal)
           if (!mountedRef.current || generation !== refreshGenerationRef.current || controller.signal.aborted) return
           setSnapshot({ status: "ready", value })
+          const credentialState = value?.credential?.state
+          const signedIn = credentialState === "signed-in"
+            || (credentialState === undefined && value?.credential?.configured === true)
+          if (!signedIn || typeof client.usage !== "function") {
+            setUsageSnapshot({ status: "idle" })
+            return
+          }
+          setUsageSnapshot((current) => ({
+            status: "loading",
+            ...(current.value === undefined ? {} : { value: current.value }),
+          }))
+          try {
+            const usage = safeAccountUsage(await client.usage(controller.signal))
+            if (usage === undefined) throw new Error("invalid account usage")
+            if (!mountedRef.current || generation !== refreshGenerationRef.current || controller.signal.aborted) return
+            setUsageSnapshot({ status: "ready", value: usage })
+          } catch {
+            if (!mountedRef.current || generation !== refreshGenerationRef.current || controller.signal.aborted) return
+            setUsageSnapshot((current) => ({
+              status: "error",
+              ...(current.value === undefined ? {} : { value: current.value }),
+            }))
+          }
         } catch {
           if (!mountedRef.current || generation !== refreshGenerationRef.current || controller.signal.aborted) return
           setSnapshot({ status: "error" })
@@ -381,9 +755,6 @@ window.__ModuleLoader__.load({
       React.useEffect(() => {
         mountedRef.current = true
         void refresh()
-        const timer = typeof window.setInterval === "function"
-          ? window.setInterval(() => void refresh(), 60_000)
-          : undefined
         return () => {
           mountedRef.current = false
           refreshGenerationRef.current += 1
@@ -396,7 +767,6 @@ window.__ModuleLoader__.load({
           attemptRef.current = null
           current?.controller.abort()
           if (current !== null && !current.done) void client.cancel(current.id).catch(() => undefined)
-          if (timer !== undefined) window.clearInterval(timer)
         }
       }, [client])
 
@@ -646,22 +1016,22 @@ window.__ModuleLoader__.load({
               onClick: () => void logout(),
             }, loggingOut ? t("signingOut") : t("signOut")) : null)
 
+      const liveUsage = usageSnapshot.value
       let quotaBody
-      if (quota.status === "recent-success") {
+      if (liveUsage !== undefined) {
         quotaBody = h(React.Fragment, null,
-          h("p", { className: "dshCodexQuotaState" }, `${t("quotaRecentSuccess")} · ${new Date(quota.observedAt).toLocaleString()}`),
-          h("p", { className: "dshCodexMuted" }, t("quotaSuccessCaution")))
-      } else if (quota.status === "exhausted") {
+          renderAccountUsage(liveUsage, t),
+          usageSnapshot.status === "error"
+            ? h("p", { role: "status", className: "dshCodexError" }, `${t("quotaLoadFailed")} ${t("quotaStaleHelp")}`)
+            : null)
+      } else if (usageSnapshot.status === "loading") {
+        quotaBody = h("p", { className: "dshCodexMuted", "aria-busy": "true" }, t("quotaLoading"))
+      } else if (usageSnapshot.status === "error") {
         quotaBody = h(React.Fragment, null,
-          h("p", { className: "dshCodexQuotaState dshCodexQuotaExhausted" }, t("quotaExhausted")),
-          h("p", { className: "dshCodexMuted" }, `${t("quotaObservedAt")} · ${new Date(quota.observedAt).toLocaleString()}`),
-          quota.resetAt === undefined
-            ? h("p", { className: "dshCodexMuted" }, t("quotaNoReset"))
-            : h("p", { className: "dshCodexMuted" }, `${t("quotaResetAt")} · ${new Date(quota.resetAt).toLocaleString()} · ${t("quotaResetIn")} ${quota.remainingMinutes} ${t("quotaMinutes")}`))
+          h("p", { role: "status", className: "dshCodexError" }, t("quotaLoadFailed")),
+          renderObservedQuota(quota, t))
       } else {
-        quotaBody = h(React.Fragment, null,
-          h("p", { className: "dshCodexQuotaState dshCodexQuotaUnknown" }, t("quotaUnknown")),
-          h("p", { className: "dshCodexMuted" }, t("quotaUnknownHelp")))
+        quotaBody = renderObservedQuota(quota, t)
       }
 
       return h("section", {
@@ -741,10 +1111,12 @@ window.__ModuleLoader__.load({
           h("button", {
             type: "button",
             className: "dshCodexButton dshCodexRefreshButton",
-            disabled: actionBusy,
+            disabled: actionBusy || usageSnapshot.status === "loading",
             onClick: refresh,
           }, t("refresh"))),
-        h("p", { className: "dshCodexQuotaProduct" }, t("quotaProduct")),
+        liveUsage === undefined
+          ? h("p", { className: "dshCodexQuotaProduct" }, t("quotaProduct"))
+          : null,
         quotaBody))
     }
 
@@ -851,20 +1223,40 @@ window.__ModuleLoader__.load({
         const original = new Set(snapshot.selectedIds)
         const dirty = selected.size !== original.size || [...selected].some((id) => !original.has(id))
         const plan = modelSavePlan(snapshot, selectedIds)
-        const modelItems = snapshot.models.map((model) => h("li", { key: model.id },
-          h("label", {
-            className: "dshCodexModelOption",
-            "data-selected": selected.has(model.id) ? "true" : undefined,
-          },
-            h("input", {
-              type: "checkbox",
-              checked: selected.has(model.id),
-              disabled: saving || !snapshot.writable,
-              onChange: () => toggle(model.id),
-            }),
-            h("span", null,
-              h("strong", null, model.name ?? model.id),
-              model.name === undefined || model.name === model.id ? null : h("code", null, model.id)))))
+        const modelItems = snapshot.models.map((model) => {
+          const metadata = [
+            ...(model.contextWindow === undefined
+              ? []
+              : [`${t("modelsContextWindow")} ${formatModelTokenCount(model.contextWindow, t("locale"))}`]),
+            ...(model.maxTokens === undefined
+              ? []
+              : [`${t("modelsMaxOutput")} ${formatModelTokenCount(model.maxTokens, t("locale"))}`]),
+          ]
+          return h("li", { key: model.id },
+            h("label", {
+              className: "dshCodexModelOption",
+              "data-selected": selected.has(model.id) ? "true" : undefined,
+            },
+              h("input", {
+                type: "checkbox",
+                checked: selected.has(model.id),
+                disabled: saving || !snapshot.writable,
+                onChange: () => toggle(model.id),
+              }),
+              h("span", { className: "dshCodexModelCopy" },
+                h("span", { className: "dshCodexModelHeading" },
+                  h("strong", null, model.name ?? model.id),
+                  model.name === undefined || model.name === model.id
+                    ? null
+                    : h("code", { className: "dshCodexModelId" }, model.id)),
+                metadata.length === 0
+                  ? null
+                  : h("span", { className: "dshCodexModelCapabilities" },
+                      ...metadata.map((label) => h("span", {
+                        key: label,
+                        className: "dshCodexModelBadge",
+                      }, label))))))
+        })
         content = h(React.Fragment, null,
           snapshot.writable ? null : h("p", { className: "dshCodexMuted" }, t("modelsReadOnly")),
           h("ul", {
@@ -915,6 +1307,7 @@ window.__ModuleLoader__.load({
       ctx.effect(() => ctx.locale.register(NS, { zh, en }), "dsh-codex: client dictionaries")
       const t = ctx.locale.bind(NS)
       const client = createAuthorizationClient(ctx.connection)
+      const sessionPreferenceClient = createSessionPreferenceClient(ctx.connection)
       const modelClient = createModelEnablementClient(ctx.connection, ctx.settingsScope?.describe?.())
       ctx.slots.inject("settings.section", () => ctx.slots.register({
         name: "settings.section",
@@ -924,6 +1317,25 @@ window.__ModuleLoader__.load({
         locale: NS,
         inject: () => ({ client, modelClient, t }),
       }, CodexSettings))
+      ctx.inject?.(["slots", "modelDirectories"], (scope) => {
+        scope.slots.inject("conversation.input.right", () => scope.slots.register({
+          name: "conversation.input.right",
+          id: "dsh-codex-fast",
+          order: 100,
+          locale: NS,
+          inject: (sessionId) => {
+            const directory = scope.modelDirectories.directoryFor(sessionId)
+            return {
+              preferenceClient: sessionPreferenceClient.forSession(sessionId),
+              selectModel: (selection) => directory.select(selection),
+              t,
+              hooks: {
+                modelDirectory: directory.store,
+              },
+            }
+          },
+        }, CodexFastToggle))
+      })
     }
 
     function installStyle() {
@@ -936,16 +1348,15 @@ window.__ModuleLoader__.load({
         document.head.appendChild(style)
       }
       style.textContent = [
-        "[role=dialog]:has(.dshCodexPage){width:min(1180px,calc(100vw - 48px))}",
-        ".dshCodexPage{box-sizing:border-box;display:flex;width:100%;max-width:1120px;min-width:0;flex-direction:column;gap:28px;padding:6px 0 40px;color:var(--dsw-alias-label-primary)}",
+        ".dshCodexPage{box-sizing:border-box;display:flex;width:100%;min-width:0;flex-direction:column;gap:14px;padding:6px 0 32px;color:var(--dsw-alias-label-primary);font:inherit}",
         ".dshCodexPage *{box-sizing:border-box}",
         ".dshCodexHero{display:flex;min-width:0;flex-direction:column;gap:8px}",
         ".dshCodexHero h2,.dshCodexHero p{margin:0}",
         ".dshCodexHero h2{font-size:16px;font-weight:500;line-height:24px}",
         ".dshCodexHero p{max-width:760px;color:var(--dsw-alias-label-tertiary);font-size:14px;line-height:22px}",
-        ".dshCodexPanel{display:flex;width:100%;min-width:0;max-width:none;color:var(--dsw-alias-label-primary);flex-direction:column;gap:18px}",
+        ".dshCodexPanel{display:flex;width:100%;min-width:0;color:var(--dsw-alias-label-primary);flex-direction:column;gap:14px}",
         ".dshCodexPanel p,.dshCodexPanel label{overflow-wrap:anywhere;word-break:break-word}",
-        ".dshCodexCard{border:1px solid var(--dsw-alias-border-l2);border-radius:18px;background:var(--dsw-alias-bg-module-platform,var(--dsw-alias-bg-layer-3));padding:clamp(24px,3vw,34px)}",
+        ".dshCodexCard{border:1px solid var(--dsw-alias-border-l2);border-radius:18px;background:var(--dsw-alias-bg-module-platform,var(--dsw-alias-bg-layer-3));padding:20px}",
         ".dshCodexHeader{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}",
         ".dshCodexHeader>div{min-width:0}",
         ".dshCodexHeader h3,.dshCodexHeader p,.dshCodexNotices p,.dshCodexQuota p{margin:0}",
@@ -957,7 +1368,7 @@ window.__ModuleLoader__.load({
         ".dshCodexStatus[data-state=active] .dshCodexStatusDot{background:var(--dsw-alias-state-success-primary)}",
         ".dshCodexStatus[data-state=invalid] .dshCodexStatusDot{background:var(--dsw-alias-state-error-primary)}",
         ".dshCodexStatus[data-state=busy] .dshCodexStatusDot{background:var(--dsw-alias-state-business-primary)}",
-        ".dshCodexQuota{display:flex;min-width:0;flex-direction:column;gap:10px;border-top:1px solid var(--dsw-alias-border-l2);padding-top:24px}",
+        ".dshCodexQuota{display:flex;min-width:0;flex-direction:column;gap:10px;border-top:1px solid var(--dsw-alias-border-l2);padding-top:18px}",
         ".dshCodexQuotaHeader{display:flex;min-width:0;align-items:center;justify-content:space-between;gap:12px}",
         ".dshCodexQuota h3{margin:0;font-size:16px;font-weight:500;line-height:24px}",
         ".dshCodexQuotaProduct{font-size:14px;font-weight:500;line-height:22px}",
@@ -966,6 +1377,19 @@ window.__ModuleLoader__.load({
         ".dshCodexQuotaUnknown::before{background:var(--dsw-alias-label-tertiary)}",
         ".dshCodexQuotaExhausted::before{background:var(--dsw-alias-state-error-primary)}",
         ".dshCodexQuotaExhausted{color:var(--dsw-alias-state-error-primary)}",
+        ".dshCodexQuotaGroup{display:flex;min-width:0;flex-direction:column;gap:10px}",
+        ".dshCodexQuotaGroup+.dshCodexQuotaGroup{border-top:1px solid var(--dsw-alias-border-l2);padding-top:14px}",
+        ".dshCodexQuotaWindow{display:flex;min-width:0;flex-direction:column;gap:7px}",
+        ".dshCodexQuotaWindow+.dshCodexQuotaWindow{margin-top:4px}",
+        ".dshCodexQuotaWindowHeader,.dshCodexQuotaMeta{display:flex;min-width:0;align-items:center;justify-content:space-between;gap:12px}",
+        ".dshCodexQuotaWindowHeader{font-size:14px;line-height:22px}",
+        ".dshCodexQuotaWindowHeader strong{font-weight:400;color:var(--dsw-alias-label-secondary)}",
+        ".dshCodexQuotaMeta{color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:18px}",
+        ".dshCodexQuotaWindow progress{display:block;width:100%;height:8px;overflow:hidden;border:0;border-radius:999px;appearance:none;-webkit-appearance:none;background:var(--dsw-alias-bg-layer-1)}",
+        ".dshCodexQuotaWindow progress::-webkit-progress-bar{border-radius:999px;background:var(--dsw-alias-bg-layer-1)}",
+        ".dshCodexQuotaWindow progress::-webkit-progress-value{border-radius:999px;background:var(--dsw-alias-state-business-primary)}",
+        ".dshCodexQuotaWindow progress::-moz-progress-bar{border-radius:999px;background:var(--dsw-alias-state-business-primary)}",
+        ".dshCodexQuotaUpdated{margin-top:2px!important}",
         ".dshCodexMuted{color:var(--dsw-alias-label-tertiary);font-size:14px;line-height:22px}",
         ".dshCodexWarning{max-width:820px;color:var(--dsw-alias-label-secondary);font-size:14px;line-height:22px}",
         ".dshCodexActions{display:flex;min-width:0;flex-wrap:wrap;gap:8px}",
@@ -976,6 +1400,15 @@ window.__ModuleLoader__.load({
         ".dshCodexButton:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover,var(--dsw-alias-bg-layer-2))}",
         ".dshCodexButton:focus-visible,.dshCodexModelOption:has(input:focus-visible){outline:2px solid var(--dsw-alias-brand-primary,var(--dsw-alias-border-l3));outline-offset:2px}",
         ".dshCodexButton:disabled{cursor:not-allowed;opacity:.5}",
+        ".dshCodexFastToggle{box-sizing:border-box;display:inline-flex;width:28px;height:28px;flex:none;align-items:center;justify-content:center;border:0;border-radius:999px;background:transparent;color:var(--dsw-alias-label-tertiary);font:inherit;cursor:pointer;padding:0;transition:background-color .15s ease,color .15s ease}",
+        ".dshCodexFastToggle:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover,var(--dsw-alias-bg-layer-2));color:var(--dsw-alias-label-primary)}",
+        ".dshCodexFastToggle[data-fast=true]{background:var(--dsw-alias-state-business-secondary,var(--dsw-alias-bg-layer-2));color:var(--dsw-alias-state-business-primary)}",
+        ".dshCodexFastToggle:focus-visible{outline:2px solid var(--dsw-alias-brand-primary,var(--dsw-alias-border-l3));outline-offset:2px}",
+        ".dshCodexFastToggle:disabled{cursor:not-allowed;opacity:.45}",
+        ".dshCodexLegacyRepair{box-sizing:border-box;display:inline-flex;min-width:0;height:28px;flex:none;align-items:center;border:1px solid var(--dsw-alias-border-l2);border-radius:14px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-state-warning-primary,var(--dsw-alias-label-secondary));font:inherit;font-size:12px;line-height:18px;cursor:pointer;padding:0 10px;white-space:nowrap}",
+        ".dshCodexLegacyRepair:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover,var(--dsw-alias-bg-layer-2))}",
+        ".dshCodexLegacyRepair:focus-visible{outline:2px solid var(--dsw-alias-brand-primary,var(--dsw-alias-border-l3));outline-offset:2px}",
+        ".dshCodexLegacyRepair:disabled{cursor:not-allowed;opacity:.55}",
         ".dshCodexPrimary{border-color:var(--dsw-alias-button-primary-fill,var(--dsw-alias-state-business-primary));background:var(--dsw-alias-button-primary-fill,var(--dsw-alias-state-business-primary));color:var(--dsw-alias-label-primary-foreground,#fff)}",
         ".dshCodexPrimary:hover:not(:disabled){background:var(--dsw-alias-button-primary-hover,var(--dsw-alias-state-business-primary))}",
         ".dshCodexModelList{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:36px;row-gap:8px;margin:0;padding:0;list-style:none}",
@@ -984,9 +1417,12 @@ window.__ModuleLoader__.load({
         ".dshCodexModelOption:has(input:disabled){cursor:not-allowed;opacity:.65}",
         ".dshCodexModelOption:has(input:disabled):hover{background:transparent}",
         ".dshCodexModelOption input{width:18px;height:18px;flex:none;margin:2px 0 0;accent-color:var(--dsw-alias-state-business-primary)}",
-        ".dshCodexModelOption span{display:flex;min-width:0;flex-wrap:wrap;align-items:baseline;column-gap:8px;row-gap:2px}",
+        ".dshCodexModelCopy{display:flex;min-width:0;flex:1;flex-direction:column;gap:7px}",
+        ".dshCodexModelHeading{display:flex;min-width:0;flex-direction:column;gap:1px}",
         ".dshCodexModelOption strong{overflow-wrap:anywhere;font-size:14px;font-weight:500;line-height:22px}",
-        ".dshCodexModelOption code{overflow-wrap:anywhere;color:var(--dsw-alias-label-tertiary);font-family:inherit;font-size:12px;line-height:18px}",
+        ".dshCodexModelId{overflow-wrap:anywhere;color:var(--dsw-alias-label-tertiary);font-family:inherit;font-size:12px;line-height:18px}",
+        ".dshCodexModelCapabilities{display:flex;min-width:0;flex-wrap:wrap;gap:6px}",
+        ".dshCodexModelBadge{display:inline-flex;align-items:center;border-radius:999px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-secondary);font-family:inherit;font-size:12px;line-height:18px;padding:2px 8px}",
         ".dshCodexModelActions{justify-content:flex-end;border-top:1px solid var(--dsw-alias-border-l2);padding-top:20px}",
         ".dshCodexNotices{display:flex;min-width:0;flex-direction:column;gap:10px;margin:0;padding:0;list-style:none}",
         ".dshCodexNotices li,.dshCodexPrompt{box-sizing:border-box;min-width:0;border:1px solid var(--dsw-alias-border-l2);border-radius:12px;background:var(--dsw-alias-bg-layer-1);padding:14px 16px}",
@@ -998,9 +1434,9 @@ window.__ModuleLoader__.load({
         ".dshCodexPrompt input,.dshCodexPrompt select{box-sizing:border-box;width:100%;min-width:0;height:38px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit;padding:0 10px}",
         ".dshCodexError{margin:0;color:var(--dsw-alias-state-error-primary);font-size:12px;line-height:18px}",
         ".dshCodexSuccess{margin:0;color:var(--dsw-alias-state-success-primary);font-size:12px;line-height:18px}",
-        "@media(max-width:760px){.dshCodexCard{padding:24px}.dshCodexModelList{grid-template-columns:1fr}.dshCodexModelActions{justify-content:flex-start}}",
+        "@media(max-width:760px){.dshCodexModelList{grid-template-columns:1fr}.dshCodexModelActions{justify-content:flex-start}}",
         "@media(max-width:640px){.dshCodexAuthToolbar,.dshCodexHeader{align-items:stretch;flex-direction:column}.dshCodexAuthActions{margin-left:0;justify-content:flex-start}}",
-        "@media(max-width:480px){[role=dialog]:has(.dshCodexPage){flex-direction:column}[role=dialog]:has(.dshCodexPage)>nav{box-sizing:border-box;width:100%;height:auto;flex:none;gap:0;overflow:hidden;padding:10px 12px 8px}[role=dialog]:has(.dshCodexPage)>nav>div:first-child{display:none}[role=dialog]:has(.dshCodexPage)>nav>div:last-child{display:flex;width:100%;flex-direction:row;gap:4px;overflow-x:auto;padding-bottom:2px}[role=dialog]:has(.dshCodexPage)>nav>div:last-child>*{flex:none}[role=dialog]:has(.dshCodexPage)>:not(nav){width:100%;min-width:0;min-height:0;overflow:hidden;flex:1 1 0%}.dshCodexPage{gap:20px;padding:0 0 28px}.dshCodexCard{border-radius:14px;padding:18px}.dshCodexActions{align-items:stretch;flex-direction:column}.dshCodexButton{width:100%}}",
+        "@media(max-width:480px){.dshCodexPage{gap:12px;padding:0 0 24px}.dshCodexCard{border-radius:14px;padding:16px}.dshCodexQuotaWindowHeader,.dshCodexQuotaMeta{align-items:flex-start;flex-direction:column;gap:2px}.dshCodexActions{align-items:stretch;flex-direction:column}.dshCodexButton{width:100%}}",
       ].join("")
       const references = style[STYLE_REF_KEY]
       style[STYLE_REF_KEY] = Number.isSafeInteger(references) && references > 0
@@ -1024,12 +1460,14 @@ window.__ModuleLoader__.load({
     exports.AuthorizationSettings = AuthorizationSettings
     exports.CHANNEL = CHANNEL
     exports.CODEX_PROVIDER = CODEX_PROVIDER
+    exports.CodexFastToggle = CodexFastToggle
     exports.CodexSettings = CodexSettings
     exports.ModelEnablementSettings = ModelEnablementSettings
     exports.NS = NS
     exports.apply = apply
     exports.createAuthorizationClient = createAuthorizationClient
     exports.createModelEnablementClient = createModelEnablementClient
+    exports.createSessionPreferenceClient = createSessionPreferenceClient
     exports.inject = inject
     exports.safeQuotaSnapshot = safeQuotaSnapshot
     return module.exports

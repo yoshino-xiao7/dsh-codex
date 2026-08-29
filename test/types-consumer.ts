@@ -10,13 +10,18 @@ import {
 import type { Config as HostConfig } from "dsh-codex-community"
 import {
   AuthorizationSettings,
+  CodexFastToggle,
   CodexSettings,
   createAuthorizationClient,
   createModelEnablementClient,
+  createSessionPreferenceClient,
 } from "dsh-codex-community/client"
 import type {
+  CodexAccountUsage,
   AuthorizationClient,
   RpcConnection,
+  SessionPreferenceClient,
+  UseCodexModelDirectory,
 } from "dsh-codex-community/client"
 import {
   inspectCodexFailure,
@@ -40,7 +45,22 @@ ConfigSchema(config)
 const client: AuthorizationClient = createAuthorizationClient(connection)
 const modelClient = createModelEnablementClient(connection)
 void client.describe()
+const accountUsage: Promise<CodexAccountUsage> = client.usage()
+const sessionPreferences = createSessionPreferenceClient(connection)
+const sessionPreference: SessionPreferenceClient = sessionPreferences.forSession("session-1")
+void sessionPreference.get()
+void sessionPreference.setFast(true)
+const useModelDirectory: UseCodexModelDirectory = (selector) => selector({
+  current: { provider: "dsh-codex", model: "gpt-5.6-sol" },
+})
 AuthorizationSettings({ client, t: (key) => key })
+CodexFastToggle({
+  session: { removed: false },
+  useModelDirectory,
+  preferenceClient: sessionPreference,
+  selectModel: async () => undefined,
+  t: (key) => key,
+})
 CodexSettings({ client, modelClient, t: (key) => key })
 
 const facts = inspectCodexFailure(failure)
@@ -57,5 +77,6 @@ void [
   quota.snapshot().status,
   normalized.changed,
   attachmentPolicy.maxPixels,
+  accountUsage,
   stream,
 ]

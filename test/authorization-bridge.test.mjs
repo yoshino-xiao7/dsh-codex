@@ -442,6 +442,54 @@ test("loopback RPC and explicit logout use only the public credentials deletion 
   effects[0]?.()
 })
 
+test("loopback RPC exposes only normalized account usage and sanitizes reader failures", async () => {
+  const secret = "usage-reader-secret-must-not-cross-rpc"
+  let receivedSignal
+  const dependencies = {
+    authorization: { describe: () => undefined, cancel: () => undefined },
+    credentials: {
+      describeRecord: async () => ({ configured: true, kind: "grant", writable: true }),
+      deleteRecord: async () => undefined,
+    },
+  }
+  const snapshot = {
+    observedAt: 1_787_973_000_000,
+    rateLimits: [{
+      limitId: "codex",
+      limitName: null,
+      primary: {
+        usedPercent: 12.5,
+        windowDurationMins: 300,
+        resetsAt: 1_787_991_000_000,
+      },
+    }],
+  }
+  const bridge = new CodexAuthorizationBridge(dependencies, {
+    accountUsageReader: {
+      async read({ signal }) {
+        receivedSignal = signal
+        return snapshot
+      },
+    },
+  })
+  const handler = createAuthorizationRpcHandler(bridge)
+  const signal = new AbortController().signal
+
+  assert.deepEqual(await handler("usage", {}, signal), { ok: true, value: snapshot })
+  assert.equal(receivedSignal, signal)
+  assert.equal((await handler("usage", { token: secret }, signal)).error.code, "bad-request")
+
+  const failedHandler = createAuthorizationRpcHandler(new CodexAuthorizationBridge(dependencies, {
+    accountUsageReader: { read: async () => { throw new Error(secret) } },
+  }))
+  const failed = await failedHandler("usage", {}, signal)
+  assert.deepEqual(failed, {
+    ok: false,
+    error: { code: "internal", message: "Authorization request failed", details: {} },
+  })
+  assert.doesNotMatch(JSON.stringify(failed), new RegExp(secret, "u"))
+})
+
 test("codex-login command records no input and returns only durable-safe bilingual summaries", async () => {
   let command
   const deleted = []

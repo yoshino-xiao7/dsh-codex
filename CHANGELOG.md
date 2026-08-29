@@ -3,6 +3,54 @@
 本项目遵循 Keep a Changelog 的结构；`0.0.x` 为技术预览。
 This project follows the Keep a Changelog structure; `0.0.x` is a technical preview.
 
+## [0.0.2] - 2026-08-29
+
+### 中文
+
+#### 新增
+
+- 设置页每次进入以及手动刷新时读取真实的五小时与每周额度；Host 通过官方 Codex 客户端使用的 Web 后端兼容接口获取并严格解析数据，Web 页面不会收到 OAuth 凭据或原始响应。
+- 会话模型选择器左侧新增闪电按钮，与 `/codex set fast on|off` 共用当前会话状态；GPT-5.4、GPT-5.5 和 GPT-5.6 系列可从下一次请求起切换官方 Fast 1.5 倍速。
+
+#### 变更
+
+- 额度刷新失败时不再伪装成零余额：保留最近一次已验证读数，或安全降级为最近请求观测/未知状态。
+- 模型展示元数据以当前安装的 provider catalog 为准；推理选择器改用逐模型核验的订阅 Codex 默认值与 Low 至 Max，隐藏通用 `Default`、`Off`、`Minimal`，且不把需要主动任务委派的 `Ultra` 伪装成普通 Provider 档位。
+- 模型卡片的上下文与最大输出改用 `272K`、`128K` 一类紧凑标签，不再展示冗长的原始 token 数字。
+- 保存了 `Off` 或 `Minimal` 的旧会话不再被静默迁移；只有用户点击带有默认模型影响说明的修复按钮后，才切换到当前模型默认档位。
+- Fast 仅在支持的 GPT-5.4、GPT-5.5 和 GPT-5.6 系列请求上发送 priority service tier，会消耗更多额度；关闭或开启均从下一次请求生效，进程重启后恢复关闭。
+- DSH profile smoke 改为核对新版模型设置标题，避免 UI 文案更新被误判为插件加载失败。
+
+### English
+
+#### Added
+
+- The settings page reads real five-hour and weekly usage limits whenever it opens or is refreshed manually. The Host obtains and strictly parses the data through the Web-backend compatibility endpoint used by the official Codex client; the Web page receives neither OAuth credentials nor raw responses.
+- A lightning button to the left of the conversation model selector shares current-session state with `/codex set fast on|off`. GPT-5.4, GPT-5.5, and the GPT-5.6 family can switch to official Fast at 1.5× starting with the next request.
+
+#### Changed
+
+- A failed usage refresh is no longer presented as zero remaining usage. The page retains the latest verified reading or safely falls back to recent-request observation/an unknown state.
+- Display metadata follows the installed provider catalog. The reasoning picker now uses model-specific subscription-Codex defaults and efforts from Low through Max, hides generic `Default`, `Off`, and `Minimal`, and does not disguise agent-level `Ultra` as a plain Provider effort.
+- Model cards format context and maximum output as compact labels such as `272K` and `128K` instead of long raw token counts.
+- Older conversations that saved `Off` or `Minimal` are no longer migrated silently. They switch to the current model default only after the user clicks a repair action that discloses its default-model effect.
+- Fast sends the priority service tier only for supported GPT-5.4, GPT-5.5, and GPT-5.6-family requests and consumes more usage. Enabling or disabling it applies to the next request, and a process restart restores off.
+- The DSH profile smoke now checks the current model-settings title so a UI copy update is not misreported as a plugin-load failure.
+
+## [Unreleased]
+
+### 中文
+
+#### 新增
+
+#### 变更
+
+### English
+
+#### Added
+
+#### Changed
+
 ## [0.0.1] - 2026-08-29
 
 ### 中文

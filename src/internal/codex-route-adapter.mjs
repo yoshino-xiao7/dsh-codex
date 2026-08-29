@@ -8,6 +8,10 @@ import {
   CODEX_PROVIDER_ID,
   CODEX_ROUTE_ID,
 } from "./codex-identifiers.mjs"
+import {
+  codexModelCapability,
+  supportsCodexReasoningEffort,
+} from "./codex-model-capabilities.mjs"
 
 export { CODEX_ROUTE_ID } from "./codex-identifiers.mjs"
 
@@ -73,10 +77,10 @@ export class CodexRouteAdapter extends LlmAdapter {
 
   async resolveModel(provider, model, signal) {
     this.#assertRoute(provider)
-    return {
+    return externalModelInfo({
       ...await this.delegate.resolveModel(CODEX_PROVIDER_ID, model, signal),
       provider: CODEX_ROUTE_ID,
-    }
+    })
   }
 
   async prepareCall(provider, model, signal) {
@@ -87,7 +91,10 @@ export class CodexRouteAdapter extends LlmAdapter {
       signal,
     )
     return Object.freeze({
-      model: Object.freeze({ ...prepared.model, provider: CODEX_ROUTE_ID }),
+      model: Object.freeze(externalModelInfo({
+        ...prepared.model,
+        provider: CODEX_ROUTE_ID,
+      })),
       stream: (options) => prepared.stream(this.#canonicalOptions(options)),
     })
   }
@@ -98,9 +105,20 @@ export class CodexRouteAdapter extends LlmAdapter {
 
   #canonicalOptions(options) {
     this.#assertRoute(options?.provider)
+    const reasoningEffort = options.reasoningEffort
+    if (
+      reasoningEffort !== undefined
+      && !supportsCodexReasoningEffort(options.model, reasoningEffort)
+    ) {
+      throw new LlmError(
+        `provider "${CODEX_ROUTE_ID}" model "${String(options.model)}" does not support reasoning effort "${String(reasoningEffort)}"`,
+        "UNSUPPORTED_REASONING_EFFORT",
+      )
+    }
     return {
       ...options,
       provider: CODEX_PROVIDER_ID,
+      ...(reasoningEffort === undefined ? {} : { reasoningEffort }),
       messages: options.messages.map(toCanonicalHistoryMessage),
     }
   }
@@ -112,6 +130,21 @@ export class CodexRouteAdapter extends LlmAdapter {
         "NO_ADAPTER",
       )
     }
+  }
+}
+
+function externalModelInfo(model) {
+  const capability = codexModelCapability(model.id)
+  if (capability === undefined) {
+    const { reasoning: _unverifiedReasoning, ...withoutReasoning } = model
+    return withoutReasoning
+  }
+  return {
+    ...model,
+    reasoning: {
+      efforts: capability.reasoningEfforts,
+      defaultEffort: capability.defaultReasoningEffort,
+    },
   }
 }
 

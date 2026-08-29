@@ -23,9 +23,15 @@
 - 在安全情况下保存已经显示的纯文本；
 - 不承诺通过换 transport 或重复请求绕过账户额度。
 
-设置页的“Codex 额度观测”和 `/codex-usage` 只显示最近请求产生的状态。它们不会主动查询账户，也不代表实时余额；reset 必须通过严格格式和有限时距校验，否则耗尽状态会在有限时间后回到“未知”。
+设置页每次进入以及手动点击“刷新”时，会由 Host 请求真实的五小时与每周使用窗口。`/codex-usage` 仍是最近请求产生的脱敏观测，用于实时读取不可用时的安全降级。failure 中的 reset 必须通过严格格式和有限时距校验，否则耗尽观测会在有限时间后回到“未知”。
 
 请等待重置、使用账户允许的其他模型/方案，或按 ChatGPT 账户页面提供的选项处理。不要在 Issue 中提交账户截图、token 或完整原始响应。
+
+## 五小时或每周额度无法刷新
+
+设置页通过官方 Codex 客户端使用的 Web 后端兼容接口读取额度，因此登录有效但网络、鉴权或接口结构变化仍可能让本次刷新失败。页面不会把失败显示成剩余 `0%`，也不会清空最近一次已验证读数；没有可保留读数时，只会显示最近请求观测或“未知”。
+
+先确认登录状态，再手动刷新一次。如果仍失败，请检查到 ChatGPT/Codex 服务的网络访问和系统时间，然后重新登录。报告问题时只提供插件版本、DSH 版本、发生时间和脱敏错误类别；不要提交 token、account ID、请求头或 usage 原始响应。
 
 ## `QUOTA_OR_RATE_LIMIT`
 
@@ -33,7 +39,17 @@ pi-ai 可能只返回通用的 ChatGPT usage-limit 文案，而不再提供原�
 
 ## Fast 不可用
 
-先运行 `/codex status` 确认当前会话是否开启 Fast。Fast 请求 priority service tier，但可用性取决于账号与服务端；插件不会把失败请求自动降级重放。可以运行 `/codex set fast off` 关闭当前会话的 Fast，再由用户决定是否重新发送请求。
+先确认当前选择的是 GPT-5.4、GPT-5.5、GPT-5.6 Luna、Sol 或 Terra；闪电按钮在 GPT-5.3 Codex Spark、GPT-5.4 mini 和未知模型上不可用，也不会发送 Fast service tier。点击模型选择器左侧的闪电按钮，或运行 `/codex status` 与 `/codex set fast on|off` 检查和修改当前会话状态。切换从下一次请求生效；进程重启后恢复关闭。
+
+Fast 使用官方 priority service tier，目标速度为 1.5 倍并消耗更多额度。插件不会把失败请求自动降级重放；关闭 Fast 后，需要由用户决定是否重新发送请求。
+
+## 模型或推理档位与预期不同
+
+设置页显示当前安装的 provider catalog，不是账号动态模型目录；推理选择器使用插件逐模型核验的订阅 Codex 档位与默认值。当前不会显示 `Default`、`Off` 或 `Minimal`。GPT-5.6 三款显示到 `Max`；Codex 客户端中的 `Ultra` 还会开启主动任务委派，本 Provider 尚未实现对应的 Harness Agent 编排，所以不会显示一个只有名字相同、行为却不完整的 `Ultra`。未知模型不会获得推断档位。
+
+旧会话若保存了 `Off` 或 `Minimal`，请点击输入框旁的“修复旧推理档位”。页面不会自动迁移；点击后会改用该模型当前默认档位，并像手动使用模型选择器一样，把该模型保存为未来新会话的默认模型。
+
+请先重新进入设置页并确认已启用目标模型，再检查当前安装的精确插件版本。不要根据旧截图或模型名称猜测能力；若 catalog 与选择器不一致，请提交脱敏后的模型 ID 和版本信息，不要附 OAuth 凭据。
 
 ## 回复到一半中断
 
@@ -44,4 +60,4 @@ pi-ai 可能只返回通用的 ChatGPT usage-limit 文案，而不再提供原�
 
 ## 登录后仍不可用
 
-先在 **设置 → Codex 登录** 确认登录状态，并在同一页面确认目标模型已启用，再从会话模型选择器的 `dsh-codex` provider 组中选用。不要把 ChatGPT OAuth bearer 当成 OpenAI Platform API key。若 refresh 失败，先在 Codex 登录页退出再重新登录；卸载包不会自动删除 grant。
+先在 **设置 → OpenAI Codex** 确认登录状态，并在同一页面确认目标模型已启用，再从会话模型选择器的 `dsh-codex` provider 组中选用。不要把 ChatGPT OAuth bearer 当成 OpenAI Platform API key。若 refresh 失败，先在该设置页退出再重新登录；卸载包不会自动删除 grant。
