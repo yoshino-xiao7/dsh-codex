@@ -8,10 +8,10 @@
 | --- | --- | --- |
 | DeepSeek Harness | `test/fixtures/dsh-runtime/pnpm-lock.yaml` 锁定完整 `@deepseek-ai/dsh@0.1.1-rc.2` runtime/peer 图，并验证 `dsh-llm` schema 与 stream contract | 精确版本已验证 |
 | pi-ai | `@earendil-works/pi-ai@0.82.1` 的 OAuth、模型目录、Codex payload 与 replay 合同测试 | 公开合同已验证；0.0.3 真实网络验收 `0/13 pending` |
-| Node.js | 本地 Node 22 完整测试；候选 CI 将覆盖 Node 22/24 | `>=22.19.0 <25`；三平台候选待运行 |
-| macOS | `macos-latest` Node 22/24 完整检查、冻结 DSH 安装与 Web/profile smoke | `0.0.3` 平台门禁待运行 |
-| Windows x64 | `windows-latest` Node 22/24 完整检查、冻结 DSH 安装与 Web/profile smoke | `0.0.3` 平台门禁待运行；真实用户环境待验收 |
-| Linux x64 | `ubuntu-latest` Node 22/24 完整检查、冻结 DSH 安装与 Web/profile smoke | `0.0.3` 平台门禁待运行 |
+| Node.js | 本地 `22.22.2` 完整测试；[0.0.3 三平台候选运行](https://github.com/yoshino-xiao7/dsh-codex/actions/runs/33248224386)覆盖 Node 22/24 | `>=22.19.0 <25`；候选运行通过 |
+| macOS | `macos-latest` Node 22/24 完整检查、冻结 DSH 安装与 Web/profile smoke | 平台门禁通过 |
+| Windows x64 | `windows-latest` Node 22/24 完整检查、冻结 DSH 安装与 Web/profile smoke | 平台门禁通过；真实用户环境待验收 |
+| Linux x64 | `ubuntu-latest` Node 22/24 完整检查、冻结 DSH 安装与 Web/profile smoke | 平台门禁通过 |
 | ChatGPT OAuth 真实登录 | 自动化不读取或修改用户真实 grant | 受控验收待完成 |
 | Codex 额度窗口 | 进入设置页和手动刷新都会通过 Host 主动读取并严格解析真实五小时与每周额度；本机 DSH 设置页已验证剩余比例、刷新状态、五小时精确时间和每周 24 小时阈值 | 本机已验证；读取失败时保留最近安全读数或降级为请求观测/未知状态 |
 | Codex 模型设置 | 安装目录字段、紧凑 `K` 标签、已选择优先与未选择折叠由 Web 客户端测试及本机中英文设置页覆盖 | 本机已验证；不推测目录未提供的能力 |
@@ -20,9 +20,9 @@
 | Codex 图片输入 | attachment seam 与预算投影自动化已通过 | `maxPixels=4194304` 真实请求待验收 |
 | auto / SSE / WebSocket / cached | transport 映射与会话隔离自动化已通过 | 四种真实请求待验收 |
 | Fast / priority tier | 已验证仅在当前会话开启时改变 `service_tier` | 账号权限与真实网络待验收 |
-| npm / GitHub Release | 严格工作流将校验 `0.0.3` 候选、Registry 回读、provenance、签名与 Release 资产；最近已发布制品为 [`v0.0.2`](https://github.com/yoshino-xiao7/dsh-codex/releases/tag/v0.0.2) | `0.0.3` 正式发布待三平台验收与维护者批准 |
+| npm / GitHub Release | 严格工作流校验候选、Registry 回读、provenance、签名与 Release 资产；发布制品见 [`v0.0.3`](https://github.com/yoshino-xiao7/dsh-codex/releases/tag/v0.0.3) | 正式发布由受保护工作流完成 |
 
-`0.0.x` 是技术预览，只对表中的精确 DSH 预发布版本声明兼容。`0.0.3` 的 Linux、macOS 和 Windows CI/profile smoke 当前为 `0/3 pending`，正式发布前必须达到 `3/3`；候选提交、精确 Node 版本与作业链接将记录在[验收记录](releases/v0.0.3.acceptance.json)中，并由维护者批准。真实 OAuth、对话、图片、transport 和 Fast 网络验收从独立的 `0/13 pending` 记录开始，发布后再逐项补齐；这些未完成项必须如实展示，不能冒充已验证能力。额度窗口与模型设置已独立完成本机中英文页面验证，不计入这 13 个会消耗模型请求或需要完整交互闭环的验收项。
+`0.0.x` 是技术预览，只对表中的精确 DSH 预发布版本声明兼容。`0.0.3` 的 Linux、macOS 和 Windows CI/profile smoke 已达到 `3/3`，候选提交、精确 Node 版本与作业链接记录在[验收记录](releases/v0.0.3.acceptance.json)中，并已获得维护者批准。真实 OAuth、对话、图片、transport 和 Fast 网络验收从独立的 `0/13 pending` 记录开始，发布后再逐项补齐；这些未完成项必须如实展示，不能冒充已验证能力。额度窗口与模型设置已独立完成本机中英文页面验证，不计入这 13 个会消耗模型请求或需要完整交互闭环的验收项。
 
 根目录 `pnpm-lock.yaml` 锁定插件依赖，`test/fixtures/dsh-runtime/pnpm-lock.yaml` 独立锁定兼容性 smoke 的完整 DSH runtime 与 peer 图；CI 使用 `pnpm --dir test/fixtures/dsh-runtime install --frozen-lockfile --ignore-scripts`，不把该 peer 图交给直接 npm 解算，以避免不确定依赖结果和内存失控。该冻结层验证 Web/profile 集成，不声称覆盖 DSH 依赖中需要生命周期脚本的原生终端或本机构建能力。依赖升级必须通过固定版本变更 PR，同时更新并审查两套 lockfile，在发布前重跑完整 CI、profile smoke 和供应链校验，发布后重新记录受控真实验证。定时兼容工作流只验证当前锁定图并报告 Registry 漂移，不能从宽泛 semver 或一次定时运行推断跨 RC 兼容。
 

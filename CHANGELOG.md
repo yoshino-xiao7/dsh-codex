@@ -3,7 +3,7 @@
 本项目遵循 Keep a Changelog 的结构；`0.0.x` 为技术预览。
 This project follows the Keep a Changelog structure; `0.0.x` is a technical preview.
 
-## [0.0.3] - Unreleased
+## [0.0.3] - 2026-08-29
 
 ### 中文
 
