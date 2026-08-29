@@ -21,6 +21,18 @@ pnpm run release:prepare -- 0.0.2
 
 它只创建或补齐 `package.json` 版本、双语 `CHANGELOG.md` 草稿、双语 Release 草稿和全新的 schema v3 draft 验收记录。脚本幂等，不访问 Git 或网络，也不会伪造日期、提交或通过证据；已有有效人工内容不会被覆盖，任何冲突都会在写入前失败。README、兼容性文档、lockfile、发布分支、提交和标签仍需人工处理。
 
+### 本地或 CI 复演候选
+
+在已经提交且工作树干净的候选 checkout 中，使用 Node 24、pnpm `10.34.5` 和 npm `11.16.0` 一键复演 `0.0.1` 候选：
+
+```sh
+pnpm run release:candidate -- 0.0.1
+```
+
+该命令可在本地开发机或独立 CI 中运行，不发布 npm 包或 GitHub Release，也不读取 npm token、OIDC、OAuth 或其他凭据。它精确执行根目录和冻结 DSH 夹具的 frozen install、完整 `check`、仅一次会生成候选 tarball 的 `npm pack`、本地 tarball publish dry-run、确定性 SBOM、精确候选的 DSH profile smoke、隔离安装与 Host 导入，以及生产依赖 audit，并把候选包、摘要和全部证据写入 `release/`。为避免把旧文件误当成当前证据，只要发现已有候选输出就会在任何写入前失败；清理或移走已确认不再需要的旧输出后才能重试。
+
+这只是可重复的本地/CI 预检。权威发布候选仍必须由 `main` 上的 `release.yml` workflow 生成并上传；macOS 或 Windows 上的本地复演不能替代该 workflow 的 Linux x64 发布证据，也不能替代三平台 CI/profile smoke、真实账号验收或维护者审批。
+
 ## 两级门禁
 
 普通 CI 使用草稿模式。它允许 `TBD` 和 `pending`，但会检查版本、双语 Release 结构及验收记录结构，因此未发布版本可以持续集成：

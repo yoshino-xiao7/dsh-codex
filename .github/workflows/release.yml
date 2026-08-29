@@ -57,133 +57,15 @@ jobs:
         with:
           node-version: 24
           package-manager-cache: false
-      - name: Install the committed dependency graph without lifecycle scripts
-        run: pnpm install --frozen-lockfile --ignore-scripts
-      - name: Install the exact supported DSH CLI in isolation
-        run: pnpm --dir test/fixtures/dsh-runtime install --frozen-lockfile --ignore-scripts
-      - name: Verify source, tests, package boundary, and draft release metadata
-        run: |
-          pnpm run check
-          pnpm run verify:release
-          git diff --exit-code
-          test -z "$(git status --porcelain=v1 --untracked-files=all)"
       - name: Install and verify the candidate packaging npm toolchain
         run: |
           set -eu
-          mkdir -p release
           npm install --global --ignore-scripts --no-audit --no-fund npm@11.16.0
-          npm --version > release/npm-cli-version.txt
-          node --input-type=module -e '
-            import fs from "node:fs"
-            const candidateVersion = fs.readFileSync("release/npm-cli-version.txt", "utf8")
-            if (candidateVersion !== "11.16.0\n") process.exit(1)
-          '
-      - name: Build the candidate tarball exactly once without rerunning lifecycle scripts
+          test "$(npm --version)" = "11.16.0"
+      - name: Build and verify the immutable release candidate
         env:
-          REQUESTED_VERSION: ${{ inputs.version }}
-        run: |
-          set -eu
-          mkdir -p release
-          npm pack --ignore-scripts --json --pack-destination release > release/pack.json
-          node --input-type=module -e '
-            import fs from "node:fs"
-            import path from "node:path"
-            const [result] = JSON.parse(fs.readFileSync("release/pack.json", "utf8"))
-            if (result?.filename !== path.basename(process.env.PACKAGE_FILE)) process.exit(1)
-            if (result?.name !== "dsh-codex-community" || result?.version !== process.env.REQUESTED_VERSION) process.exit(1)
-          '
-      - name: Verify npm resolves the candidate as a local tarball
-        run: |
-          set -eu
-          npm publish "./$PACKAGE_FILE" --dry-run --force --ignore-scripts --json > "$RUNNER_TEMP/npm-publish-dry-run.json"
-          test -s "$RUNNER_TEMP/npm-publish-dry-run.json"
-      - name: Generate deterministic verification assets
-        run: |
-          set -eu
-          node --input-type=module -e '
-            import crypto from "node:crypto"
-            import fs from "node:fs"
-            import path from "node:path"
-            const artifact = process.env.PACKAGE_FILE
-            const bytes = fs.readFileSync(artifact)
-            const sha256 = crypto.createHash("sha256").update(bytes).digest("hex")
-            const sri = `sha512-${crypto.createHash("sha512").update(bytes).digest("base64")}`
-            fs.writeFileSync(`${artifact}.sha256`, `${sha256}  ${path.basename(artifact)}\n`)
-            fs.writeFileSync(`${artifact}.sri`, `${sri}\n`)
-          '
-          node scripts/generate-sbom.mjs "$PACKAGE_FILE" "$PACKAGE_FILE.cdx.json"
-      - name: Record the exact supported DSH dependency tree
-        run: |
-          set -eu
-          pnpm --dir test/fixtures/dsh-runtime list --depth Infinity --json > release/dsh-runtime-dependency-tree.json
-      - name: Install the exact candidate tarball and boot a disposable DSH Web profile
-        env:
-          DSH_CLI_ROOT: ${{ github.workspace }}/test/fixtures/dsh-runtime
-          DSH_PLUGIN_PACKAGE: ${{ env.PACKAGE_FILE }}
-        run: pnpm run smoke:dsh-profile
-      - name: Record the frozen DSH runtime environment after successful smoke
-        run: |
-          set -eu
-          node --input-type=module -e '
-            import crypto from "node:crypto"
-            import { execFileSync } from "node:child_process"
-            import fs from "node:fs"
-            const runtimeManifest = JSON.parse(fs.readFileSync("test/fixtures/dsh-runtime/node_modules/@deepseek-ai/dsh/package.json", "utf8"))
-            const fixtureManifest = JSON.parse(fs.readFileSync("test/fixtures/dsh-runtime/package.json", "utf8"))
-            const expectedPnpmVersion = /^pnpm@(.+)$/u.exec(fixtureManifest.packageManager ?? "")?.[1]
-            const pnpmVersion = execFileSync("pnpm", ["--version"], { encoding: "utf8" }).trim()
-            if (runtimeManifest.name !== "@deepseek-ai/dsh" || runtimeManifest.version !== fixtureManifest.dependencies?.["@deepseek-ai/dsh"]) process.exit(1)
-            if (pnpmVersion !== expectedPnpmVersion) process.exit(1)
-            const fixtureLockSha256 = crypto.createHash("sha256")
-              .update(fs.readFileSync("test/fixtures/dsh-runtime/pnpm-lock.yaml"))
-              .digest("hex")
-            const environment = {
-              schemaVersion: 1,
-              runtimePackage: runtimeManifest.name,
-              runtimeVersion: runtimeManifest.version,
-              fixtureLockSha256,
-              nodeVersion: process.version,
-              pnpmVersion,
-              platform: process.platform,
-              arch: process.arch,
-              lifecycleScripts: "disabled",
-            }
-            fs.writeFileSync("release/dsh-runtime-environment.json", `${JSON.stringify(environment, null, 2)}\n`)
-          '
-      - name: Install and import the exact candidate in isolation
-        env:
-          REQUESTED_VERSION: ${{ inputs.version }}
-        run: |
-          set -eu
-          mkdir isolated
-          cd isolated
-          npm init -y
-          npm install --ignore-scripts --no-audit --no-fund "../$PACKAGE_FILE"
-          node --input-type=module -e 'const plugin = await import("dsh-codex-community"); if (plugin.name !== "dsh-codex") process.exit(1)'
-          npm ls --all --json > ../release/isolated-dependency-tree.json
-          npm audit --omit=dev --audit-level=high --json > ../release/npm-audit.json
-          cd ..
-          node --input-type=module -e '
-            import crypto from "node:crypto"
-            import fs from "node:fs"
-            const hash = (file) => crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex")
-            const evidence = {
-              status: "passed",
-              packageName: "dsh-codex-community",
-              version: process.env.REQUESTED_VERSION,
-              sourceCommit: process.env.GITHUB_SHA,
-              dshProfileSmoke: "passed",
-              artifactSha256: hash(process.env.PACKAGE_FILE),
-              lockSha256: hash("pnpm-lock.yaml"),
-              sbomSha256: hash(`${process.env.PACKAGE_FILE}.cdx.json`),
-              dshRuntimeDependencyTreeSha256: hash("release/dsh-runtime-dependency-tree.json"),
-              dshRuntimeEnvironmentSha256: hash("release/dsh-runtime-environment.json"),
-              isolatedDependencyTreeSha256: hash("release/isolated-dependency-tree.json"),
-              npmAuditSha256: hash("release/npm-audit.json"),
-              npmCliVersionSha256: hash("release/npm-cli-version.txt"),
-            }
-            fs.writeFileSync("release/isolated-import.json", `${JSON.stringify(evidence, null, 2)}\n`)
-          '
+          RELEASE_SOURCE_COMMIT: ${{ github.sha }}
+        run: pnpm run release:candidate -- ${{ inputs.version }}
       - name: Upload the immutable candidate and evidence
         id: upload-candidate
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

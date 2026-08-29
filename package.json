@@ -81,6 +81,7 @@
     "check:pack": "node scripts/check-pack.mjs",
     "generate:sbom": "node scripts/generate-sbom.mjs",
     "release:prepare": "node scripts/prepare-release.mjs",
+    "release:candidate": "node scripts/build-release-candidate.mjs",
     "release:acceptance": "node scripts/record-release-acceptance.mjs",
     "verify:release": "node scripts/verify-release.mjs --mode=draft",
     "verify:release:publish": "node scripts/verify-release.mjs --mode=publish",

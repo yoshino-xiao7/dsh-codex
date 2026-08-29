@@ -8,6 +8,7 @@ const fixtureManifestUrl = new URL("./fixtures/dsh-runtime/package.json", import
 const fixtureLockUrl = new URL("./fixtures/dsh-runtime/pnpm-lock.yaml", import.meta.url)
 const fixtureRoot = fileURLToPath(new URL("./fixtures/dsh-runtime/", import.meta.url))
 const workflowRoot = new URL("../.github/workflows/", import.meta.url)
+const candidateBuilderUrl = new URL("../scripts/build-release-candidate.mjs", import.meta.url)
 
 test("the smoke runtime has a committed exact and private pnpm fixture", async () => {
   const manifest = JSON.parse(await readFile(fixtureManifestUrl, "utf8"))
@@ -44,8 +45,8 @@ test("the pinned pnpm CLI accepts the complete dependency-tree evidence command"
   assert.ok(Array.isArray(JSON.parse(result.stdout)))
 })
 
-test("CI, compatibility, and release smoke install only the frozen DSH fixture", async () => {
-  for (const name of ["ci.yml", "compatibility.yml", "release.yml"]) {
+test("CI, compatibility, and the delegated release candidate install only the frozen DSH fixture", async () => {
+  for (const name of ["ci.yml", "compatibility.yml"]) {
     const source = await readFile(new URL(name, workflowRoot), "utf8")
     assert.match(
       source,
@@ -59,4 +60,25 @@ test("CI, compatibility, and release smoke install only the frozen DSH fixture",
       `${name} must not use npm's unbounded DSH peer resolver`,
     )
   }
+
+  const [releaseWorkflow, candidateBuilder] = await Promise.all([
+    readFile(new URL("release.yml", workflowRoot), "utf8"),
+    readFile(candidateBuilderUrl, "utf8"),
+  ])
+  assert.equal(
+    (releaseWorkflow.match(/pnpm run release:candidate -- \$\{\{ inputs\.version \}\}/gu) ?? []).length,
+    1,
+  )
+  assert.doesNotMatch(
+    releaseWorkflow,
+    /pnpm --dir test\/fixtures\/dsh-runtime install/u,
+    "release.yml must delegate candidate construction instead of duplicating it",
+  )
+  assert.match(
+    candidateBuilder,
+    /\["--dir", "test\/fixtures\/dsh-runtime", "install", "--frozen-lockfile", "--ignore-scripts"\]/u,
+  )
+  assert.match(candidateBuilder, /const fixtureRoot = path\.join\(root, "test", "fixtures", "dsh-runtime"\)/u)
+  assert.match(candidateBuilder, /path\.join\(fixtureRoot, "pnpm-lock\.yaml"\)/u)
+  assert.doesNotMatch(candidateBuilder, /npm install --prefix [^\n]*@deepseek-ai\/dsh@/u)
 })

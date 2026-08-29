@@ -109,11 +109,10 @@ test("CI boots the exact DSH CLI from the final tarball on the full OS and Node 
   )
 })
 
-test("every full-suite job installs the frozen DSH fixture before collecting tests", async () => {
+test("direct CI full-suite jobs install the frozen DSH fixture before collecting tests", async () => {
   const cases = [
     ["ci.yml", "test", "pnpm run check"],
     ["compatibility.yml", "current-contract", "pnpm test"],
-    ["release.yml", "candidate", "pnpm run check"],
   ]
   const fixtureInstall = "pnpm --dir test/fixtures/dsh-runtime install --frozen-lockfile --ignore-scripts"
 
@@ -192,107 +191,94 @@ test("release dispatch is manual and defaults to the candidate-only control path
   assert.equal((source.match(/pnpm run verify:release:publish/gu) ?? []).length, 2)
 })
 
-test("release candidate is read-only, fails explicitly off main, and is built once", async () => {
+test("release candidate is read-only, fails explicitly off main, and delegates its build once", async () => {
   const source = await workflow("release.yml")
   const candidate = workflowJob(source, "candidate")
+  const build = workflowStep(candidate, "Build and verify the immutable release candidate")
+  const upload = workflowStep(candidate, "Upload the immutable candidate and evidence")
+
   assert.match(source, /permissions: \{\}/u)
   assert.doesNotMatch(candidate, /^    if:/mu)
   assert.match(candidate, /test "\$GITHUB_REF" = "refs\/heads\/main"/u)
+  assert.match(
+    candidate,
+    /test "\$\(git rev-parse HEAD\)" = "\$\(git rev-parse refs\/remotes\/origin\/main\)"/u,
+  )
   assert.match(source, /candidate:[\s\S]*?permissions:\n\s+contents: read/u)
   assert.equal((source.match(/persist-credentials: false/gu) ?? []).length, 3)
-  assert.equal((source.match(/npm pack --ignore-scripts --json --pack-destination release/gu) ?? []).length, 1)
-  assert.equal((source.match(/pnpm run check/gu) ?? []).length, 1)
-  assert.match(source, /pnpm install --frozen-lockfile --ignore-scripts/u)
-  assert.match(source, /git diff --exit-code/u)
-  assert.match(source, /git status --porcelain=v1 --untracked-files=all/u)
+  assert.match(build, /^        env:\n          RELEASE_SOURCE_COMMIT: \$\{\{ github\.sha \}\}$/mu)
+  assert.match(
+    build,
+    /^        run: pnpm run release:candidate -- \$\{\{ inputs\.version \}\}$/mu,
+  )
+  assert.equal((candidate.match(/pnpm run release:candidate -- \$\{\{ inputs\.version \}\}/gu) ?? []).length, 1)
+  assert.ok(candidate.indexOf(build) < candidate.indexOf(upload))
+
+  for (const oldInlineCommand of [
+    /pnpm install --frozen-lockfile --ignore-scripts/u,
+    /pnpm --dir test\/fixtures\/dsh-runtime install/u,
+    /pnpm run check/u,
+    /pnpm run verify:release(?:\s|$)/u,
+    /npm pack --ignore-scripts/u,
+    /npm publish "\.\/\$PACKAGE_FILE" --dry-run/u,
+    /scripts\/generate-sbom\.mjs/u,
+    /pnpm run smoke:dsh-profile/u,
+    /npm ls --all --json/u,
+    /npm audit --omit=dev/u,
+    /fs\.writeFileSync\("release\/isolated-import\.json"/u,
+  ]) {
+    assert.doesNotMatch(candidate, oldInlineCommand)
+  }
 })
 
-test("candidate packaging uses and records the exact reviewed npm toolchain before pack", async () => {
-  const source = await workflow("release.yml")
-  const install = "npm install --global --ignore-scripts --no-audit --no-fund npm@11.16.0"
-  const record = "npm --version > release/npm-cli-version.txt"
-  const pack = "npm pack --ignore-scripts --json --pack-destination release"
-  assert.equal((source.match(new RegExp(install, "gu")) ?? []).length, 2)
-  assert.equal((source.match(new RegExp(record, "gu")) ?? []).length, 1)
-  assert.ok(source.indexOf(install) < source.indexOf(pack))
-  assert.ok(source.indexOf(record) < source.indexOf(pack))
-  assert.match(source, /if \(candidateVersion !== "11\.16\.0\\n"\) process\.exit\(1\)/u)
-})
-
-test("release uses no dependency cache and dry-runs the local tarball spec with the pinned npm", async () => {
+test("candidate installs and verifies the reviewed npm toolchain before delegation", async () => {
   const source = await workflow("release.yml")
   const candidate = workflowJob(source, "candidate")
-  const pack = candidate.indexOf("npm pack --ignore-scripts --json --pack-destination release")
-  const dryRun = candidate.indexOf('npm publish "./$PACKAGE_FILE" --dry-run --force --ignore-scripts --json')
+  const install = "npm install --global --ignore-scripts --no-audit --no-fund npm@11.16.0"
+  const verify = 'test "$(npm --version)" = "11.16.0"'
+  const build = "pnpm run release:candidate -- ${{ inputs.version }}"
+  assert.equal((source.match(new RegExp(install, "gu")) ?? []).length, 2)
+  assert.equal((candidate.match(/npm --version > release\/npm-cli-version\.txt/gu) ?? []).length, 0)
+  assert.ok(candidate.indexOf(install) < candidate.indexOf(build))
+  assert.ok(candidate.indexOf(verify) < candidate.indexOf(build))
+})
+
+test("release uses no dependency cache in every Node setup", async () => {
+  const source = await workflow("release.yml")
 
   assert.equal((source.match(/package-manager-cache: false/gu) ?? []).length, 3)
   assert.doesNotMatch(source, /^\s+cache:/mu)
-  assert.notEqual(pack, -1)
-  assert.ok(dryRun > pack, "local publish dry-run must inspect the once-built candidate")
-  assert.equal(
-    (candidate.match(/npm publish "\.\/\$PACKAGE_FILE" --dry-run --force --ignore-scripts --json/gu) ?? []).length,
-    1,
-  )
 })
 
-test("release boots the exact once-built candidate in the supported DSH runtime", async () => {
+test("candidate uploads the unified command output before summary and strict approval gate", async () => {
   const source = await workflow("release.yml")
-  assert.match(
-    source,
-    /pnpm --dir test\/fixtures\/dsh-runtime install --frozen-lockfile --ignore-scripts/u,
+  const candidate = workflowJob(source, "candidate")
+  const build = workflowStep(candidate, "Build and verify the immutable release candidate")
+  const upload = workflowStep(candidate, "Upload the immutable candidate and evidence")
+  const summary = workflowStep(candidate, "Summarize the exact candidate for release approval")
+  const gate = workflowStep(
+    candidate,
+    "Enforce the strict publication gate before requesting approval",
   )
-  assert.match(source, /DSH_CLI_ROOT: \$\{\{ github\.workspace \}\}\/test\/fixtures\/dsh-runtime/u)
-  assert.match(source, /DSH_PLUGIN_PACKAGE: \$\{\{ env\.PACKAGE_FILE \}\}/u)
-  assert.equal((source.match(/pnpm run smoke:dsh-profile/gu) ?? []).length, 1)
-  assert.match(source, /dshProfileSmoke: "passed"/u)
-  const smoke = source.indexOf("pnpm run smoke:dsh-profile")
-  const environmentEvidence = source.indexOf("release/dsh-runtime-environment.json")
-  assert.ok(environmentEvidence > smoke, "runtime environment evidence must be written only after smoke passes")
-  assert.match(source, /fixtureLockSha256/u)
-  assert.match(source, /nodeVersion: process\.version/u)
-  assert.match(source, /pnpmVersion/u)
-  assert.match(source, /platform: process\.platform/u)
-  assert.match(source, /arch: process\.arch/u)
-  assert.match(source, /lifecycleScripts: "disabled"/u)
+  assert.ok(candidate.indexOf(build) < candidate.indexOf(upload))
+  assert.ok(candidate.indexOf(upload) < candidate.indexOf(summary))
+  assert.ok(candidate.indexOf(summary) < candidate.indexOf(gate))
+  assert.match(upload, /^          path: release\/$/mu)
+  assert.match(upload, /^          retention-days: 90$/mu)
+  assert.match(gate, /RELEASE_ISOLATED_IMPORT_EVIDENCE: release\/isolated-import\.json/u)
+  assert.match(gate, /RELEASE_SOURCE_COMMIT: \$\{\{ github\.sha \}\}/u)
 })
 
-test("release candidate retains auditable dependency and production vulnerability evidence", async () => {
+test("candidate approval summary validates the portable checksum sidecar", async () => {
   const source = await workflow("release.yml")
-  assert.match(source, /retention-days: 90/u)
+  const candidate = workflowJob(source, "candidate")
+  const summary = workflowStep(candidate, "Summarize the exact candidate for release approval")
+  assert.match(summary, /import path from "node:path"/u)
   assert.match(
-    source,
-    /pnpm --dir test\/fixtures\/dsh-runtime list --depth Infinity --json > release\/dsh-runtime-dependency-tree\.json/u,
+    summary,
+    /fs\.readFileSync\(`\$\{process\.env\.PACKAGE_FILE\}\.sha256`, "utf8"\)\.trim\(\)/u,
   )
-  assert.doesNotMatch(source, /pnpm --dir test\/fixtures\/dsh-runtime list --all/u)
-  assert.match(source, /npm ls --all --json > \.\.\/release\/isolated-dependency-tree\.json/u)
-  assert.match(
-    source,
-    /npm audit --omit=dev --audit-level=high --json > \.\.\/release\/npm-audit\.json/u,
-  )
-  assert.match(
-    source,
-    /dshRuntimeDependencyTreeSha256: hash\("release\/dsh-runtime-dependency-tree\.json"\)/u,
-  )
-  assert.match(
-    source,
-    /isolatedDependencyTreeSha256: hash\("release\/isolated-dependency-tree\.json"\)/u,
-  )
-  assert.match(source, /npmAuditSha256: hash\("release\/npm-audit\.json"\)/u)
-  assert.match(source, /npmCliVersionSha256: hash\("release\/npm-cli-version\.txt"\)/u)
-  assert.match(
-    source,
-    /dshRuntimeEnvironmentSha256: hash\("release\/dsh-runtime-environment\.json"\)/u,
-  )
-})
-
-test("release checksum sidecar is portable outside the CI release directory", async () => {
-  const source = await workflow("release.yml")
-  assert.match(source, /import path from "node:path"/u)
-  assert.match(
-    source,
-    /fs\.writeFileSync\(`\$\{artifact\}\.sha256`, `\$\{sha256\}  \$\{path\.basename\(artifact\)\}\\n`\)/u,
-  )
-  assert.doesNotMatch(source, /`\$\{sha256\}  \$\{artifact\}\\n`/u)
+  assert.match(summary, /checksumMatch\[2\] !== path\.basename\(process\.env\.PACKAGE_FILE\)/u)
 })
 
 test("publication separates protected npm OIDC from GitHub Release write permission", async () => {

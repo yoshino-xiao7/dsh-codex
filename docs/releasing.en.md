@@ -21,6 +21,18 @@ pnpm run release:prepare -- 0.0.2
 
 It only creates or completes the `package.json` version, bilingual `CHANGELOG.md` draft, bilingual Release draft, and a fresh schema v3 draft acceptance record. The script is idempotent, accesses neither Git nor the network, and never fabricates dates, commits, or passing evidence. Existing valid human-authored content is preserved, and any conflict fails before writing. The README, compatibility documents, lockfiles, release branch, commit, and tag still require manual handling.
 
+### Replaying a candidate locally or in CI
+
+From a committed candidate checkout with a clean working tree, use Node 24, pnpm `10.34.5`, and npm `11.16.0` to replay the `0.0.1` candidate in one command:
+
+```sh
+pnpm run release:candidate -- 0.0.1
+```
+
+The command runs on a local development machine or in separate CI. It neither publishes an npm package or GitHub Release nor reads npm tokens, OIDC, OAuth, or other credentials. It performs the root and frozen-DSH-fixture frozen installs, the complete `check`, exactly one artifact-producing `npm pack`, a local-tarball publish dry-run, the deterministic SBOM, exact-candidate DSH profile smoke, isolated installation and Host import, and the production-dependency audit. It writes the candidate package, digests, and all evidence under `release/`. To prevent stale files from being mistaken for current evidence, any existing candidate output makes the command fail before its first write; remove or move only old output that you have confirmed is no longer needed before retrying.
+
+This is only a reproducible local/CI preflight. The authoritative release candidate must still be generated and uploaded by the `release.yml` workflow on `main`. A local replay on macOS or Windows cannot replace that workflow's Linux x64 publication evidence, nor can it replace three-platform CI/profile smoke, live-account acceptance, or maintainer approval.
+
 ## Two gate levels
 
 Regular CI uses draft mode. It permits `TBD` and `pending`, while checking the version, bilingual Release structure, and acceptance-record shape so unreleased work remains continuously testable:
