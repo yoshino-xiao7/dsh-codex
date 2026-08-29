@@ -10,6 +10,8 @@
 - [Testing strategy](testing.en.md)
 - [Release process](releasing.en.md)
 - [GitHub About and topics](github-about.md)
+- [v0.0.3 Release copy](releases/v0.0.3.md)
+- [v0.0.2 Release copy](releases/v0.0.2.md)
 - [v0.0.1 Release copy](releases/v0.0.1.md)
 
 Every “verified” claim must point to repository tests, CI, or release-artifact evidence. “Wired” and “planned” must not be presented as “supported.”

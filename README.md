@@ -4,7 +4,7 @@
 
 面向 DeepSeek Harness 的 Codex 插件，提供 ChatGPT OAuth 登录、Codex 模型、图片输入和可靠的流式回复。
 
-> 当前版本：`0.0.2` 技术预览，使用 npm `latest` 与正式 GitHub Release 发布。npm 包名：`dsh-codex-community`。
+> 当前版本：`0.0.3` 技术预览发布候选；三平台验收与受保护发布流程通过后，将使用 npm `latest` 与正式 GitHub Release 发布。npm 包名：`dsh-codex-community`。
 
 ## 功能
 
@@ -16,6 +16,8 @@
 - 将 `AccountQuotaExceeded` 识别为不可重试的账户配额错误，并显示脱敏后的重置时间；
 - 流中断时保留安全的半段纯文本；涉及未完成工具调用时停止，不自动重放请求；
 - 每次进入设置页或手动刷新时读取真实的 5 小时与每周额度；读取失败时安全降级，不向 Web 页面暴露 OAuth 凭据；
+- 使用紧凑的额度卡展示剩余比例：5 小时额度显示精确重置时间，每周额度在不足 24 小时时显示精确时间，其余时间显示相对天数；
+- 在设置页优先展示已选择模型，默认收起未选择模型；上下文和最大输出使用来自当前 provider catalog 的紧凑 `K` 标签；
 - 使用模型选择器左侧的闪电按钮或 `/codex` 为当前会话切换官方 Fast（1.5 倍速）和传输方式，默认关闭 Fast、自动选择传输。
 
 ## 运行要求
@@ -28,7 +30,7 @@
 请固定安装精确版本：
 
 ```sh
-dsh plugin --profile web add dsh-codex-community@0.0.2
+dsh plugin --profile web add dsh-codex-community@0.0.3
 dsh web
 ```
 
@@ -56,7 +58,7 @@ Fast 和传输偏好只保存在当前进程的当前会话中，不会持久化
 更新：
 
 ```sh
-dsh plugin --profile web update dsh-codex-community@0.0.2
+dsh plugin --profile web update dsh-codex-community@0.0.3
 dsh web
 ```
 
@@ -79,8 +81,8 @@ dsh web
 ## 支持边界
 
 - `0.0.x` 不承诺稳定 API，请固定版本；
-- `0.0.2` 的 Linux、macOS 和 Windows CI/profile smoke 已达到 `3/3`，候选提交与平台证据见[验收记录](docs/releases/v0.0.2.acceptance.json)；
-- 真实 OAuth、对话、图片、transport 和 Fast 网络验收为 `0/13 pending`；这些未验证能力继续如实展示，并在发布后逐项补齐；
+- `0.0.3` 的 Linux、macOS 和 Windows CI/profile smoke 当前为 `0/3 pending`；正式发布前必须达到 `3/3`，候选提交与平台证据将记录在[验收记录](docs/releases/v0.0.3.acceptance.json)；
+- `0.0.3` 的真实 OAuth、对话、图片、transport 和 Fast 网络验收从独立记录的 `0/13 pending` 开始；这些未验证能力继续如实展示，并在发布后逐项补齐；
 - 设置页额度通过官方 Codex 客户端使用的 Web 后端兼容接口读取；接口不可用或返回异常时保留最近的安全读数，并降级为请求观测或未知状态，不把错误伪装成零余额；
 - 模型名称、上下文和最大输出来自当前安装的 provider catalog；推理选择器只展示已按订阅 Codex 目录核验且 Provider 能完整实现的 Low 至 Max 与模型默认值，不展示通用的 `Default`、`Off`、`Minimal`，也不把需要主动任务委派的 `Ultra` 伪装成普通推理档位；
 - Fast 仅用于 GPT-5.4、GPT-5.5、GPT-5.6 Luna、Sol 和 Terra，并会提高额度消耗；其他模型不会发送 Fast service tier；

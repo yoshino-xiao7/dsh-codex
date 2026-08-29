@@ -3,6 +3,36 @@
 本项目遵循 Keep a Changelog 的结构；`0.0.x` 为技术预览。
 This project follows the Keep a Changelog structure; `0.0.x` is a technical preview.
 
+## [0.0.3] - Unreleased
+
+### 中文
+
+#### 新增
+
+- OpenAI Codex 设置入口改用独立的代码括号图标，与其他 Provider 插件保持可辨识的视觉差异。
+- 额度卡新增带图标的刷新按钮、刷新中状态、响应式双列布局和更清晰的剩余额度层级；五小时额度始终显示精确重置时间，每周额度在不足 24 小时时显示精确时间，其余时间显示相对天数，完整时间保留在提示与无障碍标签中。
+- 模型设置按“已选择在前、未选择在后”排序；未选择模型默认收起并可按需展开，同时显示已选择、当前显示与总数摘要。
+
+#### 修复
+
+- 缩短设置页内容高度并避免插件覆盖 Harness 弹窗宽度或滚动容器，改善窄屏与较矮窗口中的滚动体验。
+- 模型能力改为与 Grok Build 一致的紧凑标签，使用 `272K`、`128K` 一类上下文与最大输出表示，不推测 provider catalog 未提供的能力。
+- 在收起未选择模型时取消勾选，键盘焦点会回到展开按钮，避免焦点停留在隐藏元素；重置时间解析也会拒绝无法构造有效日期的值。
+
+### English
+
+#### Added
+
+- The OpenAI Codex settings entry now uses a dedicated code-brackets icon that remains visually distinct from other provider plugins.
+- Usage cards now provide an icon button with a refreshing state, a responsive two-column layout, and a clearer remaining-usage hierarchy. Five-hour limits always show the exact reset time; weekly limits show the exact time within 24 hours and otherwise use relative days, while the complete timestamp remains available in tooltips and accessible labels.
+- Model settings now sort selected models before unselected models. Unselected models are collapsed by default and can be expanded on demand, with selected, visible, and total counts shown in the summary.
+
+#### Fixed
+
+- The settings content is shorter and no longer overrides the Harness dialog width or scroll container, improving scrolling in narrow or low-height windows.
+- Model capabilities use compact Grok Build-style labels such as `272K` and `128K` for context and maximum output, without inferring capabilities absent from the provider catalog.
+- Deselecting a model while unselected entries are collapsed returns keyboard focus to the expansion control instead of leaving it on a hidden element; reset-time parsing also rejects values that cannot produce a valid date.
+
 ## [0.0.2] - 2026-08-29
 
 ### 中文
