@@ -12,6 +12,7 @@ const supportedDshVersion = "0.1.1-rc.2"
 
 if (isMainModule()) {
   const temporary = await mkdtemp(path.join(os.tmpdir(), "dsh-codex-profile-smoke-"))
+  let primaryFailure
   try {
     const command = await resolveDshCommand()
     const home = path.join(temporary, "home")
@@ -30,9 +31,37 @@ if (isMainModule()) {
 
     await expectWebReady(command, environment)
     await preserveSmokeArtifact(packageFile, process.env.DSH_SMOKE_ARTIFACT_DIR)
-  } finally {
-    await rm(temporary, { recursive: true, force: true })
+  } catch (error) {
+    primaryFailure = error
   }
+  await finalizeSmokeTemporaryDirectory(temporary, primaryFailure)
+}
+
+export async function finalizeSmokeTemporaryDirectory(
+  temporary,
+  primaryFailure,
+  { removeDirectory = rm } = {},
+) {
+  let cleanupFailure
+  try {
+    await removeDirectory(temporary, {
+      force: true,
+      maxRetries: 10,
+      recursive: true,
+      retryDelay: 250,
+    })
+  } catch (error) {
+    cleanupFailure = error
+  }
+
+  if (primaryFailure !== undefined && cleanupFailure !== undefined) {
+    throw new AggregateError(
+      [primaryFailure, cleanupFailure],
+      "DSH profile smoke failed and temporary cleanup also failed",
+    )
+  }
+  if (primaryFailure !== undefined) throw primaryFailure
+  if (cleanupFailure !== undefined) throw cleanupFailure
 }
 
 export async function resolvePluginPackage(candidate, temporary) {

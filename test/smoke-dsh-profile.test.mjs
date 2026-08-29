@@ -8,6 +8,7 @@ import { resolveNpmCommand } from "../scripts/npm-command.mjs"
 import {
   assertInstalledConfig,
   commandFromDshManifest,
+  finalizeSmokeTemporaryDirectory,
   resolveDshCommand,
   resolvePluginPackage,
 } from "../scripts/smoke-dsh-profile.mjs"
@@ -27,6 +28,38 @@ const additions = `# == dsh-codex-community
   config:
     partialResponseRecovery: true
 `
+
+test("profile smoke cleanup requests bounded retries for transient Windows directory locks", async () => {
+  const calls = []
+  await finalizeSmokeTemporaryDirectory("C:\\temporary-profile", undefined, {
+    removeDirectory: async (directory, options) => calls.push({ directory, options }),
+  })
+  assert.deepEqual(calls, [{
+    directory: "C:\\temporary-profile",
+    options: {
+      force: true,
+      maxRetries: 10,
+      recursive: true,
+      retryDelay: 250,
+    },
+  }])
+})
+
+test("profile smoke cleanup cannot mask the primary failure", async () => {
+  const primary = new Error("DSH command timed out")
+  const cleanup = Object.assign(new Error("profile directory is locked"), { code: "EBUSY" })
+  await assert.rejects(
+    finalizeSmokeTemporaryDirectory("C:\\temporary-profile", primary, {
+      removeDirectory: async () => { throw cleanup },
+    }),
+    (error) => {
+      assert.ok(error instanceof AggregateError)
+      assert.match(error.message, /profile smoke failed and temporary cleanup also failed/iu)
+      assert.deepEqual(error.errors, [primary, cleanup])
+      return true
+    },
+  )
+})
 
 test("npm command resolution avoids Windows shims and uses a safe fallback", () => {
   const configured = path.resolve("runtime", "npm-cli.js")
