@@ -29,7 +29,7 @@ pnpm run verify:release
 - `docs/releases/v<version>.acceptance.json` 未标记为 `approved`；
 - Linux、macOS、Windows 的 `smoke:dsh-profile`，或固定清单中的真实 ChatGPT OAuth、模型、文本/reasoning 流、usage、工具闭环、replay、图片、transport 与 Fast 验收没有全部通过；
 - 验收时间、运行环境、Node 版本、审批人或 HTTPS 证据链接缺失；
-- 验收后的提交修改了 Release 正文和验收记录以外的文件；
+- 验收后的提交修改了允许的发布证据文件以外的文件；允许清理发布状态的文件仅包括双语 Release 正文、验收 JSON、双语 README、`CHANGELOG.md` 和双语兼容性文档；
 - `.tgz`、SHA-256、SRI、锁定参考 SBOM、实际安装树、生产依赖审计或隔离导入证据缺失或不匹配。
 
 严格命令由发布工作流和 `prepublishOnly` 同时调用：
@@ -48,7 +48,7 @@ pnpm run verify:release:publish
 3. 在三个系统分别使用精确 DSH `0.1.1-rc.2` 和已测试的 Node 22（至少 `22.19.0`）或 24 运行 profile smoke，填写 `testedAt`、环境信息和不含敏感参数的 HTTPS 证据链接；
 4. 使用受控测试账号逐项完成下表的真实验收；每项只能在对应断言均有脱敏证据后改为 `passed`，不能用自由文本概括代替；
 5. 所有项目通过后由维护者填写审批信息，并把 `releaseStatus` 改为 `approved`；
-6. 此后只允许修改 `docs/releases/v<version>.md` 和对应验收 JSON。产品文件变化后必须重新验收。
+6. 此后只允许修改 `docs/releases/v<version>.md`、对应验收 JSON、`README.md`、`README.en.md`、`CHANGELOG.md`、`docs/compatibility.md` 和 `docs/compatibility.en.md`，用于填写日期、证据和发布状态。源码、配置、依赖、锁文件或工作流有任何变化，都必须基于新提交重新验收。
 
 | 验收项 | 必须证明 |
 | --- | --- |
@@ -107,12 +107,66 @@ CycloneDX SBOM 是从已提交 `pnpm-lock.yaml` 与 package manifest 离线生�
 
 升级 DSH、pi-ai 或其他运行依赖时，必须更新并审查两套 lockfile，确认夹具仍只固定目标 DSH 版本，再重跑完整跨平台 CI、profile smoke 与受控真实验收。定时 Registry 漂移报告不能替代这条升级流程。
 
-## 发布
+## 发布环境
 
-- 发布前必须为仓库和 `npm-release` environment 配置 npm Trusted Publisher；工作流只使用 GitHub OIDC，不保存或读取长期 `NPM_TOKEN`；
-- npm Trusted Publishing 的最低 CLI 版本是 `11.5.1`，`--include-attestations` 至少需要 `11.12.0`；本版本发布工作流在任何网络写入前安装、精确校验并记录 `npm@11.16.0`，后续版本建议固定当时最新的兼容版本；
-- 发布工作流必须由仓库所有者手工触发，并通过 `npm-release` environment 审批；
-- `publish=false` 只生成并验证候选产物；`publish=true` 才启用严格门禁和 npm 发布；
+在 GitHub 仓库的 **Settings → Environments** 创建 `npm-release`：
+
+1. 配置至少一名 required reviewer；
+2. deployment branches 只允许 `main`；
+3. 不添加普通仓库级 npm token；只有首次发布引导期间，才临时添加 environment secret `NPM_BOOTSTRAP_TOKEN`；
+4. 发布人手工触发工作流，并在核对版本、提交和候选 job 后审批 environment。
+
+发布工作流固定使用 npm `11.16.0`，在任何网络写入前精确校验并记录版本。Trusted Publishing 最低需要 npm CLI `11.5.1`，`--include-attestations` 至少需要 `11.12.0`；升级 npm 时必须更新固定版本、测试和发布说明。
+
+先运行只读候选流程：
+
+```sh
+gh workflow run release.yml --ref main \
+  -f version=0.0.1 \
+  -f publish=false
+```
+
+`--ref main` 是硬门禁；从其他分支触发时 candidate 会明确失败，不会以全部 job 被跳过的方式显示成功。下载并核对候选附件、完成真实验收、更新允许的发布证据文件并合并到 `main` 后，再开始发布。
+
+## 首次发布 `0.0.1`
+
+npm 只允许给**已经存在**的包配置 Trusted Publisher，因此新包第一次发布需要一次性引导。该例外只适用于 `dsh-codex-community@0.0.1` 且 Registry 中尚不存在这个包；工作流会同时检查版本、包名状态和精确候选产物，条件不满足就失败。
+
+1. 在 npm 网页创建最短有效期的 Granular Access Token：Packages and scopes 设为 **Read and write**，选择 **All packages**，开启 **Bypass 2FA**。新包尚不存在，无法把 token 限定到该包；因此必须使用最短有效期，并在成功后立即撤销；
+2. 只把 token 粘贴到 GitHub `npm-release` environment 的 secret `NPM_BOOTSTRAP_TOKEN`。不要写入仓库、终端历史、Issue、Release 证据或聊天；
+3. 确认严格门禁已通过后触发一次性发布：
+
+   ```sh
+   gh workflow run release.yml --ref main \
+     -f version=0.0.1 \
+     -f publish=true
+   ```
+
+4. 审批 `npm-release` environment。工作流只在实际需要写入不存在的 `0.0.1` 时把该 secret 注入 `npm publish`，并在 GitHub 托管 runner 上生成 provenance；
+5. npm 包出现后，在包的 **Settings → Trusted Publisher** 中填写：Provider `GitHub Actions`、owner `yoshino-xiao7`、repository `dsh-codex`、workflow filename `release.yml`、environment `npm-release`、allowed action `npm publish`；
+6. 撤销 npm token，并删除 GitHub environment secret：
+
+   ```sh
+   gh secret delete NPM_BOOTSTRAP_TOKEN --env npm-release
+   ```
+
+7. 在包的 **Settings → Publishing access** 选择 **Require two-factor authentication and disallow tokens**，再验证 Trusted Publisher 配置；
+8. 后续版本由工作流自动选择 Trusted Publisher。Registry 中包名不存在时，只有 `0.0.1` 可以进入一次性引导；包名已存在时不会读取 bootstrap secret；如果 `0.0.1` 已经存在且包体与候选逐字节一致，重跑只恢复后续 Release 步骤，不再需要 token。
+
+首次引导依据 npm 的 [Trusted Publisher 限制](https://docs.npmjs.com/trusted-publishers/)、[2FA 与 Granular Access Token 要求](https://docs.npmjs.com/requiring-2fa-for-package-publishing-and-settings-modification/)和[GitHub Actions provenance 要求](https://docs.npmjs.com/generating-provenance-statements/)设计。
+
+## 常规发布
+
+Trusted Publisher 配置完成后，所有版本使用：
+
+```sh
+gh workflow run release.yml --ref main \
+  -f version=0.0.2 \
+  -f publish=true
+```
+
+- `publish=false` 只生成并验证候选产物；`publish=true` 才启用严格门禁、Registry 写入和双语 GitHub Release；
+- 常规发布只使用 GitHub OIDC，不读取 token；
 - npm 发布成功后回读 `repository.url`、`dist.integrity` 和 provenance，要求 `dist.integrity` 与候选 `.sri` 逐字符一致；
 - 在全新目录安装精确 Registry 版本并执行 `npm audit signatures --json --include-attestations`；签名或 attestation 校验失败会阻止公开 Release，原始 provenance bundle 与审计结果随 Release 保存；
 - 从 Registry 重新下载 tarball，验证其与工作流产生的 `.tgz` 逐字节一致；

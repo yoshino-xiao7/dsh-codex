@@ -37,6 +37,7 @@ This project follows the Keep a Changelog structure; `0.0.x` is a technical prev
 - 模型可选字段的显式 `null` 与非有限流空闲超时可能穿过基础 Schema；配置现在会在适配器 profile 与设置保存边界拒绝这些不可服务值。
 - 发布候选过早获得写权限、可变 Action 引用、未 smoke 精确候选、把参考 SBOM 当成实际安装树、缺少生产依赖高危审计、exact SRI 与签名/attestation 校验、GitHub Release 资产未回读、draft/tag 目标未在公开前验证和重复发布恢复不完整；直接依赖声明、贡献许可、双语隐私模板和协调依赖升级新增本地门禁，候选证据保留 90 天，并支持只重跑失败 job。
 - GitHub Actions 审核门禁现在逐条校验每个 `uses:` 是否属于明确审核的完整提交 allowlist，避免新增未审核 Action 借用其他位置的已审核 SHA 通过测试。
+- 发布工作流从错误分支触发时不再静默跳过；首次 `0.0.1` 根据 Registry 状态自动进入受限引导，后续版本自动使用 OIDC。候选会用固定 npm 对 `./` 本地 tarball 做 dry-run，发布后按 npm 11 的 `attestationBundles` 结构验证 SLSA provenance；所有 Actions 已更新到审核过的 Node 24 版本。
 
 ### English
 
@@ -70,3 +71,4 @@ This project follows the Keep a Changelog structure; `0.0.x` is a technical prev
 - Explicit `null` model overrides and non-finite stream idle timeouts could pass the basic Schema. Configuration now rejects these unserviceable values at the adapter-profile and settings-save boundaries.
 - Release candidates receiving write permission too early, mutable Action references, a missing exact-candidate smoke, reference SBOMs being treated as actual install trees, missing high-severity production-dependency audit, exact SRI and signature/attestation checks, missing GitHub asset readback, missing pre-publication draft/tag target verification, and incomplete recovery after a partial publication. Local gates now cover direct-dependency notices, contribution licensing, bilingual privacy templates, and coordinated dependency updates. Candidate evidence is retained for 90 days and supports rerunning only failed jobs.
 - The GitHub Actions review gate now checks every `uses:` entry against an explicit allowlist of reviewed full commits, preventing an unreviewed Action from passing merely because a reviewed SHA appears elsewhere.
+- A release dispatch from the wrong branch now fails instead of silently skipping. The first `0.0.1` automatically enters a Registry-state-gated bootstrap, while later versions automatically use OIDC. The candidate dry-runs the `./` local tarball with the pinned npm, post-publication checks use npm 11's `attestationBundles` shape for SLSA provenance, and every Action is pinned to a reviewed Node 24 release.

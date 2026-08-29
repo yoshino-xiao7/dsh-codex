@@ -10,7 +10,7 @@
 | pi-ai | `@earendil-works/pi-ai@0.82.1` 的 OAuth、模型目录、Codex payload 与 replay 合同测试 | 公开合同已验证；真实登录待验收 |
 | Node.js | 本地 `22.22.2` 完整测试；[CI 运行 33224023141](https://github.com/yoshino-xiao7/dsh-codex/actions/runs/33224023141) 在三种系统上覆盖 22 与 24 | `>=22.19.0 <25` |
 | macOS arm64 | 本地测试、构建、attachment seam 与隔离 profile 启动；`macos-latest` 的 Node 22/24 CI 通过 | 本地与 CI 自动化已验证 |
-| Windows x64 | `windows-latest` 的 Node 22/24 CI 完成冻结 DSH 安装、294 项检查、发布草案校验、精确候选包安装与一次性 Web/profile 启动 | CI 自动化已验证；真实用户环境待验收 |
+| Windows x64 | `windows-latest` 的 Node 22/24 CI 完成冻结 DSH 安装、299 项检查、发布草案校验、精确候选包安装与一次性 Web/profile 启动 | CI 自动化已验证；真实用户环境待验收 |
 | Linux x64 | `ubuntu-latest` 的 Node 22/24 CI 完成同一组检查与 Web/profile smoke | CI 自动化已验证 |
 | ChatGPT OAuth 真实登录 | 自动化不读取或修改用户真实 grant | 受控验收待完成 |
 | Codex 真实网络对话 | 自动化不消耗用户账户配额 | 受控验收待完成 |

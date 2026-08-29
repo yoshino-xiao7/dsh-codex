@@ -29,7 +29,7 @@ pnpm run verify:release
 - `docs/releases/v<version>.acceptance.json` is not `approved`;
 - `smoke:dsh-profile` on Linux, macOS, and Windows, or any fixed live check for ChatGPT OAuth, models, text/reasoning streams, usage, the tool round trip, replay, images, transports, and Fast has not passed;
 - timestamps, runner details, Node versions, approver, or HTTPS evidence links are missing;
-- files other than the Release body and acceptance record changed after the accepted commit;
+- files outside the permitted release-evidence set changed after the accepted commit; only the bilingual Release body, acceptance JSON, bilingual READMEs, `CHANGELOG.md`, and bilingual compatibility documents may be updated to clear publication state;
 - the `.tgz`, SHA-256, SRI, locked reference SBOM, actual install trees, production-dependency audit, or isolated-import evidence is missing or inconsistent.
 
 Both the release workflow and `prepublishOnly` invoke the strict command:
@@ -48,7 +48,7 @@ Do not bypass the gate with fabricated environment variables. Keep the release i
 3. Run the profile smoke on all three operating systems with exact DSH `0.1.1-rc.2` and a tested Node 22 release (at least `22.19.0`) or Node 24, then record `testedAt`, environment details, and HTTPS evidence links without sensitive parameters.
 4. Use a controlled test account to complete every live check below. Mark a check `passed` only after every fixed assertion has sanitized evidence; a free-form scope statement is not a substitute.
 5. After every item passes, a maintainer records approval and changes `releaseStatus` to `approved`.
-6. From that point, only `docs/releases/v<version>.md` and its acceptance JSON may change. Any product-file change requires acceptance to be repeated.
+6. From that point, only `docs/releases/v<version>.md`, its acceptance JSON, `README.md`, `README.en.md`, `CHANGELOG.md`, `docs/compatibility.md`, and `docs/compatibility.en.md` may change to record dates, evidence, and publication state. Any source, configuration, dependency, lockfile, or workflow change requires acceptance against a new commit.
 
 | Check | Required proof |
 | --- | --- |
@@ -107,12 +107,66 @@ Because the frozen fixture uses `--ignore-scripts`, this layer proves DSH Web/pr
 
 An upgrade to DSH, pi-ai, or another runtime dependency must update and review both lockfiles, confirm that the fixture still pins only the intended DSH version, and rerun complete cross-platform CI, profile smoke, and controlled live acceptance. A scheduled Registry drift report does not replace this upgrade process.
 
-## Publication
+## Release environment
 
-- Configure npm Trusted Publisher for the repository and the `npm-release` environment before publication. The workflow uses GitHub OIDC only and neither stores nor reads a long-lived `NPM_TOKEN`.
-- npm Trusted Publishing requires CLI `11.5.1` or newer, while `--include-attestations` requires at least `11.12.0`. Before any network write, this release workflow installs, exactly verifies, and records `npm@11.16.0`; future releases should pin the latest compatible version available at the time.
-- The repository owner manually dispatches the release workflow and approves the `npm-release` environment.
-- `publish=false` only builds and verifies a candidate artifact; `publish=true` enables the strict gate and npm publication.
+Create `npm-release` under **GitHub repository Settings → Environments**:
+
+1. configure at least one required reviewer;
+2. restrict deployment branches to `main`;
+3. do not add a normal repository-level npm token; only during the first-publish bootstrap, temporarily add the environment secret `NPM_BOOTSTRAP_TOKEN`;
+4. have the releaser manually dispatch the workflow and approve the environment only after checking the version, commit, and candidate job.
+
+The release workflow pins npm `11.16.0` and verifies and records that exact version before any network write. Trusted Publishing requires npm CLI `11.5.1` or newer, while `--include-attestations` requires at least `11.12.0`; an npm upgrade must update the pin, tests, and release documentation together.
+
+Run the read-only candidate first:
+
+```sh
+gh workflow run release.yml --ref main \
+  -f version=0.0.1 \
+  -f publish=false
+```
+
+`--ref main` is a hard gate. Dispatching another branch makes the candidate fail explicitly instead of reporting success with every job skipped. Download and review the candidate assets, complete live acceptance, update only the permitted release-evidence documents, and merge them to `main` before publishing.
+
+## First publication of `0.0.1`
+
+npm allows Trusted Publisher configuration only for a package that **already exists**, so a new package needs a one-time bootstrap. This exception is valid only for `dsh-codex-community@0.0.1` while the package name is absent from the Registry. The workflow checks the version, package-name state, and exact candidate and fails when any condition differs.
+
+1. In the npm website, create a shortest-lived Granular Access Token. Set Packages and scopes to **Read and write**, select **All packages**, and enable **Bypass 2FA**. The token cannot be restricted to a package that does not exist yet, so revoke it immediately after success;
+2. paste the token only into the GitHub `npm-release` environment secret `NPM_BOOTSTRAP_TOKEN`. Never put it in the repository, shell history, an Issue, Release evidence, or chat;
+3. after the strict gate is ready, dispatch the one-time publication:
+
+   ```sh
+   gh workflow run release.yml --ref main \
+     -f version=0.0.1 \
+     -f publish=true
+   ```
+
+4. approve the `npm-release` environment. The workflow injects this secret into `npm publish` only when it must create the absent `0.0.1`, and generates provenance on a GitHub-hosted runner;
+5. once the package exists, open its **Settings → Trusted Publisher** and enter: provider `GitHub Actions`, owner `yoshino-xiao7`, repository `dsh-codex`, workflow filename `release.yml`, environment `npm-release`, and allowed action `npm publish`;
+6. revoke the npm token and delete the GitHub environment secret:
+
+   ```sh
+   gh secret delete NPM_BOOTSTRAP_TOKEN --env npm-release
+   ```
+
+7. under **Settings → Publishing access**, select **Require two-factor authentication and disallow tokens**, then verify the Trusted Publisher configuration;
+8. the workflow automatically selects Trusted Publisher for every later version. While the package name is absent from the Registry, only `0.0.1` may enter the one-time bootstrap; once the package exists, the workflow does not read the bootstrap secret. If `0.0.1` already exists and is byte-identical to the candidate, a rerun only recovers later Release steps and no longer needs the token.
+
+This bootstrap follows npm's [Trusted Publisher limitation](https://docs.npmjs.com/trusted-publishers/), [2FA and Granular Access Token requirements](https://docs.npmjs.com/requiring-2fa-for-package-publishing-and-settings-modification/), and [GitHub Actions provenance requirements](https://docs.npmjs.com/generating-provenance-statements/).
+
+## Routine publication
+
+After Trusted Publisher is configured, every version uses:
+
+```sh
+gh workflow run release.yml --ref main \
+  -f version=0.0.2 \
+  -f publish=true
+```
+
+- `publish=false` only builds and verifies a candidate artifact; `publish=true` enables the strict gate, Registry write, and bilingual GitHub Release.
+- Routine publication uses GitHub OIDC only and reads no token.
 - After npm publication, read back `repository.url`, `dist.integrity`, and provenance, requiring `dist.integrity` to exactly match the candidate `.sri` value.
 - Install the exact Registry version in a fresh directory and run `npm audit signatures --json --include-attestations`. A signature or attestation verification failure blocks the public Release; preserve the raw provenance bundle and audit result as Release assets.
 - Download the registry tarball and compare it byte-for-byte with the workflow artifact.

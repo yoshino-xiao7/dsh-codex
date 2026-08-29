@@ -10,13 +10,13 @@ const REVIEWED_WORKFLOWS = Object.freeze([
   "release.yml",
 ])
 const REVIEWED_ACTIONS = new Set([
-  "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
-  "actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093",
-  "actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
-  "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
-  "github/codeql-action/analyze@6f5948dfacef28e207b48d0905cf90c03365536d",
-  "github/codeql-action/init@6f5948dfacef28e207b48d0905cf90c03365536d",
-  "pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+  "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+  "actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+  "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
+  "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+  "github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938",
+  "github/codeql-action/init@cdf488f595d80d6e07e03d4674febd5ab45fa938",
+  "pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86",
 ])
 
 async function workflow(name) {
@@ -125,10 +125,12 @@ test("every full-suite job installs the frozen DSH fixture before collecting tes
   }
 })
 
-test("release candidate is read-only, main-only, and built once", async () => {
+test("release candidate is read-only, fails explicitly off main, and is built once", async () => {
   const source = await workflow("release.yml")
+  const candidate = workflowJob(source, "candidate")
   assert.match(source, /permissions: \{\}/u)
-  assert.match(source, /candidate:\n\s+if: github\.ref == 'refs\/heads\/main'/u)
+  assert.doesNotMatch(candidate, /^\s+if:/mu)
+  assert.match(candidate, /test "\$GITHUB_REF" = "refs\/heads\/main"/u)
   assert.match(source, /candidate:[\s\S]*?permissions:\n\s+contents: read/u)
   assert.equal((source.match(/persist-credentials: false/gu) ?? []).length, 2)
   assert.equal((source.match(/npm pack --ignore-scripts --json --pack-destination release/gu) ?? []).length, 1)
@@ -148,6 +150,22 @@ test("candidate packaging uses and records the exact reviewed npm toolchain befo
   assert.ok(source.indexOf(install) < source.indexOf(pack))
   assert.ok(source.indexOf(record) < source.indexOf(pack))
   assert.match(source, /if \(candidateVersion !== "11\.16\.0\\n"\) process\.exit\(1\)/u)
+})
+
+test("release uses no dependency cache and dry-runs the local tarball spec with the pinned npm", async () => {
+  const source = await workflow("release.yml")
+  const candidate = workflowJob(source, "candidate")
+  const pack = candidate.indexOf("npm pack --ignore-scripts --json --pack-destination release")
+  const dryRun = candidate.indexOf('npm publish "./$PACKAGE_FILE" --dry-run --force --ignore-scripts --json')
+
+  assert.equal((source.match(/package-manager-cache: false/gu) ?? []).length, 2)
+  assert.doesNotMatch(source, /^\s+cache:/mu)
+  assert.notEqual(pack, -1)
+  assert.ok(dryRun > pack, "local publish dry-run must inspect the once-built candidate")
+  assert.equal(
+    (candidate.match(/npm publish "\.\/\$PACKAGE_FILE" --dry-run --force --ignore-scripts --json/gu) ?? []).length,
+    1,
+  )
 })
 
 test("release boots the exact once-built candidate in the supported DSH runtime", async () => {
@@ -212,15 +230,16 @@ test("release checksum sidecar is portable outside the CI release directory", as
 
 test("publication uses a protected OIDC job and the downloaded candidate", async () => {
   const source = await workflow("release.yml")
+  assert.doesNotMatch(source, /^\s+authentication:/mu)
   assert.match(source, /publish:\n\s+if: inputs\.publish && github\.ref == 'refs\/heads\/main'/u)
   assert.match(source, /needs: candidate/u)
   assert.match(source, /environment:\n\s+name: npm-release/u)
   assert.match(source, /permissions:\n\s+contents: write\n\s+id-token: write/u)
   assert.match(
     source,
-    /actions\/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4/u,
+    /actions\/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8/u,
   )
-  assert.match(source, /npm publish "\$PACKAGE_FILE" --access public --provenance/u)
+  assert.match(source, /npm publish "\.\/\$PACKAGE_FILE" --access public --provenance/u)
   assert.doesNotMatch(source, /NPM_TOKEN|attestations: write/u)
   assert.equal(
     (source.match(/test "\$\(git rev-parse HEAD\)" = "\$\(git rev-parse refs\/remotes\/origin\/main\)"/gu) ?? []).length,
@@ -229,10 +248,34 @@ test("publication uses a protected OIDC job and the downloaded candidate", async
   )
 })
 
+test("Registry state automatically selects the isolated bootstrap or routine OIDC path", async () => {
+  const source = await workflow("release.yml")
+  const publishSource = workflowJob(source, "publish")
+
+  assert.equal((publishSource.match(/secrets\.NPM_BOOTSTRAP_TOKEN/gu) ?? []).length, 1)
+  assert.doesNotMatch(publishSource, /secrets\.NPM_TOKEN/u)
+  assert.match(
+    publishSource,
+    /absent\)\n\s+test "\$REQUESTED_VERSION" = "0\.0\.1"/u,
+  )
+  assert.match(
+    publishSource,
+    /if: steps\.registry\.outputs\.state == 'absent' && steps\.registry\.outputs\.package_state == 'absent'/u,
+  )
+  assert.match(
+    publishSource,
+    /if: steps\.registry\.outputs\.state == 'absent' && steps\.registry\.outputs\.package_state == 'present'/u,
+  )
+  assert.equal(
+    (publishSource.match(/npm publish "\.\/\$PACKAGE_FILE" --access public --provenance/gu) ?? []).length,
+    2,
+  )
+})
+
 test("publication pins npm independently and compares the immutable candidate toolchain evidence", async () => {
   const source = await workflow("release.yml")
   const toolchainInstall = "npm install --global --ignore-scripts --no-audit --no-fund npm@11.16.0"
-  const publish = 'npm publish "$PACKAGE_FILE" --access public --provenance'
+  const publish = 'npm publish "./$PACKAGE_FILE" --access public --provenance'
   const publishSource = source.slice(source.indexOf("\n  publish:"))
   assert.ok(source.includes(toolchainInstall))
   assert.ok(publishSource.indexOf(toolchainInstall) < publishSource.indexOf(publish))
@@ -292,20 +335,26 @@ test("publication verifies registry signatures and attestations from a clean exa
     /JSON\.parse\(fs\.readFileSync\(`\$\{process\.env\.GITHUB_WORKSPACE\}\/release\/npm-signatures\.json`, "utf8"\)\)/u,
   )
   assert.match(source, /Array\.isArray\(report\.verified\)/u)
+  assert.match(source, /Array\.isArray\(report\.invalid\)/u)
+  assert.match(source, /report\.invalid\.length !== 0/u)
+  assert.match(source, /Array\.isArray\(report\.missing\)/u)
+  assert.match(source, /report\.missing\.length !== 0/u)
   assert.match(
     source,
     /entry\?\.name === "dsh-codex-community" && entry\?\.version === process\.env\.REQUESTED_VERSION/u,
   )
-  assert.match(
-    source,
-    /target\.attestations\?\.provenance\?\.predicateType !== "https:\/\/slsa\.dev\/provenance\/v1"/u,
-  )
-  assert.match(source, /!Array\.isArray\(target\.attestations\?\.bundles\)/u)
-  assert.match(source, /target\.attestations\.bundles\.length === 0/u)
+  assert.match(source, /const slsaPredicate = "https:\/\/slsa\.dev\/provenance\/v1"/u)
+  assert.match(source, /target\.attestations\?\.provenance\?\.predicateType !== slsaPredicate/u)
+  assert.match(source, /!Array\.isArray\(target\.attestationBundles\)/u)
+  assert.match(source, /target\.attestationBundles\.length === 0/u)
+  assert.match(source, /entry\?\.predicateType === slsaPredicate/u)
+  assert.match(source, /!provenance\?\.bundle\?\.dsseEnvelope/u)
+  assert.match(source, /!provenance\.bundle\.verificationMaterial/u)
 })
 
 test("every release carries the complete evidence set under a version-neutral bilingual title", async () => {
   const source = await workflow("release.yml")
+  const releaseStep = source.slice(source.indexOf("- name: Create, verify, and publish the bilingual GitHub Release"))
   const assetsBlock = source.match(/assets=\(\n([\s\S]*?)\n\s+\)/u)?.[1]
   const expectedBlock = source.match(/const expected = \[\n([\s\S]*?)\n\s+\]\.sort\(\)/u)?.[1]
   assert.ok(assetsBlock)
@@ -330,7 +379,7 @@ test("every release carries the complete evidence set under a version-neutral bi
     source,
     /const expectedTitle = `v\$\{process\.env\.EXPECTED_VERSION\} 社区版本 \/ Community Release`/u,
   )
-  assert.doesNotMatch(source, /0\.0\.1|首个公开预览|Initial Public Preview/u)
+  assert.doesNotMatch(releaseStep, /0\.0\.1|首个公开预览|Initial Public Preview/u)
 })
 
 test("publication is safely repeatable and verifies every GitHub Release asset before going public", async () => {
@@ -387,6 +436,7 @@ test("publish-blocking placeholders appear only in the release metadata header",
 
 test("strict release verification covers every packed publication-state document", async () => {
   const source = await readFile(new URL("../scripts/verify-release.mjs", import.meta.url), "utf8")
+  const boundary = await readFile(new URL("../scripts/release-source-boundary.mjs", import.meta.url), "utf8")
   for (const document of [
     "README.md",
     "README.en.md",
@@ -394,8 +444,10 @@ test("strict release verification covers every packed publication-state document
     "docs/compatibility.md",
     "docs/compatibility.en.md",
   ]) {
-    assert.ok(source.includes(document), `strict verifier does not cover ${document}`)
+    assert.ok(boundary.includes(document), `strict verifier does not cover ${document}`)
   }
+  assert.match(source, /publicationStatePaths/u)
+  assert.match(source, /findUnexpectedPostAcceptanceChanges/u)
   assert.match(source, /test\/fixtures\/dsh-runtime\/package\.json/u)
   assert.match(source, /test\/fixtures\/dsh-runtime\/pnpm-lock\.yaml/u)
   assert.match(source, /dshRuntimeLockSha256: actualDshRuntimeLockSha256/u)

@@ -11,6 +11,10 @@ import {
 } from "./generate-sbom.mjs"
 import { assertAcceptanceRecord } from "./release-acceptance.mjs"
 import { assertCandidateEvidenceHashes } from "./release-evidence.mjs"
+import {
+  findUnexpectedPostAcceptanceChanges,
+  publicationStatePaths,
+} from "./release-source-boundary.mjs"
 import { assertReleaseVersion, releaseDocumentPaths } from "./release-version.mjs"
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..")
@@ -28,13 +32,6 @@ const { notes: releasePath, acceptance: acceptancePath } = releaseDocumentPaths(
 const changelog = await readRepositoryFile("CHANGELOG.md")
 const releaseNotes = await readRepositoryFile(releasePath)
 const acceptance = JSON.parse(await readRepositoryFile(acceptancePath))
-const publicationStatePaths = Object.freeze([
-  "README.md",
-  "README.en.md",
-  "CHANGELOG.md",
-  "docs/compatibility.md",
-  "docs/compatibility.en.md",
-])
 const publicationStateDocuments = new Map(await Promise.all(
   publicationStatePaths.map(async (path) => [path, await readRepositoryFile(path)]),
 ))
@@ -94,11 +91,13 @@ function assertAcceptedSource(sourceCommit) {
     throw new Error("Acceptance testedCommit must be an ancestor of the release commit")
   }
 
-  const allowedEvidenceChanges = new Set([releasePath, acceptancePath])
   const changedFiles = runGit(["diff", "--name-only", `${acceptance.testedCommit}..${sourceCommit}`])
     .split("\n")
     .filter(Boolean)
-  const productChanges = changedFiles.filter((path) => !allowedEvidenceChanges.has(path))
+  const productChanges = findUnexpectedPostAcceptanceChanges(changedFiles, {
+    acceptancePath,
+    releasePath,
+  })
   assert(
     productChanges.length === 0,
     `Product files changed after the accepted commit: ${productChanges.join(", ")}`,
