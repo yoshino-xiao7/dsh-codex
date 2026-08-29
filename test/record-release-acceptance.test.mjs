@@ -19,6 +19,7 @@ import test from "node:test"
 
 import {
   assertAcceptanceRecord,
+  assertPublicationAcceptanceRecord,
   createDraftAcceptanceRecord,
   LIVE_ACCEPTANCE_ASSERTIONS,
 } from "../scripts/release-acceptance.mjs"
@@ -33,6 +34,7 @@ const THIRD_COMMIT = "c".repeat(40)
 const PASS_TIME = "2026-08-29T10:00:00+08:00"
 const COMPLETE_EVIDENCE_TIME = "2026-08-29T02:00:00Z"
 const APPROVED_AT = "2026-08-29T03:00:00Z"
+const POST_RELEASE_PASS_TIME = "2026-08-29T04:00:00Z"
 const DSH_VERSION = "0.1.1-rc.2"
 const PLATFORM_NODE_VERSION = "22.22.2"
 const PLATFORM_RUNNER = "linux-controlled-runner"
@@ -859,8 +861,8 @@ test("pass is byte-idempotent and rejects different evidence or a different boun
   )
 })
 
-test("approve records a later maintainer decision only after every acceptance item passes", async (t) => {
-  const initialAcceptance = completeDraftAcceptance()
+test("approve records a later maintainer decision after all platforms pass while live checks remain pending", async (t) => {
+  const initialAcceptance = completePlatformDraftAcceptance()
   const repositoryRoot = await createRepository(t, { acceptance: initialAcceptance })
   await ageRepositoryFiles(repositoryRoot)
   const before = await snapshotTree(repositoryRoot)
@@ -887,10 +889,11 @@ test("approve records a later maintainer decision only after every acceptance it
   assert.equal(acceptance.approvalEvidenceUrl, APPROVAL_EVIDENCE_URL)
   assert.deepEqual(acceptance.platforms, initialAcceptance.platforms)
   assert.deepEqual(acceptance.liveAcceptance, initialAcceptance.liveAcceptance)
-  assert.doesNotThrow(() => assertAcceptanceRecord(acceptance, {
-    version: VERSION,
-    requirePassed: true,
-  }))
+  assert.doesNotThrow(() => assertPublicationAcceptanceRecord(acceptance, { version: VERSION }))
+  assert.throws(
+    () => assertAcceptanceRecord(acceptance, { version: VERSION, requirePassed: true }),
+    /acceptance must pass for complete live validation/iu,
+  )
   assertOnlyAcceptanceChanged(before, await snapshotTree(repositoryRoot))
 
   await ageRepositoryFiles(repositoryRoot)
@@ -904,20 +907,11 @@ test("approve records a later maintainer decision only after every acceptance it
   assert.deepEqual(await snapshotTree(repositoryRoot), beforeReplay)
 })
 
-test("approve rejects incomplete evidence, an earlier decision, mismatched commit, or loose options", async (t) => {
-  const pendingLive = completeDraftAcceptance()
-  pendingLive.liveAcceptance.fastPriority = createDraftAcceptanceRecord(VERSION).liveAcceptance.fastPriority
-
-  const pendingPlatform = completeDraftAcceptance()
+test("approve rejects a pending platform, an earlier decision, mismatched commit, or loose options", async (t) => {
+  const pendingPlatform = completePlatformDraftAcceptance()
   pendingPlatform.platforms.linux = createDraftAcceptanceRecord(VERSION).platforms.linux
 
   const cases = [
-    {
-      label: "pending live check",
-      acceptance: pendingLive,
-      arguments: approveArguments(),
-      pattern: /fastPriority acceptance must pass/iu,
-    },
     {
       label: "pending platform",
       acceptance: pendingPlatform,
@@ -926,37 +920,37 @@ test("approve rejects incomplete evidence, an earlier decision, mismatched commi
     },
     {
       label: "approval before latest evidence",
-      acceptance: completeDraftAcceptance(),
+      acceptance: completePlatformDraftAcceptance(),
       arguments: approveArguments({ approvedAt: "2026-08-29T01:59:59Z" }),
       pattern: /must not precede the latest accepted evidence/iu,
     },
     {
       label: "different candidate commit",
-      acceptance: completeDraftAcceptance(),
+      acceptance: completePlatformDraftAcceptance(),
       arguments: approveArguments({ testedCommit: OTHER_COMMIT }),
       pattern: /testedCommit does not match/iu,
     },
     {
       label: "missing maintainer",
-      acceptance: completeDraftAcceptance(),
+      acceptance: completePlatformDraftAcceptance(),
       arguments: approveArguments({ approvedBy: null }),
       pattern: /--approved-by is required/iu,
     },
     {
       label: "duplicate approval time",
-      acceptance: completeDraftAcceptance(),
+      acceptance: completePlatformDraftAcceptance(),
       arguments: [...approveArguments(), `--approved-at=${APPROVED_AT}`],
       pattern: /--approved-at may be provided only once/iu,
     },
     {
       label: "placeholder maintainer",
-      acceptance: completeDraftAcceptance(),
+      acceptance: completePlatformDraftAcceptance(),
       arguments: approveArguments({ approvedBy: "TBD" }),
       pattern: /identify the approving maintainer/iu,
     },
     {
       label: "approval URL query",
-      acceptance: completeDraftAcceptance(),
+      acceptance: completePlatformDraftAcceptance(),
       arguments: approveArguments({
         evidenceUrl: "https://evidence.example.test/approval?token=secret",
       }),
@@ -964,7 +958,7 @@ test("approve rejects incomplete evidence, an earlier decision, mismatched commi
     },
     {
       label: "unreviewed approval option",
-      acceptance: completeDraftAcceptance(),
+      acceptance: completePlatformDraftAcceptance(),
       arguments: [...approveArguments(), "--assert=not-applicable"],
       pattern: /Unknown option --assert/iu,
     },
@@ -972,6 +966,116 @@ test("approve rejects incomplete evidence, an earlier decision, mismatched commi
 
   for (const fixture of cases) {
     const repositoryRoot = await createRepository(t, { acceptance: fixture.acceptance })
+    await assertRejectsWithoutWrites(
+      repositoryRoot,
+      () => runReleaseAcceptance({ repositoryRoot, arguments: fixture.arguments }),
+      fixture.pattern,
+      fixture.label,
+    )
+  }
+})
+
+test("an approved release permits a pending live check to be backfilled without exposing evidence", async (t) => {
+  const initialAcceptance = approvedAcceptanceWithPendingLive()
+  const repositoryRoot = await createRepository(t, { acceptance: initialAcceptance })
+  await ageRepositoryFiles(repositoryRoot)
+  const before = await snapshotTree(repositoryRoot)
+  const arguments_ = textStreamPassArguments({ testedAt: POST_RELEASE_PASS_TIME })
+
+  const result = await runReleaseAcceptance({ repositoryRoot, arguments: arguments_ })
+
+  assert.deepEqual(result, {
+    changedPaths: [ACCEPTANCE_PATH],
+    output: "Recorded textStream as passed.",
+    status: "changed",
+  })
+  assertSensitiveValuesRedacted(result.output, [
+    TESTED_COMMIT,
+    POST_RELEASE_PASS_TIME,
+    TEXT_EVIDENCE_URL,
+    APPROVAL_EVIDENCE_URL,
+  ])
+  const acceptance = await readAcceptance(repositoryRoot)
+  assert.equal(acceptance.releaseStatus, "approved")
+  assert.equal(acceptance.testedCommit, initialAcceptance.testedCommit)
+  assert.equal(acceptance.approvedBy, initialAcceptance.approvedBy)
+  assert.equal(acceptance.approvedAt, initialAcceptance.approvedAt)
+  assert.equal(acceptance.approvalEvidenceUrl, initialAcceptance.approvalEvidenceUrl)
+  assert.deepEqual(acceptance.platforms, initialAcceptance.platforms)
+  assert.deepEqual(acceptance.liveAcceptance.textStream, {
+    status: "passed",
+    testedAt: POST_RELEASE_PASS_TIME,
+    evidenceUrl: TEXT_EVIDENCE_URL,
+    assertions: {
+      nonEmptyTextDelta: true,
+      terminalStopObserved: true,
+    },
+  })
+  assert.equal(acceptance.liveAcceptance.fastPriority.status, "pending")
+  assert.doesNotThrow(() => assertPublicationAcceptanceRecord(acceptance, { version: VERSION }))
+  assertOnlyAcceptanceChanged(before, await snapshotTree(repositoryRoot))
+
+  const status = await runReleaseAcceptance({ repositoryRoot, arguments: ["status"] })
+  assert.match(status.output, /Release v0\.0\.2 acceptance: approved/u)
+  assert.match(status.output, new RegExp(`Live checks: 1/${Object.keys(LIVE_ACCEPTANCE_ASSERTIONS).length} passed`, "u"))
+  assert.match(status.output, /Pending live checks:/u)
+  assertSensitiveValuesRedacted(status.output, [
+    acceptance.testedCommit,
+    acceptance.approvedBy,
+    acceptance.approvedAt,
+    acceptance.approvalEvidenceUrl,
+    acceptance.liveAcceptance.textStream.testedAt,
+    acceptance.liveAcceptance.textStream.evidenceUrl,
+  ])
+
+  await ageRepositoryFiles(repositoryRoot)
+  const beforeReplay = await snapshotTree(repositoryRoot)
+  const replay = await runReleaseAcceptance({ repositoryRoot, arguments: arguments_ })
+  assert.deepEqual(replay, {
+    changedPaths: [],
+    output: "textStream already has identical passed evidence.",
+    status: "unchanged",
+  })
+  assert.deepEqual(await snapshotTree(repositoryRoot), beforeReplay)
+})
+
+test("approved live backfill still requires the exact assertions, commit, timestamp, and evidence URL", async (t) => {
+  const cases = [
+    {
+      label: "missing fixed assertion",
+      arguments: textStreamPassArguments({
+        assertions: ["nonEmptyTextDelta"],
+        testedAt: POST_RELEASE_PASS_TIME,
+      }),
+      pattern: /must explicitly confirm exactly/iu,
+    },
+    {
+      label: "different candidate commit",
+      arguments: textStreamPassArguments({
+        testedAt: POST_RELEASE_PASS_TIME,
+        testedCommit: OTHER_COMMIT,
+      }),
+      pattern: /testedCommit does not match/iu,
+    },
+    {
+      label: "unreal timestamp",
+      arguments: textStreamPassArguments({ testedAt: "2026-08-29T24:00:00Z" }),
+      pattern: /real RFC3339 timestamp/iu,
+    },
+    {
+      label: "evidence URL query",
+      arguments: textStreamPassArguments({
+        evidenceUrl: "https://evidence.example.test/live/text-stream?token=secret",
+        testedAt: POST_RELEASE_PASS_TIME,
+      }),
+      pattern: /query data/iu,
+    },
+  ]
+
+  for (const fixture of cases) {
+    const repositoryRoot = await createRepository(t, {
+      acceptance: approvedAcceptanceWithPendingLive(),
+    })
     await assertRejectsWithoutWrites(
       repositoryRoot,
       () => runReleaseAcceptance({ repositoryRoot, arguments: fixture.arguments }),
@@ -1030,7 +1134,7 @@ test("an approved record permits identical replays but rejects every attempted m
         testedAt: acceptance.liveAcceptance.textStream.testedAt,
       }),
     }),
-    /approved acceptance record is immutable/iu,
+    /already passed with different evidence/iu,
     "changed live evidence",
   )
   await assertRejectsWithoutWrites(
@@ -1047,6 +1151,15 @@ test("an approved record permits identical replays but rejects every attempted m
     }),
     /approved acceptance record is immutable/iu,
     "changed platform evidence",
+  )
+  await assertRejectsWithoutWrites(
+    repositoryRoot,
+    () => runReleaseAcceptance({
+      repositoryRoot,
+      arguments: resetCandidateArguments(),
+    }),
+    /approved acceptance record is immutable/iu,
+    "candidate reset",
   )
 })
 
@@ -1396,7 +1509,7 @@ function statusAcceptance() {
   return acceptance
 }
 
-function completeDraftAcceptance() {
+function completePlatformDraftAcceptance() {
   const acceptance = createDraftAcceptanceRecord(VERSION)
   acceptance.testedCommit = TESTED_COMMIT
   for (const [platform, result] of Object.entries(acceptance.platforms)) {
@@ -1407,6 +1520,12 @@ function completeDraftAcceptance() {
     result.profileSmoke = "passed"
     result.evidenceUrl = `https://evidence.example.test/platform/${platform}`
   }
+  assert.doesNotThrow(() => assertAcceptanceRecord(acceptance, { version: VERSION }))
+  return acceptance
+}
+
+function completeDraftAcceptance() {
+  const acceptance = completePlatformDraftAcceptance()
   for (const [check, result] of Object.entries(acceptance.liveAcceptance)) {
     result.status = "passed"
     result.testedAt = COMPLETE_EVIDENCE_TIME
@@ -1435,6 +1554,18 @@ function approvedAcceptance() {
   assert.doesNotThrow(() => assertAcceptanceRecord(acceptance, {
     version: VERSION,
     requirePassed: true,
+  }))
+  return acceptance
+}
+
+function approvedAcceptanceWithPendingLive() {
+  const acceptance = completePlatformDraftAcceptance()
+  acceptance.releaseStatus = "approved"
+  acceptance.approvedBy = "release-maintainer"
+  acceptance.approvedAt = APPROVED_AT
+  acceptance.approvalEvidenceUrl = APPROVAL_EVIDENCE_URL
+  assert.doesNotThrow(() => assertPublicationAcceptanceRecord(acceptance, {
+    version: VERSION,
   }))
   return acceptance
 }

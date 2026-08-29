@@ -14,13 +14,13 @@ pnpm run verify:release
 
 `pnpm run check` 依次执行语法与导入边界扫描、公开声明的严格 TypeScript 消费检查、全部测试、构建、中英文配对检查和 npm pack 白名单检查。全部测试包含真实冻结 DSH AgentLoop/Retry 编排，因此本地、CI、兼容性监测和发布候选都必须先安装已提交的 DSH 运行时夹具。
 
-根目录 `pnpm-lock.yaml` 与夹具的 `test/fixtures/dsh-runtime/pnpm-lock.yaml` 必须同时保持受审查状态。升级 DSH、pi-ai 或其他运行依赖时要更新两套 lockfile，并重新运行完整 CI、profile smoke 与受控真实验收。
+根目录 `pnpm-lock.yaml` 与夹具的 `test/fixtures/dsh-runtime/pnpm-lock.yaml` 必须同时保持受审查状态。升级 DSH、pi-ai 或其他运行依赖时要更新两套 lockfile，在发布前重新运行完整 CI、profile smoke 与供应链校验，正式发布后再重新开始受控真实验证。
 
 夹具禁用生命周期脚本，因此这一级只验证 DSH Web/profile 与插件集成，不代表已验证 DSH 依赖中需要安装脚本的原生终端或本机构建能力。
 
 ### 普通 CI 候选复演
 
-普通 CI 另设只读的 `candidate-replay` Ubuntu/Node 24 job。它从干净 checkout 安装固定 pnpm `10.34.5` 和 npm `11.16.0`，动态读取 `package.json` 版本，随后仅调用一次 `pnpm run release:candidate -- <version>`；完整 `release/` 以 `dsh-codex-community-${{ github.sha }}-ci-replay` artifact 上传并保留 14 天。该 job 不发布、不读取凭据，也不是 `main` 上 `release.yml` 生成的权威发布候选；它不能替代三平台 CI/profile smoke、真实账号验收或维护者审批。
+普通 CI 另设只读的 `candidate-replay` Ubuntu/Node 24 job。它从干净 checkout 安装固定 pnpm `10.34.5` 和 npm `11.16.0`，动态读取 `package.json` 版本，随后仅调用一次 `pnpm run release:candidate -- <version>`；完整 `release/` 以 `dsh-codex-community-${{ github.sha }}-ci-replay` artifact 上传并保留 14 天。该 job 不发布、不读取凭据，也不是 `main` 上 `release.yml` 生成的权威发布候选；它不能替代三平台 CI/profile smoke、完整供应链门禁或维护者审批，也不执行发布后的真实账号验证。
 
 ## 故障回归
 
@@ -54,8 +54,8 @@ pnpm run verify:release
 2. SDK 合同：锁定发布包的 public exports；
 3. 隔离安装：从 `.tgz` 安装到空目录并导入 Host；
 4. Harness smoke：先从 `test/fixtures/dsh-runtime/pnpm-lock.yaml` 冻结安装精确 DSH runtime，再从本地 `.tgz` 安装到隔离 profile、确认通用 pi-ai provider 配置未改变、启动 Web，并读取登录状态 RPC 与 client bundle；模型发现由 SDK 合同和 Host runtime 测试覆盖；
-5. 真实网络：由仓库所有者在受控本地环境中使用测试账号人工逐项验证 Web OAuth、模型目录、文本/reasoning 流、终态 usage、安全工具闭环、两轮 replay、`maxPixels=4194304` 图片路径、四种 transport 与 Fast；该过程会消耗账号额度，验收 JSON 的固定布尔断言全部为真后才能通过；
-6. 发布读回：npm `dist.integrity` 与候选 SRI 精确一致，签名/attestation 审计通过，GitHub 资产与本地 tarball 逐字节一致。
+5. 正式发布读回：npm `dist.integrity` 与候选 SRI 精确一致，签名/attestation 审计通过，GitHub 资产与本地 tarball 逐字节一致；发布前还必须确认三平台 `3/3`和维护者批准；
+6. 发布后真实网络：`0.0.1` 允许以 `0/13` 正式发布。随后由仓库所有者在受控本地环境中使用测试账号人工逐项验证 Web OAuth、模型目录、文本/reasoning 流、终态 usage、安全工具闭环、两轮 replay、`maxPixels=4194304` 图片路径、四种 transport 与 Fast；该过程会消耗账号额度，只有固定布尔断言全部有脱敏证据时才能将对应项改为 `passed`，未通过项必须如实保留；发现的产品问题进入 `0.0.2` 迭代。
 
 维护者核验一个平台的 CI 与 profile smoke 后，用完整参数离线记录该结论：
 
@@ -82,4 +82,4 @@ pnpm run release:acceptance -- reset-candidate \
 
 `--from-commit` 必须匹配当前 `testedCommit`，两个完整小写 SHA 必须不同。命令会清空全部旧平台/live 证据和审批字段并绑定新 SHA；approved 记录不能重置。它离线运行且不检查提交存在性，并通过受管路径检查、并发写锁和原子替换安全写入。同一条 `old → new` 命令在记录已是只绑定新 SHA 的 fresh draft 时返回 `unchanged`；任何残留证据都会冲突且不写入。重置后先在新 SHA 上运行 CI/profile smoke，再通过 `pass-platform` 记录新平台证据。
 
-真实 OAuth、配额或网络 smoke 不应要求贡献者在 CI 提交秘密，也不能使用外部 PR 可访问的 secret。`release:acceptance` 只是离线证据记录器：`pass-platform` 只记录维护者已核验的 CI/profile smoke，既不运行测试、不联网，也不检查提交是否存在；`pass` 不读取凭据、不推断或自动通过断言；两者都不替代人工审批。`status` 只显示计数和检查项名称，不显示证据值。第一次 `pass-platform` 或 `pass` 绑定完整候选 SHA，后续所有平台/live 记录和 `approve` 必须使用同一 SHA。已通过项目只允许完全相同的幂等重放，任何不同证据都不能覆盖；严格 publish gate 仍负责验证提交存在性和祖先关系。
+真实 OAuth、配额或网络 smoke 不应要求贡献者在 CI 提交秘密，也不能使用外部 PR 可访问的 secret。`release:acceptance` 只是离线证据记录器：`pass-platform` 只记录维护者已核验的 CI/profile smoke，既不运行测试、不联网，也不检查提交是否存在；`pass` 不读取凭据、不推断或自动通过断言；两者都不替代人工审批。`status` 只显示计数和检查项名称，不显示证据值。第一次 `pass-platform` 绑定完整候选 SHA，后续所有平台/live 记录和 `approve` 必须使用同一 SHA。已通过项目只允许完全相同的幂等重放，任何不同证据都不能覆盖。严格 publish gate 负责验证三平台 `3/3`、供应链证据、维护者批准、提交存在性和祖先关系；live 可在 `0/13` 状态正式发布并在发布后继续补录。

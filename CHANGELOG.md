@@ -3,7 +3,7 @@
 本项目遵循 Keep a Changelog 的结构；`0.0.x` 为技术预览。
 This project follows the Keep a Changelog structure; `0.0.x` is a technical preview.
 
-## [0.0.1] - Unreleased
+## [0.0.1] - 2026-08-29
 
 ### 中文
 
@@ -23,6 +23,7 @@ This project follows the Keep a Changelog structure; `0.0.x` is a technical prev
 - 发布候选在 Web/profile smoke 成功后记录 DSH 版本、夹具 lock SHA-256、Node、pnpm、平台、架构与生命周期脚本状态，并由严格门禁重新验证。
 - 中英文文档、社区治理、Issue/PR、跨平台 CI，以及最小权限、SHA 固定、离线确定性 SBOM 和可恢复重跑的发布流程。
 - 发布候选生成双语审批摘要，并在受保护环境审批前后各执行一次严格门禁；npm Trusted Publisher/OIDC 与 GitHub Release 写权限分属独立 job，Registry 回读证据通过不可变 Actions artifact 交接。
+- `0.0.1` 使用 npm `latest` 与正式 GitHub Release；发布前三平台 CI/profile smoke 必须 `3/3` 通过，供应链证据必须完整且必须经维护者批准。真实账号验证允许以 `0/13` 如实发布并在发布后持续记录；发现的问题进入 `0.0.2` 迭代。
 - 不发布、不读取凭据的 `pnpm run release:candidate -- 0.0.1` 本地/CI 候选复演：要求干净提交与 Node 24、pnpm `10.34.5`、npm `11.16.0`，精确执行 frozen install、完整检查、仅一次生成候选 tarball、dry-run、SBOM、DSH profile smoke、隔离导入和生产依赖 audit，写入 `release/`，已有输出时在写前失败。普通 CI 的独立只读 Ubuntu/Node 24 `candidate-replay` job 动态读取版本后调用该命令一次，并把完整证据上传为保留 14 天的 `dsh-codex-community-${{ github.sha }}-ci-replay` artifact；权威候选仍由 `main` 发布 workflow 生成，该复演不替代三平台 CI/profile smoke、真实账号验收或审批。
 - 幂等且离线的 `release:prepare` 命令，用于生成下一版本的双语 CHANGELOG/Release 草稿和全新 schema v3 验收记录；它会保护人工内容、在冲突发生时写入前失败，并拒绝受管文件或父目录符号链接。
 - 不联网、不读取凭据的 `release:acceptance` 离线证据记录器；新增 `pass-platform <linux|macos|windows>`，只记录维护者已核验的 CI/profile smoke，不检查提交是否存在；平台与真实网络证据必须绑定同一候选 SHA，已通过项只允许相同证据的幂等重放，不能覆盖不同证据；真实检查只有明确列齐固定断言才记录通过，`status` 不显示证据值，提交存在性/祖先关系仍由严格门禁验证，审批仍由维护者人工作出。
@@ -64,6 +65,7 @@ This project follows the Keep a Changelog structure; `0.0.x` is a technical prev
 - Release candidates record the DSH version, fixture-lock SHA-256, Node, pnpm, platform, architecture, and lifecycle-script state only after Web/profile smoke succeeds, and the strict gate re-verifies them.
 - Chinese and English documentation, governance, issue/PR templates, cross-platform CI, and a least-privilege release flow with pinned Actions, an offline deterministic SBOM, and recoverable reruns.
 - Release candidates produce a bilingual approval summary and run the strict gate both before and after protected-environment approval. npm Trusted Publisher/OIDC and GitHub Release write access live in separate jobs, with Registry readback evidence handed off through an immutable Actions artifact.
+- `0.0.1` uses npm `latest` and a full GitHub Release. Before publication, all three CI/profile-smoke platform gates must pass, supply-chain evidence must be complete, and a maintainer must approve the release. Controlled-account validation may be disclosed at `0/13` and continue after release; findings are iterated in `0.0.2`.
 - A non-publishing, credential-free `pnpm run release:candidate -- 0.0.1` local/CI replay requires a clean committed checkout plus Node 24, pnpm `10.34.5`, and npm `11.16.0`. It performs frozen installs, the complete checks, exactly one artifact-producing pack, dry-run, SBOM, DSH profile smoke, isolated import, and production-dependency audit into `release/`, failing before any write when output already exists. Regular CI's separate read-only Ubuntu/Node 24 `candidate-replay` job reads the version dynamically, invokes the command once, and uploads the complete evidence as the 14-day `dsh-codex-community-${{ github.sha }}-ci-replay` artifact. The authoritative candidate still comes from the release workflow on `main`; this replay does not replace three-platform CI/profile smoke, live-account acceptance, or approval.
 - An idempotent offline `release:prepare` command that creates the next bilingual CHANGELOG/Release drafts and a fresh schema-v3 acceptance record, preserves human-authored content, fails before writing on conflicts, and rejects managed-file or parent-directory symlinks.
 - An offline `release:acceptance` evidence recorder that neither accesses the network nor reads credentials, now with `pass-platform <linux|macos|windows>` to record only maintainer-verified CI/profile smoke without checking that the commit exists. Platform and live-network evidence must bind to one candidate SHA; a passed item permits only an idempotent replay of identical evidence and cannot be overwritten with different evidence. Live checks pass only when every fixed assertion is explicitly listed, `status` hides evidence values, the strict gate still checks commit existence/ancestry, and approval remains a maintainer decision.

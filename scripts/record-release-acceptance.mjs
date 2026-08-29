@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url"
 
 import {
   assertAcceptanceRecord,
+  assertPublicationAcceptanceRecord,
   createDraftAcceptanceRecord,
   LIVE_ACCEPTANCE_ASSERTIONS,
 } from "./release-acceptance.mjs"
@@ -156,10 +157,6 @@ export async function recordLiveAcceptance({
     return { check, path: context.acceptancePath, status: "unchanged" }
   }
   assert(
-    context.acceptance.releaseStatus !== "approved",
-    "An approved acceptance record is immutable",
-  )
-  assert(
     currentResult.status === "pending",
     `${check} already passed with different evidence and cannot be overwritten`,
   )
@@ -190,9 +187,7 @@ export async function approveReleaseAcceptance({
     approvedAt,
     approvalEvidenceUrl: evidenceUrl,
   }
-  validateAcceptance(nextAcceptance, context.version, context.acceptancePath, {
-    requirePassed: true,
-  })
+  validatePublicationAcceptance(nextAcceptance, context.version, context.acceptancePath)
 
   if (sameJson(context.acceptance, nextAcceptance)) {
     return { path: context.acceptancePath, status: "unchanged" }
@@ -272,6 +267,14 @@ async function readAcceptanceContext(repositoryRoot) {
 function validateAcceptance(acceptance, version, path, options) {
   try {
     assertAcceptanceRecord(acceptance, { version, ...options })
+  } catch (error) {
+    throw new ReleaseFileError(`${path}: ${error.message}`)
+  }
+}
+
+function validatePublicationAcceptance(acceptance, version, path) {
+  try {
+    assertPublicationAcceptanceRecord(acceptance, { version })
   } catch (error) {
     throw new ReleaseFileError(`${path}: ${error.message}`)
   }

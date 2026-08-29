@@ -2,7 +2,7 @@
 
 [简体中文](releasing.md) | [English](releasing.en.md)
 
-Versioning begins at `0.0.1`. The `0.0.x` line is a technical preview, and every GitHub Release requires complete Chinese and English copy.
+Versioning begins at `0.0.1`. The `0.0.x` line is a technical preview, but `0.0.1` is still published under npm `latest` with a full GitHub Release. Every Release requires complete Chinese and English copy. The pre-publication hard gates are `3/3` platforms, complete supply-chain evidence, and maintainer approval; controlled-account validation may start at `0/13`, continue after formal publication, and must remain honestly disclosed.
 
 ## Preparation
 
@@ -11,7 +11,7 @@ Versioning begins at `0.0.1`. The `0.0.x` line is a technical preview, and every
 3. confirm package name, repository URL, license, peer range, and `dsh.bundle`;
 4. review and update both the root `pnpm-lock.yaml` and `test/fixtures/dsh-runtime/pnpm-lock.yaml`; never update only one dependency graph;
 5. require green Linux, macOS, and Windows CI before merge;
-6. use a controlled test account for required real acceptance without recording tokens, OAuth codes, cookies, or account credentials.
+6. state the controlled-account validation plan and current progress. `0.0.1` may be formally published at `0/13`, then completed check by check with a controlled test account without recording tokens, OAuth codes, cookies, or account credentials.
 
 Use the offline preparation script to establish the next release skeleton:
 
@@ -33,7 +33,7 @@ The command runs on a local development machine or in separate CI. It neither pu
 
 Regular CI's separate read-only `candidate-replay` job uses a clean Ubuntu/Node 24 checkout, pinned pnpm `10.34.5`, and npm `11.16.0`. It reads the version dynamically from `package.json`, invokes the unified command exactly once, and uploads the complete `release/` directory as the `dsh-codex-community-${{ github.sha }}-ci-replay` artifact with 14-day retention.
 
-This is only a reproducible local/CI preflight. The authoritative release candidate must still be generated and uploaded by the `release.yml` workflow on `main`. A local replay on macOS or Windows cannot replace that workflow's Linux x64 publication evidence, nor can it replace three-platform CI/profile smoke, live-account acceptance, or maintainer approval.
+This is only a reproducible local/CI preflight. The authoritative release candidate must still be generated and uploaded by the `release.yml` workflow on `main`. A local replay on macOS or Windows cannot replace that workflow's Linux x64 publication evidence, three-platform CI/profile smoke, the supply-chain gate, or maintainer approval. It also does not perform post-release controlled-account validation.
 
 ## Two gate levels
 
@@ -45,12 +45,12 @@ pnpm run check
 pnpm run verify:release
 ```
 
-`npm publish` uses strict mode. Publication fails before any network write if any of these conditions is unmet:
+`npm publish` uses strict mode. `0.0.1` may retain controlled-account validation at `0/13`, so `pending` and its corresponding `TBD` fields are valid, truthful states inside live records. Publication fails before any network write if any of these publication conditions is unmet:
 
-- the Release body still contains `TBD`, `pending`, `draft`, `unreleased`, or the corresponding Chinese placeholders;
-- `docs/releases/v<version>.acceptance.json` is not `approved`;
-- `smoke:dsh-profile` on Linux, macOS, and Windows, or any fixed live check for ChatGPT OAuth, models, text/reasoning streams, usage, the tool round trip, replay, images, transports, and Fast has not passed;
-- timestamps, runner details, Node versions, approver, or HTTPS evidence links are missing;
+- the Release date, Accepted commit, current-version CHANGELOG date, or another publication-critical field is still a placeholder;
+- `docs/releases/v<version>.acceptance.json` does not record maintainer approval for formal publication;
+- Linux, macOS, and Windows CI/profile smoke have not all passed with `3/3` evidence bound to the same candidate commit;
+- platform timestamps, runner details, Node versions, approver, or HTTPS evidence links are missing;
 - files outside the permitted release-evidence set changed after the accepted commit; only the bilingual Release body, acceptance JSON, bilingual READMEs, `CHANGELOG.md`, and bilingual compatibility documents may be updated to clear publication state;
 - the `.tgz`, SHA-256, SRI, locked reference SBOM, actual install trees, production-dependency audit, or isolated-import evidence is missing or inconsistent.
 
@@ -65,17 +65,18 @@ pnpm run verify:release:publish
 # After Registry publication and provenance/signature readback, upload immutable Registry evidence; the GitHub Release job has no OIDC and downloads and rechecks that evidence before writing the Release
 ```
 
-Do not bypass the gate with fabricated environment variables. Keep the release in draft state until real evidence exists.
+Do not bypass the gate with fabricated environment variables. Keep the release in draft state until all three platform, supply-chain, and maintainer-approval records exist. Missing live evidence remains `pending` and must never be presented as verified.
 `prepublishOnly` protects publication from a repository checkout. npm does not run that lifecycle when publishing an existing tarball, so the workflow runs the strict gate once before approval and again immediately before publishing that same `.tgz`; it requests a short-lived OIDC identity token only after the protected environment approves the job.
 
 ## Acceptance record
 
-1. Run cross-platform CI and live-network acceptance against a committed release candidate.
-2. Let the first `pass-platform` or `pass` bind that candidate's full 40-character commit to `testedCommit`.
+1. Run cross-platform CI/profile smoke and complete supply-chain verification against a committed release candidate.
+2. Let the first `pass-platform` bind that candidate's full 40-character commit to `testedCommit`.
 3. Run the profile smoke on all three operating systems with exact DSH `0.1.1-rc.2` and a tested Node 22 release (at least `22.19.0`) or Node 24. After a maintainer verifies the evidence, use `pass-platform` to record `testedAt`, environment details, and HTTPS evidence links without sensitive parameters.
-4. Manually complete every live check below with a test account in a controlled local environment. This consumes account quota. Mark a check `passed` only after every fixed assertion has sanitized evidence; a free-form scope statement is not a substitute.
-5. After every item passes, a maintainer records approval and changes `releaseStatus` to `approved`.
-6. From that point, only `docs/releases/v<version>.md`, its acceptance JSON, `README.md`, `README.en.md`, `CHANGELOG.md`, `docs/compatibility.md`, and `docs/compatibility.en.md` may change to record dates, evidence, and publication state. After acceptance has bound a candidate, any source, configuration, dependency, lockfile, or workflow change requires resetting the draft record to the new commit before CI, profile smoke, and live-network acceptance are repeated; an approved record cannot be reset.
+4. After all three platforms, the supply-chain evidence, and the candidate boundary pass, a maintainer records approval and changes `releaseStatus` to `approved`. This approves formal publication; it does not claim that controlled-account validation is `13/13`.
+5. `0.0.1` may retain live validation at `0/13` and be published under npm `latest` with a full GitHub Release. The Release and compatibility documents must disclose every unverified check honestly.
+6. After publication, manually complete the live checks below with a test account in a controlled local environment. This consumes account quota. Mark a check `passed` only after every fixed assertion has sanitized evidence; a free-form scope statement is not a substitute.
+7. Before publication, any source, configuration, dependency, lockfile, or workflow change after the candidate was bound requires resetting the draft record to the new commit and repeating CI, profile smoke, and supply-chain verification; an approved record cannot be reset. Product findings after formal publication are fixed in `0.0.2`, never by overwriting `0.0.1`.
 
 | Check | Required proof | Copyable exact `--assert` arguments |
 | --- | --- | --- |
@@ -127,9 +128,9 @@ All seven options are required exactly once and must use the `--name=value` form
 
 `pass-platform` only writes a CI/profile-smoke result that a maintainer has already verified to the acceptance record; it does not run the smoke, access the network, or check that the commit exists. The first `pass-platform` or `pass` binds the full candidate SHA, and all later platform and live-network evidence must use that same SHA. A passed item permits only a semantically identical idempotent replay; any differing field conflicts and cannot overwrite existing evidence. The same identical-replay-only rule applies after approval.
 
-### Local controlled-account acceptance recording
+### Post-release local controlled-account validation
 
-A maintainer must perform real-account operations manually in a controlled local environment. `release:acceptance` is only an offline evidence recorder: it does not access the network, read credentials, make provider requests, infer assertions, or replace human approval.
+A maintainer must perform real-account operations manually in a controlled local environment. For `0.0.1`, these checks run after formal publication and incomplete items remain `pending`. `release:acceptance` is only an offline evidence recorder: it does not access the network, read credentials, make provider requests, infer assertions, or replace human judgment.
 
 Inspect the current state first:
 
@@ -148,7 +149,7 @@ pnpm run release:acceptance -- pass <check> \
   --assert=<fixed-assertion>
 ```
 
-The first `pass-platform` or `pass` binds the candidate while the record's `testedCommit` is still `TBD`. Every later `pass-platform`, `pass`, and `approve` must provide the same full 40-character lowercase SHA, preventing platform and live-network evidence from different candidates from being mixed. `pass` records `passed` only when the assertion names are complete and exactly match the fixed table above; it never infers, fills, or passes assertions automatically. After a maintainer has manually confirmed every check, record the approval:
+The first `pass-platform` binds the candidate while the record's `testedCommit` is still `TBD`. Every later `pass-platform`, `pass`, and `approve` must provide the same full 40-character lowercase SHA, preventing platform and live-network evidence from different candidates from being mixed. `pass` records `passed` only when the assertion names are complete and exactly match the fixed table above; it never infers, fills, or passes assertions automatically. Live validation may continue from `pending` to `passed` after a maintainer approves and publishes `0.0.1`. Record publication approval once all three platform and supply-chain records are complete:
 
 ```sh
 pnpm run release:acceptance -- approve \
@@ -214,7 +215,7 @@ That same artifact is then installed into an isolated profile by the fixture's e
 
 Because the frozen fixture uses `--ignore-scripts`, this layer proves DSH Web/profile compatibility with this plugin; it does not claim to validate native terminal or native-build capabilities in DSH dependencies that require lifecycle scripts.
 
-An upgrade to DSH, pi-ai, or another runtime dependency must update and review both lockfiles, confirm that the fixture still pins only the intended DSH version, and rerun complete cross-platform CI, profile smoke, and controlled live acceptance. A scheduled Registry drift report does not replace this upgrade process.
+An upgrade to DSH, pi-ai, or another runtime dependency must update and review both lockfiles, confirm that the fixture still pins only the intended DSH version, repeat complete cross-platform CI, profile smoke, and supply-chain verification before publication, and restart controlled live validation afterward. A scheduled Registry drift report does not replace this upgrade process.
 
 ## Release environment
 
@@ -235,7 +236,7 @@ gh workflow run release.yml --ref main \
   -f publish=false
 ```
 
-`--ref main` is a hard gate. Dispatching another branch makes the candidate fail explicitly instead of reporting success with every job skipped. Download and review the candidate assets, complete live acceptance, update only the permitted release-evidence documents, and merge them to `main` before publishing.
+`--ref main` is a hard gate. Dispatching another branch makes the candidate fail explicitly instead of reporting success with every job skipped. Download and review the candidate assets, confirm `3/3` platforms, complete supply-chain evidence, and maintainer approval, then update only the permitted release-evidence documents and merge them to `main` before publishing. Live progress at `0/13` does not block the formal `0.0.1` release, but it must remain honestly disclosed.
 
 ## First publication of `0.0.1`
 
@@ -243,7 +244,7 @@ npm allows Trusted Publisher configuration only for a package that **already exi
 
 1. In the npm website, create a shortest-lived Granular Access Token. Set Packages and scopes to **Read and write**, select **All packages**, and enable **Bypass 2FA**. The token cannot be restricted to a package that does not exist yet, so revoke it immediately after success;
 2. paste the token only into the GitHub `npm-release` environment secret `NPM_BOOTSTRAP_TOKEN`. Never put it in the repository, shell history, an Issue, Release evidence, or chat;
-3. after the strict gate is ready, dispatch the one-time publication:
+3. after the platform, supply-chain, and maintainer-approval gates pass, dispatch the one-time formal publication; the workflow uses npm `latest` and creates a full GitHub Release:
 
    ```sh
    gh workflow run release.yml --ref main \
@@ -275,6 +276,7 @@ gh workflow run release.yml --ref main \
 ```
 
 - `publish=false` only builds and verifies a candidate artifact; `publish=true` enables the strict gate, Registry write, and bilingual GitHub Release.
+- `0.0.1` publishes under npm `latest` with a full GitHub Release. Controlled-account progress may be `0/13`, but the documentation must disclose that status exactly.
 - Routine publication uses GitHub OIDC only and reads no token.
 - After npm publication, read back `repository.url`, `dist.integrity`, and provenance, requiring `dist.integrity` to exactly match the candidate `.sri` value.
 - Install the exact Registry version in a fresh directory and run `npm audit signatures --json --include-attestations`. A signature or attestation verification failure blocks the public Release; preserve the raw provenance bundle and audit result as Release assets.
@@ -282,5 +284,7 @@ gh workflow run release.yml --ref main \
 - If npm already contains the version, download it first: skip `npm publish` and continue Release recovery only when it is byte-identical, otherwise fail immediately.
 - Keep the GitHub Release as a draft while uploading or restoring every asset with `--clobber`. Download every Release asset and compare it byte-for-byte before making the Release public. A rerun of an already-public version succeeds only when the tag commit and every asset still match the candidate.
 - Do not tag or publish directly from a development machine.
+
+Continue collecting controlled-account evidence against the formal release. If validation finds a product issue, fix it and publish `0.0.2`; never modify, overwrite, or republish the existing `0.0.1`.
 
 Any failed gate stops the release, and an immutable npm version is never overwritten. A byte-identical Registry artifact permits safe recovery of later stages; a different artifact requires a fixed, incremented version. If the candidate job succeeded but the publication job failed, rerun only the failed job in the same workflow run, leaving the successful candidate job untouched. Recovery keeps the original `GITHUB_SHA` and the uploaded candidate retained for 90 days even if `main` has advanced, while a new workflow run rebuilds the then-current `main`.

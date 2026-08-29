@@ -115,7 +115,11 @@ const LIVE_CHECK_KEYS = Object.freeze([
   "testedAt",
 ])
 
-export function assertAcceptanceRecord(acceptance, { version, requirePassed = false } = {}) {
+export function assertAcceptanceRecord(acceptance, {
+  version,
+  requirePassed = false,
+  requirePublicationApproval = false,
+} = {}) {
   assertObject(acceptance, "Acceptance record")
   assertExactKeys(acceptance, ROOT_KEYS, "Acceptance record")
   assert(acceptance.schemaVersion === 3, "Acceptance record schemaVersion must be 3")
@@ -124,12 +128,14 @@ export function assertAcceptanceRecord(acceptance, { version, requirePassed = fa
     new Set(["draft", "approved"]).has(acceptance.releaseStatus),
     "Acceptance releaseStatus must be draft or approved",
   )
-  const requireAllPassed = requirePassed || acceptance.releaseStatus === "approved"
+  const requireApproval = requirePublicationApproval
+    || requirePassed
+    || acceptance.releaseStatus === "approved"
 
   assertObject(acceptance.platforms, "Acceptance platforms")
   assertExactKeys(acceptance.platforms, PLATFORM_NAMES, "Acceptance platforms")
   for (const platform of PLATFORM_NAMES) {
-    assertPlatformResult(acceptance.platforms[platform], platform, requireAllPassed)
+    assertPlatformResult(acceptance.platforms[platform], platform, requireApproval)
   }
 
   assertObject(acceptance.liveAcceptance, "Acceptance liveAcceptance")
@@ -140,11 +146,11 @@ export function assertAcceptanceRecord(acceptance, { version, requirePassed = fa
       acceptance.liveAcceptance[check],
       check,
       LIVE_ACCEPTANCE_ASSERTIONS[check],
-      requireAllPassed,
+      requirePassed,
     )
   }
 
-  if (requireAllPassed) {
+  if (requireApproval) {
     assert(acceptance.releaseStatus === "approved", "Acceptance releaseStatus must be approved")
     assertFullCommit(acceptance.testedCommit, "Acceptance testedCommit")
     assertEvidenceLabel(acceptance.approvedBy, "Acceptance approvedBy")
@@ -152,7 +158,6 @@ export function assertAcceptanceRecord(acceptance, { version, requirePassed = fa
     assertEvidenceUrl(acceptance.approvalEvidenceUrl, "Acceptance approvalEvidenceUrl")
     const latestEvidenceTime = Math.max(
       ...Object.values(acceptance.platforms).map(({ testedAt }) => Date.parse(testedAt)),
-      ...Object.values(acceptance.liveAcceptance).map(({ testedAt }) => Date.parse(testedAt)),
     )
     assert(
       Date.parse(acceptance.approvedAt) >= latestEvidenceTime,
@@ -168,6 +173,10 @@ export function assertAcceptanceRecord(acceptance, { version, requirePassed = fa
       assertNonEmptyString(value, `Acceptance ${field}`)
     }
   }
+}
+
+export function assertPublicationAcceptanceRecord(acceptance, { version } = {}) {
+  assertAcceptanceRecord(acceptance, { version, requirePublicationApproval: true })
 }
 
 function assertPlatformResult(result, platform, requirePassed) {
@@ -231,13 +240,13 @@ function assertLiveResult(result, check, assertionNames, requirePassed) {
     )
   }
   if (result.status === "passed" || requirePassed) {
-    assert(result.status === "passed", `${check} acceptance must pass before publication`)
+    assert(result.status === "passed", `${check} acceptance must pass for complete live validation`)
     assertIsoTimestamp(result.testedAt, `${check}.testedAt`)
     assertEvidenceUrl(result.evidenceUrl, `${check}.evidenceUrl`)
     for (const assertionName of assertionNames) {
       assert(
         result.assertions[assertionName] === true,
-        `${check}.assertions.${assertionName} must pass before publication`,
+        `${check}.assertions.${assertionName} must pass for complete live validation`,
       )
     }
   }

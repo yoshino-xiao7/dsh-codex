@@ -4,7 +4,7 @@
 
 面向 DeepSeek Harness 的 Codex 插件，提供 ChatGPT OAuth 登录、Codex 模型、图片输入和可靠的流式回复。
 
-> 当前版本：`0.0.1` 技术预览。npm 包名：`dsh-codex-community`。
+> 当前版本：`0.0.1` 技术预览，使用 npm `latest` 与正式 GitHub Release 发布。npm 包名：`dsh-codex-community`。
 
 ## 功能
 
@@ -33,7 +33,7 @@ dsh web
 
 ## 登录与使用
 
-1. 打开 **设置 → Codex 登录**，按页面提示完成 ChatGPT OAuth；
+1. 打开 **设置 → OpenAI Codex**，按页面提示完成 ChatGPT OAuth；
 2. 在同一页面启用模型；
 3. 从会话模型选择器中选择 Codex 模型开始使用。
 
@@ -59,7 +59,7 @@ dsh plugin --profile web update dsh-codex-community@0.0.1
 dsh web
 ```
 
-卸载前请先在 **设置 → Codex 登录** 中退出，然后执行：
+卸载前请先在 **设置 → OpenAI Codex** 中退出，然后执行：
 
 ```sh
 dsh plugin --profile web remove dsh-codex-community
@@ -78,8 +78,10 @@ dsh web
 ## 支持边界
 
 - `0.0.x` 不承诺稳定 API，请固定版本；
+- `0.0.1` 发布前必须通过 Linux、macOS 和 Windows 三平台门禁、完整供应链校验与维护者批准；真实账号验证允许以 `0/13` 状态正式发布，未验证能力必须如实展示并在发布后持续补齐；
+- 发布后发现的问题在 `0.0.2` 中修复和迭代，不覆盖已发布的 `0.0.1`；
 - 额度状态来自最近请求，不是实时余额或主动账户查询；
-- Fast 是显式开启的实验能力，真实账号权限仍需发布前验收；
+- Fast 是显式开启的实验能力，真实账号权限会在发布后的受控验证中继续确认；
 - 不提供图片生成或编辑；
 - Windows、Linux、真实 OAuth 与真实 Codex 网络验收状态见[兼容性文档](docs/compatibility.md)。
 

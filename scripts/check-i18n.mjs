@@ -59,7 +59,7 @@ for (const [chinese, english] of [
   [version, version],
   ["AccountQuotaExceeded", "AccountQuotaExceeded"],
   ["maxPixels", "maxPixels"],
-  ["Codex 登录", "Codex sign-in"],
+  ["OpenAI Codex", "OpenAI Codex"],
 ]) {
   if (!readmeZh.includes(chinese) || !readmeEn.includes(english)) {
     throw new Error(`README language pair is missing required markers ${chinese} / ${english}`)

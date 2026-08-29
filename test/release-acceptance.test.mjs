@@ -4,6 +4,7 @@ import test from "node:test"
 
 import {
   assertAcceptanceRecord,
+  assertPublicationAcceptanceRecord,
   createDraftAcceptanceRecord,
   LIVE_ACCEPTANCE_ASSERTIONS,
 } from "../scripts/release-acceptance.mjs"
@@ -47,10 +48,49 @@ test("obsolete acceptance schemas cannot omit reasoning, tools, or replay", () =
   )
 })
 
-test("an approved record requires every platform and live assertion to pass", () => {
+test("publication approval requires every platform but permits honest pending live checks", () => {
+  const publication = publicationFixture()
+  assert.doesNotThrow(() => assertPublicationAcceptanceRecord(publication, { version: "0.0.1" }))
+  assert.equal(
+    Object.values(publication.liveAcceptance).filter(({ status }) => status === "passed").length,
+    0,
+  )
+
+  publication.platforms.windows.status = "pending"
+  publication.platforms.windows.profileSmoke = "pending"
+  publication.platforms.windows.testedAt = "TBD"
+  publication.platforms.windows.runner = "TBD"
+  publication.platforms.windows.nodeVersion = "TBD"
+  publication.platforms.windows.evidenceUrl = "TBD"
+  assert.throws(
+    () => assertPublicationAcceptanceRecord(publication, { version: "0.0.1" }),
+    /windows acceptance must pass before publication/u,
+  )
+})
+
+test("publication approval still rejects a claimed live pass with an incomplete assertion", () => {
+  const publication = publicationFixture()
+  const textStream = publication.liveAcceptance.textStream
+  textStream.status = "passed"
+  textStream.testedAt = "2026-08-29T00:00:00Z"
+  textStream.evidenceUrl = "https://example.test/live/text-stream"
+  textStream.assertions.nonEmptyTextDelta = true
+  assert.throws(
+    () => assertPublicationAcceptanceRecord(publication, { version: "0.0.1" }),
+    /textStream\.assertions\.terminalStopObserved must pass/u,
+  )
+})
+
+test("an approved record permits pending live checks but validates every claimed pass", () => {
   const approved = approvedFixture()
   assert.doesNotThrow(() => assertAcceptanceRecord(approved, { version: "0.0.1" }))
 
+  approved.liveAcceptance.fastPriority = createDraftAcceptanceRecord("0.0.1").liveAcceptance.fastPriority
+  assert.doesNotThrow(() => assertAcceptanceRecord(approved, { version: "0.0.1" }))
+
+  approved.liveAcceptance.fastPriority.status = "passed"
+  approved.liveAcceptance.fastPriority.testedAt = "2026-08-29T00:00:01Z"
+  approved.liveAcceptance.fastPriority.evidenceUrl = "https://example.test/live/fast-priority"
   approved.liveAcceptance.fastPriority.assertions.priorityRequested = false
   assert.throws(
     () => assertAcceptanceRecord(approved, { version: "0.0.1" }),
@@ -103,9 +143,9 @@ test("passed evidence must be timestamped and use a credential-free HTTPS URL", 
   }
 })
 
-test("approval cannot predate the newest accepted evidence", () => {
+test("approval cannot predate the newest accepted platform evidence", () => {
   const approved = approvedFixture()
-  approved.liveAcceptance.textStream.testedAt = "2026-08-29T00:00:01Z"
+  approved.platforms.linux.testedAt = "2026-08-29T00:00:01Z"
   assert.throws(
     () => assertAcceptanceRecord(approved, { version: "0.0.1" }),
     /approvedAt must not precede/u,
@@ -160,6 +200,24 @@ function approvedFixture() {
     result.testedAt = "2026-08-29T00:00:00Z"
     result.evidenceUrl = `https://example.test/live/${check}`
     for (const assertion of Object.keys(result.assertions)) result.assertions[assertion] = true
+  }
+  return acceptance
+}
+
+function publicationFixture() {
+  const acceptance = createDraftAcceptanceRecord("0.0.1")
+  acceptance.releaseStatus = "approved"
+  acceptance.testedCommit = "a".repeat(40)
+  acceptance.approvedBy = "release-maintainer"
+  acceptance.approvedAt = "2026-08-29T00:00:00Z"
+  acceptance.approvalEvidenceUrl = "https://example.test/approval"
+  for (const [platform, result] of Object.entries(acceptance.platforms)) {
+    result.status = "passed"
+    result.profileSmoke = "passed"
+    result.testedAt = "2026-08-29T00:00:00Z"
+    result.runner = `${platform}-controlled-runner`
+    result.nodeVersion = "22.22.2"
+    result.evidenceUrl = `https://example.test/platform/${platform}`
   }
   return acceptance
 }

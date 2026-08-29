@@ -310,6 +310,14 @@ test("candidate approval summary validates the portable checksum sidecar", async
     /fs\.readFileSync\(`\$\{process\.env\.PACKAGE_FILE\}\.sha256`, "utf8"\)\.trim\(\)/u,
   )
   assert.match(summary, /checksumMatch\[2\] !== path\.basename\(process\.env\.PACKAGE_FILE\)/u)
+  assert.ok(
+    summary.includes("`- Platform CI / 平台 CI: \\`${platformPassed}/3\\``"),
+    "candidate summary must disclose the platform CI count",
+  )
+  assert.ok(
+    summary.includes("`- Post-release live validation / 发布后真实账号验证: \\`${livePassed}/${Object.keys(acceptance.liveAcceptance).length}\\``"),
+    "candidate summary must disclose the post-release live-validation count",
+  )
 })
 
 test("publication separates protected npm OIDC from GitHub Release write permission", async () => {
@@ -593,13 +601,10 @@ test("draft recovery verifies its target and any existing tag before publication
   assert.match(beforePublication, /test "\$existing_tag_commit" = "\$GITHUB_SHA"/u)
 })
 
-test("publish-blocking placeholders appear only in the release metadata header", async () => {
+test("release notes disclose platform and post-release live-validation progress", async () => {
   const notes = await readFile(new URL("../docs/releases/v0.0.1.md", import.meta.url), "utf8")
-  const body = notes.replace(/^>.*$/gmu, "")
-  assert.doesNotMatch(
-    body,
-    /\b(?:TBD|TODO|PENDING|DRAFT|UNRELEASED)\b|待补|未发布|草稿/iu,
-  )
+  assert.match(notes, /^> 平台验收 \/ Platform acceptance：\d+\/\d+\s*$/mu)
+  assert.match(notes, /^> 发布后真实账号验证 \/ Post-release live validation：\d+\/\d+\s*$/mu)
 })
 
 test("strict release verification covers every packed publication-state document", async () => {
@@ -616,6 +621,8 @@ test("strict release verification covers every packed publication-state document
   }
   assert.match(source, /publicationStatePaths/u)
   assert.match(source, /findUnexpectedPostAcceptanceChanges/u)
+  assert.match(source, /assertPublicationAcceptanceRecord/u)
+  assert.doesNotMatch(source, /assertNoPublishPlaceholders/u)
   assert.match(source, /test\/fixtures\/dsh-runtime\/package\.json/u)
   assert.match(source, /test\/fixtures\/dsh-runtime\/pnpm-lock\.yaml/u)
   assert.match(source, /dshRuntimeLockSha256: actualDshRuntimeLockSha256/u)

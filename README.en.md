@@ -4,7 +4,7 @@
 
 A Codex plugin for DeepSeek Harness with ChatGPT OAuth sign-in, Codex models, image input, and reliable streaming responses.
 
-> Current version: `0.0.1` technical preview. npm package: `dsh-codex-community`.
+> Current version: `0.0.1` technical preview, published under npm `latest` with a full GitHub Release. npm package: `dsh-codex-community`.
 
 ## Features
 
@@ -33,7 +33,7 @@ dsh web
 
 ## Sign in and use
 
-1. Open **Settings → Codex sign-in** and complete the ChatGPT OAuth prompts.
+1. Open **Settings → OpenAI Codex** and complete the ChatGPT OAuth prompts.
 2. Enable models on the same page.
 3. Choose a Codex model from the conversation model selector.
 
@@ -59,7 +59,7 @@ dsh plugin --profile web update dsh-codex-community@0.0.1
 dsh web
 ```
 
-Before removal, sign out under **Settings → Codex sign-in**, then run:
+Before removal, sign out under **Settings → OpenAI Codex**, then run:
 
 ```sh
 dsh plugin --profile web remove dsh-codex-community
@@ -78,8 +78,10 @@ See [Troubleshooting](docs/troubleshooting.en.md) for diagnostic steps.
 ## Support boundaries
 
 - The `0.0.x` line does not promise a stable API; pin the exact version.
+- Before publication, `0.0.1` must pass the Linux, macOS, and Windows platform gates, the complete supply-chain verification, and maintainer approval. It may be formally published with controlled-account validation at `0/13`, provided every unverified capability remains clearly disclosed and validation continues after release.
+- Problems found after publication are fixed and iterated in `0.0.2`; the published `0.0.1` is never overwritten.
 - Quota state comes from recent requests; it is not a live balance or proactive account query.
-- Fast is an explicitly enabled experimental capability; real account entitlement still requires pre-release acceptance.
+- Fast is an explicitly enabled experimental capability; controlled post-release validation continues to confirm real-account entitlement.
 - Image generation and editing are not provided.
 - See [Compatibility](docs/compatibility.en.md) for Windows, Linux, real OAuth, and real Codex network acceptance status.
 

@@ -18,9 +18,11 @@
 | Codex 图片输入 | attachment seam 与预算投影自动化已通过 | `maxPixels=4194304` 真实请求待验收 |
 | auto / SSE / WebSocket / cached | transport 映射与会话隔离自动化已通过 | 四种真实请求待验收 |
 | Fast / priority tier | 已验证仅在当前会话开启时改变 `service_tier` | 账号权限与真实网络待验收 |
-| npm / GitHub Release | 严格工作流校验候选、Registry 回读与 Release 资产 | 以公开 Registry/Release 记录为准 |
+| npm / GitHub Release | 严格工作流校验候选、Registry 回读与 Release 资产 | `0.0.1` 使用 npm `latest` 与正式 GitHub Release |
 
-`0.0.x` 是技术预览，只对表中的精确 DSH prerelease 声明兼容。根目录 `pnpm-lock.yaml` 锁定插件依赖，`test/fixtures/dsh-runtime/pnpm-lock.yaml` 独立锁定兼容性 smoke 的完整 DSH runtime 与 peer 图；CI 使用 `pnpm --dir test/fixtures/dsh-runtime install --frozen-lockfile --ignore-scripts`，不把该 peer 图交给直接 npm 解算，以避免不确定依赖结果和内存失控。该冻结层验证 Web/profile 集成，不声称覆盖 DSH 依赖中需要生命周期脚本的原生终端或本机构建能力。依赖升级必须通过固定版本变更 PR，同时更新并审查两套 lockfile，再完成完整 CI、profile smoke 与受控验收；定时兼容工作流只验证当前锁定图并报告 Registry 漂移，不能从宽泛 semver 或一次定时运行推断跨 RC 兼容。
+`0.0.x` 是技术预览，只对表中的精确 DSH 预发布版本声明兼容。`0.0.1` 在正式发布前必须完成 Linux、macOS 和 Windows 三平台 CI/profile smoke `3/3`、完整供应链校验和维护者批准。表中真实 OAuth、对话、图片、transport 和 Fast 状态可在正式发布时保持 `0/13`，并在发布后逐项补齐。这些未完成项必须如实展示，不能冒充已验证能力；发现的问题在 `0.0.2` 中修复和迭代。
+
+根目录 `pnpm-lock.yaml` 锁定插件依赖，`test/fixtures/dsh-runtime/pnpm-lock.yaml` 独立锁定兼容性 smoke 的完整 DSH runtime 与 peer 图；CI 使用 `pnpm --dir test/fixtures/dsh-runtime install --frozen-lockfile --ignore-scripts`，不把该 peer 图交给直接 npm 解算，以避免不确定依赖结果和内存失控。该冻结层验证 Web/profile 集成，不声称覆盖 DSH 依赖中需要生命周期脚本的原生终端或本机构建能力。依赖升级必须通过固定版本变更 PR，同时更新并审查两套 lockfile，在发布前重跑完整 CI、profile smoke 和供应链校验，发布后重新记录受控真实验证。定时兼容工作流只验证当前锁定图并报告 Registry 漂移，不能从宽泛 semver 或一次定时运行推断跨 RC 兼容。
 
 ## Profile 组合
 

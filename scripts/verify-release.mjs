@@ -9,7 +9,10 @@ import {
   assertSbomIdentity,
   readArtifactManifest,
 } from "./generate-sbom.mjs"
-import { assertAcceptanceRecord } from "./release-acceptance.mjs"
+import {
+  assertAcceptanceRecord,
+  assertPublicationAcceptanceRecord,
+} from "./release-acceptance.mjs"
 import { assertCandidateEvidenceHashes } from "./release-evidence.mjs"
 import {
   findUnexpectedPostAcceptanceChanges,
@@ -47,12 +50,6 @@ function assertDraftRelease() {
     assert(releaseNotes.includes(marker), `Release notes are missing ${marker}`)
   }
   assertAcceptanceRecord(acceptance, { version })
-}
-
-function assertNoPublishPlaceholders(value, label) {
-  const serialized = typeof value === "string" ? value : JSON.stringify(value)
-  const placeholder = /\b(?:TBD|TODO|PENDING|DRAFT|UNRELEASED)\b|待补|未发布|草稿/i.exec(serialized)
-  assert(!placeholder, `${label} still contains a publish-blocking placeholder: ${placeholder?.[0]}`)
 }
 
 function runGit(arguments_) {
@@ -113,6 +110,45 @@ function assertReleaseMetadata() {
   )
   const acceptedCommit = /^> 验收提交 \/ Accepted commit：([0-9a-f]{40})\s*$/mu.exec(releaseNotes)?.[1]
   assert(acceptedCommit === acceptance.testedCommit, "Release notes accepted commit must match acceptance.testedCommit")
+  return { acceptedCommit, releaseDate }
+}
+
+function assertReleaseValidationSummary() {
+  const platformPassed = Object.values(acceptance.platforms)
+    .filter(({ status }) => status === "passed").length
+  const platformTotal = Object.keys(acceptance.platforms).length
+  const livePassed = Object.values(acceptance.liveAcceptance)
+    .filter(({ status }) => status === "passed").length
+  const liveTotal = Object.keys(acceptance.liveAcceptance).length
+  const platformSummary = /^> 平台验收 \/ Platform acceptance：(\d+)\/(\d+)\s*$/mu.exec(releaseNotes)
+  const liveSummary = /^> 发布后真实账号验证 \/ Post-release live validation：(\d+)\/(\d+)\s*$/mu.exec(releaseNotes)
+  assert(platformSummary !== null, "Release notes must contain the bilingual platform-acceptance summary")
+  assert(liveSummary !== null, "Release notes must contain the bilingual post-release live-validation summary")
+  assert(
+    Number(platformSummary[1]) === platformPassed && Number(platformSummary[2]) === platformTotal,
+    "Release notes platform-acceptance summary does not match the acceptance record",
+  )
+  assert(
+    Number(liveSummary[1]) === livePassed && Number(liveSummary[2]) === liveTotal,
+    "Release notes live-validation summary does not match the acceptance record",
+  )
+}
+
+function assertPublicationStateMetadata(releaseDate) {
+  const escapedVersion = version.replaceAll(".", "\\.")
+  const changelogMatch = new RegExp(`^## \\[${escapedVersion}\\] - (\\d{4}-\\d{2}-\\d{2})\\s*$`, "mu")
+    .exec(changelog)
+  assert(changelogMatch !== null, `CHANGELOG ${version} entry must have a concrete release date`)
+  assert(changelogMatch[1] === releaseDate, "CHANGELOG and release notes must use the same release date")
+
+  const zhReadme = publicationStateDocuments.get("README.md") ?? ""
+  const enReadme = publicationStateDocuments.get("README.en.md") ?? ""
+  const zhCompatibility = publicationStateDocuments.get("docs/compatibility.md") ?? ""
+  const enCompatibility = publicationStateDocuments.get("docs/compatibility.en.md") ?? ""
+  assert(zhReadme.includes(`当前版本：\`${version}\` 技术预览`), "README must name the current technical-preview version")
+  assert(enReadme.includes(`Current version: \`${version}\` technical preview`), "English README must name the current technical-preview version")
+  assert(zhCompatibility.includes("发布后"), "Chinese compatibility status must describe post-release validation")
+  assert(/post-release/iu.test(enCompatibility), "English compatibility status must describe post-release validation")
 }
 
 async function sha256(path) {
@@ -189,13 +225,10 @@ async function assertArtifactEvidence(sourceCommit) {
 assertDraftRelease()
 
 if (mode === "publish") {
-  assertNoPublishPlaceholders(releaseNotes, "Release notes")
-  assertNoPublishPlaceholders(acceptance, "Acceptance record")
-  for (const [path, document] of publicationStateDocuments) {
-    assertNoPublishPlaceholders(document, path)
-  }
-  assertAcceptanceRecord(acceptance, { version, requirePassed: true })
-  assertReleaseMetadata()
+  assertPublicationAcceptanceRecord(acceptance, { version })
+  const { releaseDate } = assertReleaseMetadata()
+  assertReleaseValidationSummary()
+  assertPublicationStateMetadata(releaseDate)
 
   const sourceCommit = process.env.RELEASE_SOURCE_COMMIT ?? ""
   assertAcceptedSource(sourceCommit)

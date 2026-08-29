@@ -2,7 +2,7 @@
 
 [简体中文](releasing.md) | [English](releasing.en.md)
 
-新版本从 `0.0.1` 开始。`0.0.x` 是技术预览，每次发布都必须使用中英双语 Release 正文。
+新版本从 `0.0.1` 开始。`0.0.x` 是技术预览，但 `0.0.1` 仍通过 npm `latest` 和正式 GitHub Release 发布；每次发布都必须使用中英双语 Release 正文。发布前硬门禁是三平台 `3/3`、完整供应链证据与维护者批准；真实账号验证可以从 `0/13` 开始，正式发布后继续补齐并如实公开状态。
 
 ## 准备
 
@@ -11,7 +11,7 @@
 3. 确认 package name、repository URL、license、peer 范围和 `dsh.bundle`；
 4. 同步审查并更新根目录 `pnpm-lock.yaml` 与 `test/fixtures/dsh-runtime/pnpm-lock.yaml`，不能只更新其中一套依赖图；
 5. 合并前让 CI 在 Linux、macOS、Windows 通过；
-6. 用受控测试账号完成本版本要求的真实验收，不能把 token、OAuth code、Cookie 或账号凭据写入记录。
+6. 明确真实账号验证计划和当前进度；`0.0.1` 允许以 `0/13` 正式发布，发布后使用受控测试账号逐项补齐，不能把 token、OAuth code、Cookie 或账号凭据写入记录。
 
 可以用离线准备脚本建立下一版本的发布骨架：
 
@@ -33,7 +33,7 @@ pnpm run release:candidate -- 0.0.1
 
 普通 CI 的独立只读 `candidate-replay` job 在 Ubuntu/Node 24 的干净 checkout 中安装固定 pnpm `10.34.5` 与 npm `11.16.0`，动态读取 `package.json` 版本后只调用一次该统一命令。它把完整 `release/` 上传为 `dsh-codex-community-${{ github.sha }}-ci-replay` artifact，并保留 14 天。
 
-这只是可重复的本地/CI 预检。权威发布候选仍必须由 `main` 上的 `release.yml` workflow 生成并上传；macOS 或 Windows 上的本地复演不能替代该 workflow 的 Linux x64 发布证据，也不能替代三平台 CI/profile smoke、真实账号验收或维护者审批。
+这只是可重复的本地/CI 预检。权威发布候选仍必须由 `main` 上的 `release.yml` workflow 生成并上传；macOS 或 Windows 上的本地复演不能替代该 workflow 的 Linux x64 发布证据，也不能替代三平台 CI/profile smoke、供应链门禁或维护者审批。它也不执行发布后的真实账号验证。
 
 ## 两级门禁
 
@@ -45,12 +45,12 @@ pnpm run check
 pnpm run verify:release
 ```
 
-`npm publish` 使用严格模式。下面任一条件不满足都会在网络发布前失败：
+`npm publish` 使用严格模式。`0.0.1` 允许真实账号验证保持 `0/13`，因此 `pending` 和对应的 `TBD` 是 live 记录中合法且必须如实保留的状态。下面任一发布条件不满足都会在网络发布前失败：
 
-- Release 正文仍包含 `TBD`、`pending`、`draft`、`unreleased` 或对应中文占位词；
-- `docs/releases/v<version>.acceptance.json` 未标记为 `approved`；
-- Linux、macOS、Windows 的 `smoke:dsh-profile`，或固定清单中的真实 ChatGPT OAuth、模型、文本/reasoning 流、usage、工具闭环、replay、图片、transport 与 Fast 验收没有全部通过；
-- 验收时间、运行环境、Node 版本、审批人或 HTTPS 证据链接缺失；
+- Release 日期、Accepted commit、当前版本 CHANGELOG 日期或其他发布关键字段仍是占位值；
+- `docs/releases/v<version>.acceptance.json` 未标记为维护者已批准正式发布；
+- Linux、macOS、Windows 的 CI/profile smoke 没有全部通过并以 `3/3` 证据绑定同一候选提交；
+- 平台验收时间、运行环境、Node 版本、审批人或 HTTPS 证据链接缺失；
 - 验收后的提交修改了允许的发布证据文件以外的文件；允许清理发布状态的文件仅包括双语 Release 正文、验收 JSON、双语 README、`CHANGELOG.md` 和双语兼容性文档；
 - `.tgz`、SHA-256、SRI、锁定参考 SBOM、实际安装树、生产依赖审计或隔离导入证据缺失或不匹配。
 
@@ -65,17 +65,18 @@ pnpm run verify:release:publish
 # Registry 发布与 provenance/签名回读完成后，上传不可变 Registry 证据；无 OIDC 的 GitHub Release job 下载并复核后才写入 Release
 ```
 
-不要通过设置伪造环境变量绕过门禁。缺少真实证据时保持草稿状态。
+不要通过设置伪造环境变量绕过门禁。缺少三平台、供应链或维护者批准证据时保持草稿状态；缺少的 live 证据则保持 `pending`，不得冒充已验证。
 `prepublishOnly` 保护从仓库 checkout 发起的发布；npm 对现成 tarball 不执行该生命周期，因此工作流会在审批前和发布同一 `.tgz` 的前一步各运行一次严格门禁，并只在受保护 environment 审批后申请短期 OIDC identity token。
 
 ## 验收记录
 
-1. 在已提交的 release candidate 上运行跨平台 CI 和真实网络验收；
-2. 由第一次 `pass-platform` 或 `pass` 把该提交的完整 40 位 commit 绑定到 `testedCommit`；
+1. 在已提交的 release candidate 上运行跨平台 CI/profile smoke 和完整供应链校验；
+2. 由第一次 `pass-platform` 把该提交的完整 40 位 commit 绑定到 `testedCommit`；
 3. 在三个系统分别使用精确 DSH `0.1.1-rc.2` 和已测试的 Node 22（至少 `22.19.0`）或 24 运行 profile smoke，由维护者核验证据后通过 `pass-platform` 记录 `testedAt`、环境信息和不含敏感参数的 HTTPS 证据链接；
-4. 在受控本地环境中使用测试账号人工完成下表的真实验收；该过程会消耗账号额度，每项只能在对应断言均有脱敏证据后改为 `passed`，不能用自由文本概括代替；
-5. 所有项目通过后由维护者填写审批信息，并把 `releaseStatus` 改为 `approved`；
-6. 此后只允许修改 `docs/releases/v<version>.md`、对应验收 JSON、`README.md`、`README.en.md`、`CHANGELOG.md`、`docs/compatibility.md` 和 `docs/compatibility.en.md`，用于填写日期、证据和发布状态。验收已绑定候选后，源码、配置、依赖、锁文件或工作流有任何变化，都必须先把 draft 记录重置到新提交，再重新运行 CI、profile smoke 和真实网络验收；approved 记录不可重置。
+4. 三平台、供应链与候选边界全部通过后，由维护者填写审批信息，并把 `releaseStatus` 改为 `approved`；这表示批准正式发布，不表示真实账号已完成 `13/13`；
+5. `0.0.1` 可以保持 live `0/13` 并使用 npm `latest` 与正式 GitHub Release 发布，Release 和兼容性文档必须如实标明未验证项；
+6. 发布后在受控本地环境中使用测试账号逐项完成下表的真实验证；该过程会消耗账号额度，每项只能在对应断言均有脱敏证据后改为 `passed`，不能用自由文本概括代替；
+7. 发布前已绑定候选后，源码、配置、依赖、锁文件或工作流有任何变化，都必须先把 draft 记录重置到新提交，再重新运行 CI、profile smoke 和供应链校验；approved 记录不可重置。正式发布后发现的产品问题修复到 `0.0.2`，不覆盖 `0.0.1`。
 
 | 验收项 | 必须证明 | 可复制的精确 `--assert` 参数 |
 | --- | --- | --- |
@@ -127,9 +128,9 @@ pnpm run release:acceptance -- pass-platform <linux|macos|windows> \
 
 `pass-platform` 只把维护者已经核验的 CI/profile smoke 结论写入验收记录；它不运行 smoke、不联网，也不检查提交是否存在。第一次 `pass-platform` 或 `pass` 会绑定完整候选 SHA，此后所有平台和真实网络证据都必须使用同一 SHA。已通过项目只允许完全相同的幂等重放；任一字段不同都会冲突，不能覆盖已有证据。记录批准后同样只接受完全相同的重放。
 
-### 本地受控账号验收记录
+### 正式发布后的本地受控账号验证
 
-真实账号操作必须由维护者在受控本地环境中人工执行。`release:acceptance` 只是离线证据记录器：它不访问网络、不读取凭据、不发起 provider 请求、不推断断言，也不替代人工审批。
+真实账号操作必须由维护者在受控本地环境中人工执行。对 `0.0.1` 而言，这些检查在正式发布后进行，未完成项继续保持 `pending`。`release:acceptance` 只是离线证据记录器：它不访问网络、不读取凭据、不发起 provider 请求、不推断断言，也不替代人工判断。
 
 先查看当前状态：
 
@@ -148,7 +149,7 @@ pnpm run release:acceptance -- pass <check> \
   --assert=<固定断言>
 ```
 
-第一次 `pass-platform` 或 `pass` 会在记录中的 `testedCommit` 仍为 `TBD` 时绑定该候选；后续 `pass-platform`、`pass` 和 `approve` 必须提供同一个完整 40 位小写 SHA，防止平台与真实网络证据跨候选混用。只有断言名称完整且与上表固定清单精确一致时，`pass` 才会记录 `passed`；它不会自动推断、补齐或通过断言。所有检查项都已由维护者人工确认后，再记录审批：
+第一次 `pass-platform` 会在记录中的 `testedCommit` 仍为 `TBD` 时绑定该候选；后续 `pass-platform`、`pass` 和 `approve` 必须提供同一个完整 40 位小写 SHA，防止平台与真实网络证据跨候选混用。只有断言名称完整且与上表固定清单精确一致时，`pass` 才会记录 `passed`；它不会自动推断、补齐或通过断言。真实验证可以在维护者批准并发布 `0.0.1` 后继续从 `pending` 单向补录为 `passed`。发布批准在三平台和供应链证据完整后记录：
 
 ```sh
 pnpm run release:acceptance -- approve \
@@ -214,7 +215,7 @@ CycloneDX SBOM 是从已提交 `pnpm-lock.yaml` 与 package manifest 离线生�
 
 冻结夹具使用 `--ignore-scripts`，因此该层只证明 DSH Web/profile 与本插件的兼容性，不声称验证 DSH 依赖中需要生命周期脚本的原生终端或本机构建能力。
 
-升级 DSH、pi-ai 或其他运行依赖时，必须更新并审查两套 lockfile，确认夹具仍只固定目标 DSH 版本，再重跑完整跨平台 CI、profile smoke 与受控真实验收。定时 Registry 漂移报告不能替代这条升级流程。
+升级 DSH、pi-ai 或其他运行依赖时，必须更新并审查两套 lockfile，确认夹具仍只固定目标 DSH 版本，再在发布前重跑完整跨平台 CI、profile smoke 和供应链校验，发布后重新开始受控真实验证。定时 Registry 漂移报告不能替代这条升级流程。
 
 ## 发布环境
 
@@ -235,7 +236,7 @@ gh workflow run release.yml --ref main \
   -f publish=false
 ```
 
-`--ref main` 是硬门禁；从其他分支触发时 candidate 会明确失败，不会以全部 job 被跳过的方式显示成功。下载并核对候选附件、完成真实验收、更新允许的发布证据文件并合并到 `main` 后，再开始发布。
+`--ref main` 是硬门禁；从其他分支触发时 candidate 会明确失败，不会以全部 job 被跳过的方式显示成功。下载并核对候选附件，确认三平台 `3/3`、供应链证据和维护者批准后，更新允许的发布证据文件并合并到 `main`，再开始发布。live `0/13` 不阻止 `0.0.1` 正式发布，但必须如实展示。
 
 ## 首次发布 `0.0.1`
 
@@ -243,7 +244,7 @@ npm 只允许给**已经存在**的包配置 Trusted Publisher，因此新包第
 
 1. 在 npm 网页创建最短有效期的 Granular Access Token：Packages and scopes 设为 **Read and write**，选择 **All packages**，开启 **Bypass 2FA**。新包尚不存在，无法把 token 限定到该包；因此必须使用最短有效期，并在成功后立即撤销；
 2. 只把 token 粘贴到 GitHub `npm-release` environment 的 secret `NPM_BOOTSTRAP_TOKEN`。不要写入仓库、终端历史、Issue、Release 证据或聊天；
-3. 确认严格门禁已通过后触发一次性发布：
+3. 确认三平台、供应链和维护者批准门禁已通过后触发一次性正式发布；工作流使用 npm `latest` 并创建正式 GitHub Release：
 
    ```sh
    gh workflow run release.yml --ref main \
@@ -275,6 +276,7 @@ gh workflow run release.yml --ref main \
 ```
 
 - `publish=false` 只生成并验证候选产物；`publish=true` 才启用严格门禁、Registry 写入和双语 GitHub Release；
+- `0.0.1` 发布到 npm `latest`，并创建正式 GitHub Release；真实账号进度可为 `0/13`，但必须在文档中如实公开；
 - 常规发布只使用 GitHub OIDC，不读取 token；
 - npm 发布成功后回读 `repository.url`、`dist.integrity` 和 provenance，要求 `dist.integrity` 与候选 `.sri` 逐字符一致；
 - 在全新目录安装精确 Registry 版本并执行 `npm audit signatures --json --include-attestations`；签名或 attestation 校验失败会阻止公开 Release，原始 provenance bundle 与审计结果随 Release 保存；
@@ -282,5 +284,7 @@ gh workflow run release.yml --ref main \
 - 若 npm 已存在同版本，工作流会先下载并逐字节比较：完全一致则跳过 `npm publish` 并继续恢复 Release，不一致则立即失败；
 - GitHub Release 先保持 draft；工作流用 `--clobber` 恢复上传全部附件，从 Release 回下载后逐字节比较，只有附件集合和内容全部匹配才公开；已公开版本重跑时只接受 tag commit 和全部附件与候选产物一致；
 - 不从本地开发机直接创建 tag 或发布包。
+
+正式发布后按验收表继续补齐真实账号证据。若发现产品问题，修复后发布 `0.0.2`；不修改、覆盖或重新发布已存在的 `0.0.1`。
 
 任何一步失败都停止，绝不覆盖 npm 的不可变版本。若 Registry 中的包体与候选逐字节一致，可以安全恢复后续步骤；若包体不同，修复后必须递增版本。候选 job 已成功而 publish job 失败时，只在同一 workflow run 中重跑失败的 job，不重跑已经成功的候选 job：恢复过程继续使用原始 `GITHUB_SHA` 与保留 90 天的已上传候选，即使 `main` 后来前进也不会改用新源码；新 workflow run 则从当时的 `main` 重新构建。
