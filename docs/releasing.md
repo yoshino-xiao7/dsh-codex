@@ -54,7 +54,7 @@ pnpm run verify:release:publish
 1. 在已提交的 release candidate 上运行跨平台 CI 和真实网络验收；
 2. 把该提交的完整 40 位 commit 写入 `testedCommit`；
 3. 在三个系统分别使用精确 DSH `0.1.1-rc.2` 和已测试的 Node 22（至少 `22.19.0`）或 24 运行 profile smoke，填写 `testedAt`、环境信息和不含敏感参数的 HTTPS 证据链接；
-4. 使用受控测试账号逐项完成下表的真实验收；每项只能在对应断言均有脱敏证据后改为 `passed`，不能用自由文本概括代替；
+4. 在受控本地环境中使用测试账号人工完成下表的真实验收；该过程会消耗账号额度，每项只能在对应断言均有脱敏证据后改为 `passed`，不能用自由文本概括代替；
 5. 所有项目通过后由维护者填写审批信息，并把 `releaseStatus` 改为 `approved`；
 6. 此后只允许修改 `docs/releases/v<version>.md`、对应验收 JSON、`README.md`、`README.en.md`、`CHANGELOG.md`、`docs/compatibility.md` 和 `docs/compatibility.en.md`，用于填写日期、证据和发布状态。源码、配置、依赖、锁文件或工作流有任何变化，都必须基于新提交重新验收。
 
@@ -86,6 +86,39 @@ Windows PowerShell：
 $env:DSH_BIN = "C:\path\to\dsh.exe"
 pnpm run smoke:dsh-profile
 ```
+
+### 本地受控账号验收记录
+
+真实账号操作必须由维护者在受控本地环境中人工执行。`release:acceptance` 只是离线证据记录器：它不访问网络、不读取凭据、不发起 provider 请求、不推断断言，也不替代人工审批。
+
+先查看当前状态：
+
+```sh
+pnpm run release:acceptance -- status
+```
+
+`status` 只显示通过/待验收计数和检查项名称，不显示证据值。人工完成一个检查项并审查脱敏证据后，重复 `--assert` 明确列出该检查项要求的全部固定断言：
+
+```sh
+pnpm run release:acceptance -- pass <check> \
+  --tested-commit=<完整40位小写SHA> \
+  --tested-at=<RFC3339> \
+  --evidence-url=<脱敏HTTPS> \
+  --assert=<固定断言> \
+  --assert=<固定断言>
+```
+
+第一次 `pass` 会在记录中的 `testedCommit` 仍为 `TBD` 时绑定该候选；后续 `pass` 和 `approve` 必须提供同一个完整 40 位小写 SHA，防止跨候选混用证据。只有断言名称完整且与固定清单精确一致时，命令才会记录 `passed`；它不会自动推断、补齐或通过断言。所有检查项都已由维护者人工确认后，再记录审批：
+
+```sh
+pnpm run release:acceptance -- approve \
+  --tested-commit=<完整40位小写SHA> \
+  --approved-by=<公开维护者标识> \
+  --approved-at=<RFC3339> \
+  --evidence-url=<脱敏HTTPS>
+```
+
+命令只校验 SHA 的格式及其与验收记录的一致性，并记录已经作出的人工审批；它不会代表维护者作出审批。提交是否存在以及候选与发布提交的祖先关系仍由严格 publish gate 验证。参数、证据 URL、验收记录和终端日志中都不得出现 token、OAuth code、Cookie、账号标识或完整私人内容。
 
 发布前填写 Release 日期和 `testedCommit` 对应的验收提交，并清除全部占位词。工作流实际构建所用的 release commit 会写入隔离导入证据并作为附件上传。
 

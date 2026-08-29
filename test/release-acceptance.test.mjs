@@ -49,14 +49,11 @@ test("obsolete acceptance schemas cannot omit reasoning, tools, or replay", () =
 
 test("an approved record requires every platform and live assertion to pass", () => {
   const approved = approvedFixture()
-  assert.doesNotThrow(() => assertAcceptanceRecord(approved, {
-    version: "0.0.1",
-    requirePassed: true,
-  }))
+  assert.doesNotThrow(() => assertAcceptanceRecord(approved, { version: "0.0.1" }))
 
   approved.liveAcceptance.fastPriority.assertions.priorityRequested = false
   assert.throws(
-    () => assertAcceptanceRecord(approved, { version: "0.0.1", requirePassed: true }),
+    () => assertAcceptanceRecord(approved, { version: "0.0.1" }),
     /fastPriority\.assertions\.priorityRequested must pass/u,
   )
 })
@@ -78,11 +75,40 @@ test("acceptance rejects missing, renamed, or unreviewed live checks", () => {
 })
 
 test("passed evidence must be timestamped and use a credential-free HTTPS URL", () => {
+  for (const value of [
+    "https://example.test/evidence?token=secret",
+    "https://example.test/evidence?",
+    "https://example.test/evidence#",
+  ]) {
+    const approved = approvedFixture()
+    approved.liveAcceptance.textStream.evidenceUrl = value
+    assert.throws(
+      () => assertAcceptanceRecord(approved, { version: "0.0.1" }),
+      /must not contain credentials, query data, or fragments/u,
+    )
+  }
+
+  for (const value of [
+    "2026-02-29T00:00:00Z",
+    "2026-04-31T00:00:00Z",
+    "2026-08-29T24:00:00Z",
+    "2026-08-29T00:00:00.1234Z",
+  ]) {
+    const approved = approvedFixture()
+    approved.liveAcceptance.textStream.testedAt = value
+    assert.throws(
+      () => assertAcceptanceRecord(approved, { version: "0.0.1" }),
+      /real RFC3339 timestamp/u,
+    )
+  }
+})
+
+test("approval cannot predate the newest accepted evidence", () => {
   const approved = approvedFixture()
-  approved.liveAcceptance.textStream.evidenceUrl = "https://example.test/evidence?token=secret"
+  approved.liveAcceptance.textStream.testedAt = "2026-08-29T00:00:01Z"
   assert.throws(
-    () => assertAcceptanceRecord(approved, { version: "0.0.1", requirePassed: true }),
-    /must not contain credentials, query data, or fragments/u,
+    () => assertAcceptanceRecord(approved, { version: "0.0.1" }),
+    /approvedAt must not precede/u,
   )
 })
 

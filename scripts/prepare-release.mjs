@@ -1,5 +1,4 @@
-import { lstat, readFile, rename, unlink, writeFile } from "node:fs/promises"
-import { dirname, resolve, sep } from "node:path"
+import { dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import {
@@ -7,6 +6,13 @@ import {
   compareReleaseVersions,
   releaseDocumentPaths,
 } from "./release-version.mjs"
+import {
+  assertReleaseFile as assert,
+  inspectReleaseFile as inspectFile,
+  parseReleaseJson as parseJson,
+  ReleaseFileError as ReleasePreparationError,
+  writeReleaseFileAtomically as writeAtomically,
+} from "./release-managed-file.mjs"
 import {
   assertAcceptanceRecord,
   createDraftAcceptanceRecord,
@@ -16,112 +22,8 @@ const PACKAGE_PATH = "package.json"
 const CHANGELOG_PATH = "CHANGELOG.md"
 const PACKAGE_NAME = "dsh-codex-community"
 
-class ReleasePreparationError extends Error {
-  constructor(message) {
-    super(message)
-    this.name = "ReleasePreparationError"
-    this.exitCode = 2
-  }
-}
-
-function assert(condition, message) {
-  if (!condition) throw new ReleasePreparationError(message)
-}
-
-function parseJson(source, path) {
-  try {
-    return JSON.parse(source)
-  } catch (error) {
-    throw new ReleasePreparationError(`${path} is not valid JSON: ${error.message}`)
-  }
-}
-
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")
-}
-
-async function inspectFile(repositoryRoot, path, { required = false } = {}) {
-  const absolutePath = resolveManagedPath(repositoryRoot, path)
-  await assertManagedPathParents(repositoryRoot, path)
-  try {
-    const metadata = await lstat(absolutePath)
-    assert(
-      !metadata.isSymbolicLink(),
-      `${path} is a symlink and violates the managed path boundary`,
-    )
-    assert(metadata.isFile(), `${path} must be a regular file`)
-    return {
-      absolutePath,
-      content: await readFile(absolutePath, "utf8"),
-      mode: metadata.mode & 0o777,
-      path,
-      repositoryRoot: resolve(repositoryRoot),
-    }
-  } catch (error) {
-    if (error?.code === "ENOENT" && !required) {
-      return {
-        absolutePath,
-        content: null,
-        mode: undefined,
-        path,
-        repositoryRoot: resolve(repositoryRoot),
-      }
-    }
-    if (error instanceof ReleasePreparationError) throw error
-    if (error?.code === "ENOENT") {
-      throw new ReleasePreparationError(`Required release file is missing: ${path}`)
-    }
-    throw error
-  }
-}
-
-async function assertManagedPathParents(repositoryRoot, path) {
-  const root = resolve(repositoryRoot)
-  const rootMetadata = await lstat(root)
-  assert(
-    !rootMetadata.isSymbolicLink() && rootMetadata.isDirectory(),
-    "repositoryRoot must be a real directory, not a symlink/path boundary",
-  )
-
-  const segments = path.replaceAll("\\", "/").split("/").slice(0, -1)
-  let parentPath = root
-  for (const segment of segments) {
-    parentPath = resolve(parentPath, segment)
-    let metadata
-    try {
-      metadata = await lstat(parentPath)
-    } catch (error) {
-      if (error?.code === "ENOENT") {
-        throw new ReleasePreparationError(
-          `Managed path parent is missing and violates the path boundary: ${relativeToRoot(root, parentPath)}`,
-        )
-      }
-      throw error
-    }
-    const relativeParent = relativeToRoot(root, parentPath)
-    assert(
-      !metadata.isSymbolicLink(),
-      `Managed path parent is a symlink and violates the path boundary: ${relativeParent}`,
-    )
-    assert(
-      metadata.isDirectory(),
-      `Managed path parent is not a directory and violates the path boundary: ${relativeParent}`,
-    )
-  }
-}
-
-function relativeToRoot(repositoryRoot, absolutePath) {
-  return absolutePath.slice(repositoryRoot.length + 1).replaceAll("\\", "/")
-}
-
-function resolveManagedPath(repositoryRoot, path) {
-  const root = resolve(repositoryRoot)
-  const absolutePath = resolve(root, path)
-  assert(
-    absolutePath.startsWith(`${root}${sep}`),
-    `Release path escapes the repository root: ${path}`,
-  )
-  return absolutePath
 }
 
 function renderChangelogEntry(version) {
@@ -271,43 +173,6 @@ function serializePackageJson(packageJson) {
 
 function serializeAcceptance(acceptance) {
   return `${JSON.stringify(acceptance, null, 2)}\n`
-}
-
-async function readCurrentContent(file) {
-  try {
-    const metadata = await lstat(file.absolutePath)
-    assert(
-      !metadata.isSymbolicLink(),
-      `${file.path} became a symlink and violates the managed path boundary`,
-    )
-    assert(metadata.isFile(), `${file.path} must remain a regular file while preparing the release`)
-    return await readFile(file.absolutePath, "utf8")
-  } catch (error) {
-    if (error?.code === "ENOENT") return null
-    throw error
-  }
-}
-
-async function writeAtomically(file, content) {
-  const temporaryPath = `${file.absolutePath}.release-prepare-${process.pid}-${Math.random().toString(16).slice(2)}`
-  try {
-    await assertManagedPathParents(file.repositoryRoot, file.path)
-    await writeFile(temporaryPath, content, {
-      encoding: "utf8",
-      flag: "wx",
-      ...(file.mode === undefined ? {} : { mode: file.mode }),
-    })
-    const currentContent = await readCurrentContent(file)
-    assert(
-      currentContent === file.content,
-      `${file.path} changed after release preparation began; no generated content was installed`,
-    )
-    await assertManagedPathParents(file.repositoryRoot, file.path)
-    await rename(temporaryPath, file.absolutePath)
-  } catch (error) {
-    await unlink(temporaryPath).catch(() => {})
-    throw error
-  }
 }
 
 export async function prepareRelease({ repositoryRoot, version }) {

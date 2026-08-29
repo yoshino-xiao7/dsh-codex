@@ -50,7 +50,7 @@ pnpm run verify:release
 2. SDK 合同：锁定发布包的 public exports；
 3. 隔离安装：从 `.tgz` 安装到空目录并导入 Host；
 4. Harness smoke：先从 `test/fixtures/dsh-runtime/pnpm-lock.yaml` 冻结安装精确 DSH runtime，再从本地 `.tgz` 安装到隔离 profile、确认通用 pi-ai provider 配置未改变、启动 Web，并读取登录状态 RPC 与 client bundle；模型发现由 SDK 合同和 Host runtime 测试覆盖；
-5. 真实网络：由仓库所有者使用受控测试账号逐项验证 Web OAuth、模型目录、文本/reasoning 流、终态 usage、安全工具闭环、两轮 replay、`maxPixels=4194304` 图片路径、四种 transport 与 Fast；验收 JSON 的固定布尔断言全部为真后才能通过；
+5. 真实网络：由仓库所有者在受控本地环境中使用测试账号人工逐项验证 Web OAuth、模型目录、文本/reasoning 流、终态 usage、安全工具闭环、两轮 replay、`maxPixels=4194304` 图片路径、四种 transport 与 Fast；该过程会消耗账号额度，验收 JSON 的固定布尔断言全部为真后才能通过；
 6. 发布读回：npm `dist.integrity` 与候选 SRI 精确一致，签名/attestation 审计通过，GitHub 资产与本地 tarball 逐字节一致。
 
-真实 OAuth、配额或网络 smoke 不应要求贡献者在 CI 提交秘密，也不能使用外部 PR 可访问的 secret。
+真实 OAuth、配额或网络 smoke 不应要求贡献者在 CI 提交秘密，也不能使用外部 PR 可访问的 secret。`release:acceptance` 只是离线证据记录器：它不联网、不读取凭据、不推断或自动通过断言，也不替代人工审批；`status` 只显示计数和检查项名称，不显示证据值。第一次 `pass` 绑定完整候选 SHA，后续 `pass`/`approve` 必须使用同一 SHA；CLI 只校验格式与记录一致性，提交存在性和祖先关系仍由严格 publish gate 验证。

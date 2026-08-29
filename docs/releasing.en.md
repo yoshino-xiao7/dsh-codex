@@ -54,7 +54,7 @@ Do not bypass the gate with fabricated environment variables. Keep the release i
 1. Run cross-platform CI and live-network acceptance against a committed release candidate.
 2. Put that candidate's full 40-character commit in `testedCommit`.
 3. Run the profile smoke on all three operating systems with exact DSH `0.1.1-rc.2` and a tested Node 22 release (at least `22.19.0`) or Node 24, then record `testedAt`, environment details, and HTTPS evidence links without sensitive parameters.
-4. Use a controlled test account to complete every live check below. Mark a check `passed` only after every fixed assertion has sanitized evidence; a free-form scope statement is not a substitute.
+4. Manually complete every live check below with a test account in a controlled local environment. This consumes account quota. Mark a check `passed` only after every fixed assertion has sanitized evidence; a free-form scope statement is not a substitute.
 5. After every item passes, a maintainer records approval and changes `releaseStatus` to `approved`.
 6. From that point, only `docs/releases/v<version>.md`, its acceptance JSON, `README.md`, `README.en.md`, `CHANGELOG.md`, `docs/compatibility.md`, and `docs/compatibility.en.md` may change to record dates, evidence, and publication state. Any source, configuration, dependency, lockfile, or workflow change requires acceptance against a new commit.
 
@@ -86,6 +86,39 @@ Windows PowerShell:
 $env:DSH_BIN = "C:\path\to\dsh.exe"
 pnpm run smoke:dsh-profile
 ```
+
+### Local controlled-account acceptance recording
+
+A maintainer must perform real-account operations manually in a controlled local environment. `release:acceptance` is only an offline evidence recorder: it does not access the network, read credentials, make provider requests, infer assertions, or replace human approval.
+
+Inspect the current state first:
+
+```sh
+pnpm run release:acceptance -- status
+```
+
+`status` displays only passed/pending counts and check names; it never displays evidence values. After manually completing one check and reviewing its sanitized evidence, repeat `--assert` to explicitly list every fixed assertion required by that check:
+
+```sh
+pnpm run release:acceptance -- pass <check> \
+  --tested-commit=<full-40-character-lowercase-SHA> \
+  --tested-at=<RFC3339> \
+  --evidence-url=<sanitized-HTTPS> \
+  --assert=<fixed-assertion> \
+  --assert=<fixed-assertion>
+```
+
+The first `pass` binds the candidate while the record's `testedCommit` is still `TBD`. Every later `pass` and `approve` must provide the same full 40-character lowercase SHA, preventing evidence from different candidates from being mixed. The command records `passed` only when the assertion names are complete and exactly match the fixed list; it never infers, fills, or passes assertions automatically. After a maintainer has manually confirmed every check, record the approval:
+
+```sh
+pnpm run release:acceptance -- approve \
+  --tested-commit=<full-40-character-lowercase-SHA> \
+  --approved-by=<public-maintainer-id> \
+  --approved-at=<RFC3339> \
+  --evidence-url=<sanitized-HTTPS>
+```
+
+The command checks only the SHA format and its consistency with the acceptance record, and records a human approval that has already been made; it does not approve on a maintainer's behalf. The strict publish gate still verifies that the commit exists and that the candidate is an ancestor of the release commit. Tokens, OAuth codes, cookies, account identifiers, and complete private content must never appear in arguments, evidence URLs, acceptance records, or terminal logs.
 
 Before publication, fill in the Release date and accepted commit from `testedCommit`, then remove every placeholder. The workflow records the exact release commit used to build the artifact in the isolated-import evidence and uploads it as an asset.
 
