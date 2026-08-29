@@ -33,7 +33,10 @@ This project follows the Keep a Changelog structure; `0.0.x` is a technical prev
 - 不支持类型或结构损坏的已存 OAuth 记录被显示为已登录；现在会返回独立的 `invalid` 状态，且凭据 secret 不跨 RPC。
 - Web 登录操作竞态、异步完成后更新已卸载组件、热重载后残留旧样式节点，以及窄屏设置页横向溢出。
 - CI 与发布 smoke 直接通过 npm 解算 DSH peer 图可能产生不确定依赖结果和内存失控；现在只安装已提交的冻结 pnpm 运行时图，并要求依赖升级同步更新两套 lockfile 后重跑 CI 与验收。
+- 跨平台维护门禁在 Linux 区分 PR 模板文件名大小写、在 Windows 误判 CRLF 工作流文本并无法直接启动 `pnpm.cmd`；模板路径、换行读取和 pnpm 测试调用现已跨平台一致。
+- 模型可选字段的显式 `null` 与非有限流空闲超时可能穿过基础 Schema；配置现在会在适配器 profile 与设置保存边界拒绝这些不可服务值。
 - 发布候选过早获得写权限、可变 Action 引用、未 smoke 精确候选、把参考 SBOM 当成实际安装树、缺少生产依赖高危审计、exact SRI 与签名/attestation 校验、GitHub Release 资产未回读、draft/tag 目标未在公开前验证和重复发布恢复不完整；直接依赖声明、贡献许可、双语隐私模板和协调依赖升级新增本地门禁，候选证据保留 90 天，并支持只重跑失败 job。
+- GitHub Actions 审核门禁现在逐条校验每个 `uses:` 是否属于明确审核的完整提交 allowlist，避免新增未审核 Action 借用其他位置的已审核 SHA 通过测试。
 
 ### English
 
@@ -63,4 +66,7 @@ This project follows the Keep a Changelog structure; `0.0.x` is a technical prev
 - Unsupported or malformed stored OAuth records being presented as signed in; they now produce a distinct `invalid` state, and credential secrets never cross RPC.
 - Web sign-in action races, state updates after unmount, stale style nodes after hot reload, and horizontal overflow in narrow settings dialogs.
 - CI and release smoke resolving the DSH peer graph directly through npm, which could produce nondeterministic dependency results and uncontrolled memory use. They now install only the committed frozen pnpm runtime graph, and dependency upgrades must update both lockfiles before CI and acceptance are repeated.
+- Cross-platform maintenance gates failing on Linux due to pull-request-template filename casing, and on Windows due to CRLF-sensitive workflow assertions and direct `pnpm.cmd` spawning. Template paths, text normalization, and pnpm test invocation are now portable.
+- Explicit `null` model overrides and non-finite stream idle timeouts could pass the basic Schema. Configuration now rejects these unserviceable values at the adapter-profile and settings-save boundaries.
 - Release candidates receiving write permission too early, mutable Action references, a missing exact-candidate smoke, reference SBOMs being treated as actual install trees, missing high-severity production-dependency audit, exact SRI and signature/attestation checks, missing GitHub asset readback, missing pre-publication draft/tag target verification, and incomplete recovery after a partial publication. Local gates now cover direct-dependency notices, contribution licensing, bilingual privacy templates, and coordinated dependency updates. Candidate evidence is retained for 90 days and supports rerunning only failed jobs.
+- The GitHub Actions review gate now checks every `uses:` entry against an explicit allowlist of reviewed full commits, preventing an unreviewed Action from passing merely because a reviewed SHA appears elsewhere.

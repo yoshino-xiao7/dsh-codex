@@ -237,6 +237,33 @@ function applyClientModule(clientModule) {
   }
 }
 
+function registeredClientDictionaries(clientModule) {
+  let dictionaries
+  clientModule.apply({
+    connection: { rpc: { call: async () => ({ ok: true, value: {} }) } },
+    settingsScope: { describe: () => undefined },
+    effect(callback) {
+      callback()
+    },
+    locale: {
+      register(namespace, value) {
+        assert.equal(namespace, "settings.codex")
+        dictionaries = value
+        return () => undefined
+      },
+      bind: () => (key) => key,
+    },
+    slots: {
+      inject(_name, callback) {
+        callback()
+      },
+      register: () => () => undefined,
+    },
+  })
+  assert.ok(dictionaries)
+  return dictionaries
+}
+
 function settingsMirror(view, hooks = {}) {
   let snapshot = { status: "ready", view }
   const listeners = new Set()
@@ -602,6 +629,25 @@ function authorizationStatus(
     credential: { configured, state, writable: true },
     quota: { status: "unknown" },
   }
+}
+
+async function renderQuotaView(quota, language) {
+  const harness = hookHarness()
+  const clientModule = await loadClientModule(harness.React)
+  const dictionaries = registeredClientDictionaries(clientModule)
+  const client = {
+    describe: async () => ({ ...authorizationStatus(false), quota }),
+  }
+
+  harness.mount(clientModule.AuthorizationSettings, {
+    client,
+    t: (key) => dictionaries[language][key] ?? key,
+  })
+  await settle()
+  harness.flush()
+  const text = textContent(harness.tree())
+  harness.unmount()
+  return { dictionaries, text }
 }
 
 test("authorization settings distinguish an invalid stored credential from a signed-in session", async () => {
@@ -1190,6 +1236,88 @@ test("authorization watcher settling after unmount cannot refresh or publish eve
   await settle()
   assert.equal(describeCalls, 1)
   assert.deepEqual(cancelled, ["active-attempt"])
+})
+
+test("quota UI renders an exhausted observation with a validated reset in Chinese and English", async () => {
+  const observedAt = Date.now() - 1_000
+  const resetAt = Date.now() + 60 * 60_000
+  const requestId = "req_quota_ui_fixture"
+  const extra = "secret_quota_ui_fixture"
+
+  for (const language of ["zh", "en"]) {
+    const { dictionaries, text } = await renderQuotaView({
+      status: "exhausted",
+      observedAt,
+      resetAt,
+      requestId,
+      diagnostic: extra,
+    }, language)
+    const messages = dictionaries[language]
+
+    assert.ok(text.includes(messages.quotaExhausted))
+    assert.ok(text.includes(messages.quotaObservedAt))
+    assert.ok(text.includes(new Date(observedAt).toLocaleString()))
+    assert.ok(text.includes(messages.quotaResetAt))
+    assert.ok(text.includes(new Date(resetAt).toLocaleString()))
+    assert.ok(text.includes(messages.quotaResetIn))
+    assert.ok(text.includes(messages.quotaMinutes))
+    assert.match(text, language === "zh" ? /账户额度耗尽.*重置时间/u : /account quota was exhausted.*reset time/iu)
+    assert.equal(text.includes(messages.quotaUnknown), false)
+    assert.equal(text.includes(messages.quotaNoReset), false)
+    assert.equal(text.includes(requestId), false)
+    assert.equal(text.includes(extra), false)
+  }
+})
+
+test("quota UI renders an exhausted observation without reset in Chinese and English", async () => {
+  const observedAt = Date.now() - 1_000
+  const requestId = "req_quota_ui_without_reset_fixture"
+  const extra = "secret_quota_ui_without_reset_fixture"
+
+  for (const language of ["zh", "en"]) {
+    const { dictionaries, text } = await renderQuotaView({
+      status: "exhausted",
+      observedAt,
+      requestId,
+      diagnostic: extra,
+    }, language)
+    const messages = dictionaries[language]
+
+    assert.ok(text.includes(messages.quotaExhausted))
+    assert.ok(text.includes(messages.quotaObservedAt))
+    assert.ok(text.includes(new Date(observedAt).toLocaleString()))
+    assert.ok(text.includes(messages.quotaNoReset))
+    assert.match(text, language === "zh" ? /账户额度耗尽.*未获得通过校验的重置时间/u : /account quota was exhausted.*no reset time passed validation/iu)
+    assert.equal(text.includes(messages.quotaResetAt), false)
+    assert.equal(text.includes(messages.quotaUnknown), false)
+    assert.equal(text.includes(requestId), false)
+    assert.equal(text.includes(extra), false)
+  }
+})
+
+test("quota UI renders a recent success observation in Chinese and English", async () => {
+  const observedAt = Date.now() - 1_000
+  const requestId = "req_quota_ui_recent_success_fixture"
+  const extra = "secret_quota_ui_recent_success_fixture"
+
+  for (const language of ["zh", "en"]) {
+    const { dictionaries, text } = await renderQuotaView({
+      status: "recent-success",
+      observedAt,
+      requestId,
+      diagnostic: extra,
+    }, language)
+    const messages = dictionaries[language]
+
+    assert.ok(text.includes(messages.quotaRecentSuccess))
+    assert.ok(text.includes(messages.quotaSuccessCaution))
+    assert.ok(text.includes(new Date(observedAt).toLocaleString()))
+    assert.match(text, language === "zh" ? /最近一次 Codex 请求成功.*不代表账户剩余额度/u : /latest Codex request succeeded.*does not represent remaining account quota/iu)
+    assert.equal(text.includes(messages.quotaExhausted), false)
+    assert.equal(text.includes(messages.quotaUnknown), false)
+    assert.equal(text.includes(requestId), false)
+    assert.equal(text.includes(extra), false)
+  }
 })
 
 test("quota presentation accepts only bounded timestamp shapes and expires observed resets", async () => {

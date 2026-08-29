@@ -1,11 +1,21 @@
 import assert from "node:assert/strict"
-import { readFile } from "node:fs/promises"
+import { readFile, readdir } from "node:fs/promises"
 import test from "node:test"
 
 import {
   assertReleaseVersion,
   releaseDocumentPaths,
 } from "../scripts/release-version.mjs"
+
+async function readText(url) {
+  return (await readFile(url, "utf8")).replace(/\r\n?/gu, "\n")
+}
+
+test("the pull-request template uses one portable canonical path", async () => {
+  const entries = await readdir(new URL("../.github/", import.meta.url))
+  assert.ok(entries.includes("pull_request_template.md"))
+  assert.equal(entries.includes("PULL_REQUEST_TEMPLATE.md"), false)
+})
 
 test("release versions start at 0.0.1 and remain future-version compatible", () => {
   for (const version of ["0.0.1", "0.0.2", "1.0.0", "2.1.0-rc.1"]) {
@@ -25,8 +35,8 @@ test("release document paths follow the current package version", () => {
 
 test("release and i18n verification derive versioned files from package.json", async () => {
   const [releaseVerifier, i18nVerifier] = await Promise.all([
-    readFile(new URL("../scripts/verify-release.mjs", import.meta.url), "utf8"),
-    readFile(new URL("../scripts/check-i18n.mjs", import.meta.url), "utf8"),
+    readText(new URL("../scripts/verify-release.mjs", import.meta.url)),
+    readText(new URL("../scripts/check-i18n.mjs", import.meta.url)),
   ])
   assert.doesNotMatch(releaseVerifier, /version === "0\.0\.1"/u)
   assert.doesNotMatch(i18nVerifier, /docs\/releases\/v0\.0\.1\.md/u)
@@ -36,8 +46,8 @@ test("release and i18n verification derive versioned files from package.json", a
 
 test("compatibility watch compares every pinned runtime package with the registry", async () => {
   const [workflow, checker] = await Promise.all([
-    readFile(new URL("../.github/workflows/compatibility.yml", import.meta.url), "utf8"),
-    readFile(new URL("../scripts/check-registry-drift.mjs", import.meta.url), "utf8"),
+    readText(new URL("../.github/workflows/compatibility.yml", import.meta.url)),
+    readText(new URL("../scripts/check-registry-drift.mjs", import.meta.url)),
   ])
   assert.match(workflow, /check-registry-drift\.mjs/u)
   assert.match(checker, /GITHUB_STEP_SUMMARY/u)
@@ -46,8 +56,8 @@ test("compatibility watch compares every pinned runtime package with the registr
 
 test("third-party notices cover every direct runtime and peer dependency", async () => {
   const [manifestSource, notices] = await Promise.all([
-    readFile(new URL("../package.json", import.meta.url), "utf8"),
-    readFile(new URL("../THIRD_PARTY_NOTICES.md", import.meta.url), "utf8"),
+    readText(new URL("../package.json", import.meta.url)),
+    readText(new URL("../THIRD_PARTY_NOTICES.md", import.meta.url)),
   ])
   const manifest = JSON.parse(manifestSource)
   const packages = new Set([
@@ -71,7 +81,7 @@ test("contribution rules retain the Apache-2.0 inbound-license and rights declar
     "docs/contribution-sources.md",
     "docs/contribution-sources.en.md",
     ".github/pull_request_template.md",
-  ].map((name) => readFile(new URL(`../${name}`, import.meta.url), "utf8")))
+  ].map((name) => readText(new URL(`../${name}`, import.meta.url))))
 
   for (const source of files) assert.match(source, /Apache-2\.0/u)
   assert.match(files[0], /有权提交/u)
@@ -82,10 +92,10 @@ test("contribution rules retain the Apache-2.0 inbound-license and rights declar
 
 test("public issue and pull-request templates keep bilingual privacy guidance", async () => {
   const [bug, feature, compatibility, pullRequest] = await Promise.all([
-    readFile(new URL("../.github/ISSUE_TEMPLATE/bug.yml", import.meta.url), "utf8"),
-    readFile(new URL("../.github/ISSUE_TEMPLATE/feature.yml", import.meta.url), "utf8"),
-    readFile(new URL("../.github/ISSUE_TEMPLATE/compatibility.yml", import.meta.url), "utf8"),
-    readFile(new URL("../.github/pull_request_template.md", import.meta.url), "utf8"),
+    readText(new URL("../.github/ISSUE_TEMPLATE/bug.yml", import.meta.url)),
+    readText(new URL("../.github/ISSUE_TEMPLATE/feature.yml", import.meta.url)),
+    readText(new URL("../.github/ISSUE_TEMPLATE/compatibility.yml", import.meta.url)),
+    readText(new URL("../.github/pull_request_template.md", import.meta.url)),
   ])
 
   assert.match(bug, /Never submit/u)
@@ -98,17 +108,21 @@ test("public issue and pull-request templates keep bilingual privacy guidance", 
 })
 
 test("Dependabot updates both npm manifests through one coordinated configuration", async () => {
-  const source = await readFile(new URL("../.github/dependabot.yml", import.meta.url), "utf8")
+  const source = await readText(new URL("../.github/dependabot.yml", import.meta.url))
   assert.equal((source.match(/package-ecosystem: npm/gu) ?? []).length, 1)
   const npmBlock = source.slice(0, source.indexOf("  - package-ecosystem: github-actions"))
   assert.match(npmBlock, /directories:\n\s+- \/\n\s+- \/test\/fixtures\/dsh-runtime/u)
   assert.match(npmBlock, /dsh-runtime:\n\s+patterns:\n\s+- "@deepseek-ai\/\*"/u)
+
+  const actionsBlock = source.slice(source.indexOf("  - package-ecosystem: github-actions"))
+  assert.match(actionsBlock, /interval: monthly/u)
+  assert.match(actionsBlock, /reviewed-actions:\n\s+patterns:\n\s+- "\*"/u)
 })
 
 test("root DSH package pins stay aligned with the compatibility runtime", async () => {
   const [rootSource, fixtureSource] = await Promise.all([
-    readFile(new URL("../package.json", import.meta.url), "utf8"),
-    readFile(new URL("./fixtures/dsh-runtime/package.json", import.meta.url), "utf8"),
+    readText(new URL("../package.json", import.meta.url)),
+    readText(new URL("./fixtures/dsh-runtime/package.json", import.meta.url)),
   ])
   const rootManifest = JSON.parse(rootSource)
   const fixtureManifest = JSON.parse(fixtureSource)
@@ -128,7 +142,7 @@ test("root DSH package pins stay aligned with the compatibility runtime", async 
 })
 
 test("i18n verification covers combined bilingual governance and templates", async () => {
-  const source = await readFile(new URL("../scripts/check-i18n.mjs", import.meta.url), "utf8")
+  const source = await readText(new URL("../scripts/check-i18n.mjs", import.meta.url))
   for (const file of [
     "CHANGELOG.md",
     "SECURITY.md",

@@ -9,9 +9,22 @@ const REVIEWED_WORKFLOWS = Object.freeze([
   "compatibility.yml",
   "release.yml",
 ])
+const REVIEWED_ACTIONS = new Set([
+  "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+  "actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093",
+  "actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+  "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+  "github/codeql-action/analyze@6f5948dfacef28e207b48d0905cf90c03365536d",
+  "github/codeql-action/init@6f5948dfacef28e207b48d0905cf90c03365536d",
+  "pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+])
 
 async function workflow(name) {
-  return readFile(new URL(name, workflowRoot), "utf8")
+  return normalizeNewlines(await readFile(new URL(name, workflowRoot), "utf8"))
+}
+
+function normalizeNewlines(source) {
+  return source.replace(/\r\n?/gu, "\n")
 }
 
 async function workflowNames() {
@@ -21,6 +34,7 @@ async function workflowNames() {
 }
 
 function workflowJob(source, jobName) {
+  source = normalizeNewlines(source)
   const jobsOffset = source.indexOf("\njobs:\n")
   assert.notEqual(jobsOffset, -1, "workflow jobs section is missing")
   const header = `  ${jobName}:\n`
@@ -31,6 +45,13 @@ function workflowJob(source, jobName) {
   const next = nextHeader.exec(source)
   return source.slice(start, next?.index ?? source.length)
 }
+
+test("workflow job parsing accepts Windows CRLF checkouts", async () => {
+  const source = (await readFile(new URL("ci.yml", workflowRoot), "utf8"))
+    .replace(/\r?\n/gu, "\r\n")
+  const job = workflowJob(source, "test")
+  assert.match(job, /pnpm run check/u)
+})
 
 test("workflow directory contains only reviewed workflow entry points", async () => {
   assert.deepEqual(await workflowNames(), REVIEWED_WORKFLOWS)
@@ -47,21 +68,18 @@ test("every third-party GitHub Action is pinned to a full commit", async () => {
   }
 })
 
-test("workflows retain the reviewed action commits", async () => {
-  const sources = await Promise.all(
-    REVIEWED_WORKFLOWS.map(workflow),
-  )
-  const combined = sources.join("\n")
-  for (const reference of [
-    "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
-    "actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
-    "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
-    "pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
-    "github/codeql-action/init@6f5948dfacef28e207b48d0905cf90c03365536d",
-    "github/codeql-action/analyze@6f5948dfacef28e207b48d0905cf90c03365536d",
-  ]) {
-    assert.ok(combined.includes(reference), `missing reviewed action pin ${reference}`)
+test("every workflow action uses an explicitly reviewed commit", async () => {
+  const observed = new Set()
+  for (const name of REVIEWED_WORKFLOWS) {
+    const source = await workflow(name)
+    const uses = [...source.matchAll(/^\s*(?:-\s+)?uses:\s*([^\s#]+)/gmu)]
+      .map((match) => match[1])
+    for (const reference of uses) {
+      assert.ok(REVIEWED_ACTIONS.has(reference), `${name}: unreviewed action ${reference}`)
+      observed.add(reference)
+    }
   }
+  assert.deepEqual(observed, REVIEWED_ACTIONS)
 })
 
 test("CI boots the exact DSH CLI from the final tarball on the full OS and Node matrix", async () => {

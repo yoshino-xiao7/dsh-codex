@@ -87,6 +87,14 @@ export function createCodexProfile(config, provider = createCodexPiProvider()) {
   if (provider?.id !== CODEX_PROVIDER_ID || provider.auth?.oauth === undefined) {
     throw new TypeError("provider must be the OAuth-capable Codex provider")
   }
+  if (config.models !== undefined && !Array.isArray(config.models)) {
+    throw new TypeError("models must be omitted or an array")
+  }
+  if (!Number.isFinite(config.streamIdleTimeoutMs)
+    || config.streamIdleTimeoutMs < 1
+    || config.streamIdleTimeoutMs > MAX_TIMER_DELAY_MS) {
+    throw new TypeError(`streamIdleTimeoutMs must be a finite number from 1 through ${MAX_TIMER_DELAY_MS}`)
+  }
   const image = resolveImagePolicy(config)
   const models = configuredModels(config.models, provider.getModels())
   const configuredMaxTokens = new Map()
@@ -212,7 +220,10 @@ function configuredModels(configured, catalog) {
 
   const seen = new Set()
   const overrides = new Map()
-  for (const row of configured) {
+  for (const [index, row] of configured.entries()) {
+    for (const field of ["name", "contextWindow", "maxTokens"]) {
+      if (row[field] === null) throw new TypeError(`models[${index}].${field} must not be null`)
+    }
     if (seen.has(row.id)) throw new Error(`Codex model "${row.id}" is listed more than once`)
     seen.add(row.id)
     const base = byId.get(row.id)

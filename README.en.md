@@ -86,6 +86,7 @@ See [Troubleshooting](docs/troubleshooting.en.md) for diagnostic steps.
 ## Documentation and contribution
 
 - [Documentation index](docs/README.en.md)
+- [Configuration reference](docs/configuration.en.md)
 - [Contributing](CONTRIBUTING.en.md)
 - [Security reports](SECURITY.md)
 - [Support scope](SUPPORT.md)

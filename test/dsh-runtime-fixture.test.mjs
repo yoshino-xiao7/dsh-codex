@@ -25,15 +25,20 @@ test("the smoke runtime has a committed exact and private pnpm fixture", async (
 
 test("the pinned pnpm CLI accepts the complete dependency-tree evidence command", async () => {
   const executable = process.platform === "win32" ? "pnpm.cmd" : "pnpm"
+  const spawnOptions = {
+    encoding: "utf8",
+    shell: process.platform === "win32",
+    windowsHide: true,
+  }
   const manifest = JSON.parse(await readFile(fixtureManifestUrl, "utf8"))
   const expectedPnpmVersion = /^pnpm@(.+)$/u.exec(manifest.packageManager)?.[1]
-  const version = spawnSync(executable, ["--version"], { encoding: "utf8", windowsHide: true })
+  const version = spawnSync(executable, ["--version"], spawnOptions)
   assert.equal(version.status, 0, version.stderr)
   assert.equal(version.stdout.trim(), expectedPnpmVersion)
   const result = spawnSync(
     executable,
     ["--dir", fixtureRoot, "list", "--depth", "Infinity", "--json"],
-    { encoding: "utf8", maxBuffer: 16 * 1024 * 1024, windowsHide: true },
+    { ...spawnOptions, maxBuffer: 16 * 1024 * 1024 },
   )
   assert.equal(result.status, 0, result.stderr)
   assert.ok(Array.isArray(JSON.parse(result.stdout)))

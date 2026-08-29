@@ -3,6 +3,7 @@
 [简体中文](README.md) | [English](README.en.md)
 
 - [Architecture and module boundaries](architecture.en.md)
+- [Configuration reference](configuration.en.md)
 - [Compatibility and acceptance status](compatibility.en.md)
 - [Troubleshooting](troubleshooting.en.md)
 - [Contribution and licensing rules](contribution-sources.en.md)

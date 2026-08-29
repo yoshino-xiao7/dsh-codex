@@ -86,6 +86,7 @@ dsh web
 ## 文档与贡献
 
 - [文档索引](docs/README.md)
+- [配置参考](docs/configuration.md)
 - [参与贡献](CONTRIBUTING.md)
 - [安全报告](SECURITY.md)
 - [支持范围](SUPPORT.md)

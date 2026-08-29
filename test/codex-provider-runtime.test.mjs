@@ -16,6 +16,9 @@ import { CODEX_ROUTE_ID } from "../src/internal/codex-route-adapter.mjs"
 test("Codex runtime config resolves safe image, cache, and recovery defaults", () => {
   const config = Config({})
   const nullDefaults = Config({
+    partialResponseRecovery: null,
+    cacheRetention: null,
+    streamIdleTimeoutMs: null,
     maxRequestImageBytes: null,
     requestImagePixelBudget: null,
     requestImageMaxBytes: null,
@@ -28,6 +31,9 @@ test("Codex runtime config resolves safe image, cache, and recovery defaults", (
   assert.equal(config.requestImagePixelBudget, 4_194_304)
   assert.equal(config.requestImageMaxBytes, 1_048_576)
   assert.equal(config.models, undefined)
+  assert.equal(nullDefaults.partialResponseRecovery, true)
+  assert.equal(nullDefaults.cacheRetention, "short")
+  assert.equal(nullDefaults.streamIdleTimeoutMs, 300_000)
   assert.equal(nullDefaults.maxRequestImageBytes, 20_971_520)
   assert.equal(nullDefaults.requestImagePixelBudget, 4_194_304)
   assert.equal(nullDefaults.requestImageMaxBytes, 1_048_576)
@@ -35,6 +41,31 @@ test("Codex runtime config resolves safe image, cache, and recovery defaults", (
   for (const requestImagePixelBudget of ["", 0, -1, 1.5, Number.NaN]) {
     assert.throws(() => Config({ requestImagePixelBudget }))
   }
+})
+
+test("Codex runtime config rejects non-finite timers and nullable model overrides", () => {
+  const provider = createCodexPiProvider()
+  const known = provider.getModels()[0].id
+
+  for (const streamIdleTimeoutMs of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+    assert.throws(
+      () => createCodexProfile(
+        { ...Config({}), streamIdleTimeoutMs },
+        provider,
+      ),
+      /streamIdleTimeoutMs.*finite/iu,
+    )
+  }
+  for (const field of ["name", "contextWindow", "maxTokens"]) {
+    assert.throws(
+      () => createCodexProfile(Config({ models: [{ id: known, [field]: null }] }), provider),
+      new RegExp(`models\\[0\\]\\.${field}`, "u"),
+    )
+  }
+  assert.throws(
+    () => createCodexProfile(Config({ models: null }), provider),
+    /models must be omitted or an array/iu,
+  )
 })
 
 test("profile selection keeps provider auth/stream ownership and applies only known model overrides", () => {
@@ -153,6 +184,14 @@ test("settings namespace changes the next adapter operation without mutating an 
   const previous = resolved
   resolved = Config({ models: [{ id: second.id }] })
   validator(resolved)
+  assert.throws(
+    () => validator(Config({ models: [{ id: first.id, maxTokens: null }] })),
+    /models\[0\]\.maxTokens must not be null/u,
+  )
+  assert.throws(
+    () => validator({ ...Config({}), streamIdleTimeoutMs: Number.NaN }),
+    /streamIdleTimeoutMs.*finite/iu,
+  )
   await watcher(resolved, previous)
   assert.deepEqual((await adapter.listModels(CODEX_ROUTE_ID)).map(({ id, provider: route }) => [id, route]), [
     [second.id, CODEX_ROUTE_ID],

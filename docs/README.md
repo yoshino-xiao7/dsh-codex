@@ -3,6 +3,7 @@
 [简体中文](README.md) | [English](README.en.md)
 
 - [架构与模块边界](architecture.md)
+- [配置参考](configuration.md)
 - [兼容性与验收状态](compatibility.md)
 - [故障排查](troubleshooting.md)
 - [贡献与许可规范](contribution-sources.md)

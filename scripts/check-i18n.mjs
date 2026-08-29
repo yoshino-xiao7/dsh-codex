@@ -12,6 +12,7 @@ const pairs = [
   ["CONTRIBUTING.md", "CONTRIBUTING.en.md"],
   ["docs/README.md", "docs/README.en.md"],
   ["docs/architecture.md", "docs/architecture.en.md"],
+  ["docs/configuration.md", "docs/configuration.en.md"],
   ["docs/compatibility.md", "docs/compatibility.en.md"],
   ["docs/contribution-sources.md", "docs/contribution-sources.en.md"],
   ["docs/troubleshooting.md", "docs/troubleshooting.en.md"],

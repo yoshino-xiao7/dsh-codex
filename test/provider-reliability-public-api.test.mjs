@@ -42,6 +42,7 @@ test("public pi-ai chain keeps a generalized 429 with discarded body/code unconf
     },
   })
   const adapter = new CodexRouteAdapter(canonical)
+  const quotaObservations = []
   const model = provider.getModels().find(({ id }) => id === "gpt-5.4")
     ?? provider.getModels()[0]
   const options = {
@@ -69,13 +70,74 @@ test("public pi-ai chain keeps a generalized 429 with discarded body/code unconf
     const chunks = await collect(stabilizeCodexStream(
       options,
       () => adapter.stream(options),
+      { onQuota: (detail) => quotaObservations.push(detail) },
     ))
 
     assert.equal(requests, 1)
     assert.equal(chunks.at(-1).reason.kind, "error")
     assert.equal(chunks.at(-1).reason.failure.code, "QUOTA_OR_RATE_LIMIT")
     assert.equal(chunks.at(-1).reason.failure.status, undefined)
+    assert.equal(chunks.at(-1).reason.failure.requestId, undefined)
+    assert.deepEqual(quotaObservations, [])
     assert.match(chunks.at(-1).reason.failure.message, /structured evidence is unavailable/iu)
+  } finally {
+    globalThis.fetch = previousFetch
+  }
+})
+
+test("public PiAiAdapter carries structured AccountQuotaExceeded into a sanitized quota observation", async () => {
+  const provider = createCodexPiProvider({
+    resolveSessionPreferences: () => ({ fast: false, transport: "sse" }),
+  })
+  const { adapter, options } = publicChain(provider, "session-public-account-quota-429")
+  const quotaObservations = []
+  const requestId = "req_public_account_quota_fixture"
+  const resetAt = Math.floor((Date.now() + 60 * 60_000) / 1_000) * 1_000
+  const resetLocal = new Date(resetAt + 8 * 60 * 60_000)
+    .toISOString()
+    .slice(0, 19)
+    .replace("T", " ")
+  const resetText = `${resetLocal} +0800 CST`
+  const previousFetch = globalThis.fetch
+  let requests = 0
+  globalThis.fetch = async () => {
+    requests += 1
+    return new Response(JSON.stringify({
+      code: "AccountQuotaExceeded",
+      message: `You have exceeded the 5-hour usage quota. It will reset at ${resetText}. We recommend upgrading your plan for more quota, or waiting for the reset. Request id: ${requestId}`,
+      param: "",
+      type: "TooManyRequests",
+    }), {
+      status: 429,
+      headers: { "content-type": "application/json" },
+    })
+  }
+
+  try {
+    const chunks = await collect(stabilizeCodexStream(
+      options,
+      () => adapter.stream(options),
+      { onQuota: (detail) => quotaObservations.push(detail) },
+    ))
+    const failure = chunks.at(-1).reason.failure
+
+    assert.equal(requests, 1)
+    assert.equal(chunks.at(-1).reason.kind, "error")
+    assert.equal(failure.code, "QUOTA")
+    assert.equal(failure.status, 429)
+    assert.equal(failure.requestId, requestId)
+    assert.match(failure.message, /automatic retry stopped/iu)
+    assert.ok(failure.message.includes(`${resetLocal} UTC+08:00`))
+    assert.deepEqual(Object.keys(failure).sort(), ["code", "message", "requestId", "status"])
+    assert.deepEqual(quotaObservations, [{
+      provider: CODEX_ROUTE_ID,
+      model: options.model,
+      resetAt,
+    }])
+    assert.doesNotMatch(
+      JSON.stringify({ failure, quotaObservations }),
+      /AccountQuotaExceeded|TooManyRequests|upgrade your plan/iu,
+    )
   } finally {
     globalThis.fetch = previousFetch
   }
