@@ -32,6 +32,10 @@ const OTHER_COMMIT = "b".repeat(40)
 const PASS_TIME = "2026-08-29T10:00:00+08:00"
 const COMPLETE_EVIDENCE_TIME = "2026-08-29T02:00:00Z"
 const APPROVED_AT = "2026-08-29T03:00:00Z"
+const DSH_VERSION = "0.1.1-rc.2"
+const PLATFORM_NODE_VERSION = "22.22.2"
+const PLATFORM_RUNNER = "linux-controlled-runner"
+const PLATFORM_EVIDENCE_URL = "https://evidence.example.test/platform/linux"
 const TEXT_EVIDENCE_URL = "https://evidence.example.test/live/text-stream"
 const APPROVAL_EVIDENCE_URL = "https://evidence.example.test/approval/review"
 const OLD_TIME = new Date("2001-02-03T04:05:06Z")
@@ -73,6 +77,298 @@ test("status is read-only and reports progress without exposing evidence values"
     assert.equal(result.output.includes(value), false, `status output must redact ${value}`)
   }
   assert.deepEqual(await snapshotTree(repositoryRoot), before)
+})
+
+test("pass-platform first binds the candidate commit and changes only the selected platform", async (t) => {
+  const fixtures = [
+    ["linux", "22.22.2"],
+    ["macos", "v24.0.0"],
+    ["windows", "24.19.0"],
+  ]
+
+  for (const [platform, nodeVersion] of fixtures) {
+    const initialAcceptance = createDraftAcceptanceRecord(VERSION)
+    const repositoryRoot = await createRepository(t, { acceptance: initialAcceptance })
+    await ageRepositoryFiles(repositoryRoot)
+    const before = await snapshotTree(repositoryRoot)
+    const arguments_ = platformPassArguments({ nodeVersion, platform })
+
+    const result = await runReleaseAcceptance({ repositoryRoot, arguments: arguments_ })
+
+    assert.deepEqual(result, {
+      changedPaths: [ACCEPTANCE_PATH],
+      output: `Recorded ${platform} platform smoke as passed.`,
+      status: "changed",
+    })
+    assertSensitiveValuesRedacted(result.output, [
+      TESTED_COMMIT,
+      PASS_TIME,
+      `${platform}-controlled-runner`,
+      nodeVersion,
+      DSH_VERSION,
+      `https://evidence.example.test/platform/${platform}`,
+    ])
+
+    const acceptance = await readAcceptance(repositoryRoot)
+    const expected = structuredClone(initialAcceptance)
+    expected.testedCommit = TESTED_COMMIT
+    expected.platforms[platform] = {
+      status: "passed",
+      testedAt: PASS_TIME,
+      runner: `${platform}-controlled-runner`,
+      nodeVersion,
+      dshVersion: DSH_VERSION,
+      profileSmoke: "passed",
+      evidenceUrl: `https://evidence.example.test/platform/${platform}`,
+    }
+    assert.deepEqual(acceptance, expected)
+    assert.doesNotThrow(() => assertAcceptanceRecord(acceptance, { version: VERSION }))
+    assert.equal(
+      (await readFile(absoluteRepositoryPath(repositoryRoot, ACCEPTANCE_PATH), "utf8")).endsWith("\n"),
+      true,
+    )
+    assertOnlyAcceptanceChanged(before, await snapshotTree(repositoryRoot))
+  }
+})
+
+test("pass-platform requires every exact option and rejects invalid platform evidence without writes", async (t) => {
+  const cases = [
+    {
+      label: "missing platform",
+      arguments: platformPassArguments({ platform: null }),
+      pattern: /Usage:.*pass-platform <platform>/iu,
+    },
+    {
+      label: "unknown platform",
+      arguments: platformPassArguments({ platform: "solaris" }),
+      pattern: /Unknown release platform/iu,
+    },
+    {
+      label: "case-changed platform",
+      arguments: platformPassArguments({ platform: "Linux" }),
+      pattern: /Unknown release platform/iu,
+    },
+    {
+      label: "prototype platform key",
+      arguments: platformPassArguments({ platform: "__proto__" }),
+      pattern: /Unknown release platform/iu,
+    },
+    {
+      label: "missing tested commit",
+      arguments: platformPassArguments({ testedCommit: null }),
+      pattern: /--tested-commit is required/iu,
+    },
+    {
+      label: "missing tested time",
+      arguments: platformPassArguments({ testedAt: null }),
+      pattern: /--tested-at is required/iu,
+    },
+    {
+      label: "missing runner",
+      arguments: platformPassArguments({ runner: null }),
+      pattern: /--runner is required/iu,
+    },
+    {
+      label: "missing Node version",
+      arguments: platformPassArguments({ nodeVersion: null }),
+      pattern: /--node-version is required/iu,
+    },
+    {
+      label: "missing DSH version",
+      arguments: platformPassArguments({ dshVersion: null }),
+      pattern: /--dsh-version is required/iu,
+    },
+    {
+      label: "missing profile smoke result",
+      arguments: platformPassArguments({ profileSmoke: null }),
+      pattern: /--profile-smoke is required/iu,
+    },
+    {
+      label: "missing evidence URL",
+      arguments: platformPassArguments({ evidenceUrl: null }),
+      pattern: /--evidence-url is required/iu,
+    },
+    {
+      label: "duplicate runner",
+      arguments: [...platformPassArguments(), `--runner=${PLATFORM_RUNNER}`],
+      pattern: /--runner may be provided only once/iu,
+    },
+    {
+      label: "unknown option",
+      arguments: [...platformPassArguments(), "--architecture=x64"],
+      pattern: /Unknown option --architecture/iu,
+    },
+    {
+      label: "non-equals option spelling",
+      arguments: [
+        "pass-platform",
+        "linux",
+        "--tested-commit",
+        TESTED_COMMIT,
+        `--tested-at=${PASS_TIME}`,
+        `--runner=${PLATFORM_RUNNER}`,
+        `--node-version=${PLATFORM_NODE_VERSION}`,
+        `--dsh-version=${DSH_VERSION}`,
+        "--profile-smoke=passed",
+        `--evidence-url=${PLATFORM_EVIDENCE_URL}`,
+      ],
+      pattern: /--name=value form/iu,
+    },
+    {
+      label: "short tested commit",
+      arguments: platformPassArguments({ testedCommit: "a".repeat(39) }),
+      pattern: /full lowercase Git commit/iu,
+    },
+    {
+      label: "uppercase tested commit",
+      arguments: platformPassArguments({ testedCommit: "A".repeat(40) }),
+      pattern: /full lowercase Git commit/iu,
+    },
+    {
+      label: "unsupported Node major",
+      arguments: platformPassArguments({ nodeVersion: "20.19.0" }),
+      pattern: /tested Node 22 or 24 line/iu,
+    },
+    {
+      label: "Node 22 below minimum",
+      arguments: platformPassArguments({ nodeVersion: "22.18.9" }),
+      pattern: /at least 22\.19\.0/iu,
+    },
+    {
+      label: "non-concrete Node version",
+      arguments: platformPassArguments({ nodeVersion: "24" }),
+      pattern: /concrete stable Node version/iu,
+    },
+    {
+      label: "wrong DSH version",
+      arguments: platformPassArguments({ dshVersion: "0.1.1-rc.3" }),
+      pattern: /dshVersion must be 0\.1\.1-rc\.2/iu,
+    },
+    {
+      label: "unconfirmed profile smoke",
+      arguments: platformPassArguments({ profileSmoke: "pending" }),
+      pattern: /profileSmoke must be explicitly confirmed as passed/iu,
+    },
+    {
+      label: "placeholder runner",
+      arguments: platformPassArguments({ runner: "TBD" }),
+      pattern: /runner must not be a placeholder/iu,
+    },
+    {
+      label: "multiline runner",
+      arguments: platformPassArguments({ runner: "controlled\nrunner" }),
+      pattern: /--name=value form|runner must be a bounded printable line/iu,
+    },
+    {
+      label: "unreal tested time",
+      arguments: platformPassArguments({ testedAt: "2026-02-29T00:00:00Z" }),
+      pattern: /real RFC3339 timestamp/iu,
+    },
+    {
+      label: "tested time without timezone",
+      arguments: platformPassArguments({ testedAt: "2026-08-29T02:00:00" }),
+      pattern: /real RFC3339 timestamp/iu,
+    },
+    {
+      label: "HTTP evidence URL",
+      arguments: platformPassArguments({ evidenceUrl: "http://evidence.example.test/platform/linux" }),
+      pattern: /must use HTTPS/iu,
+    },
+    {
+      label: "evidence URL query",
+      arguments: platformPassArguments({
+        evidenceUrl: "https://evidence.example.test/platform/linux?token=secret",
+      }),
+      pattern: /query data/iu,
+    },
+    {
+      label: "evidence URL fragment",
+      arguments: platformPassArguments({
+        evidenceUrl: "https://evidence.example.test/platform/linux#private",
+      }),
+      pattern: /fragments/iu,
+    },
+  ]
+
+  for (const fixture of cases) {
+    const repositoryRoot = await createRepository(t)
+    await assertRejectsWithoutWrites(
+      repositoryRoot,
+      () => runReleaseAcceptance({ repositoryRoot, arguments: fixture.arguments }),
+      fixture.pattern,
+      fixture.label,
+      fixture.redact,
+    )
+  }
+})
+
+test("pass-platform is byte-idempotent and cannot replace different platform evidence", async (t) => {
+  const repositoryRoot = await createRepository(t)
+  const arguments_ = platformPassArguments()
+  await runReleaseAcceptance({ repositoryRoot, arguments: arguments_ })
+  await ageRepositoryFiles(repositoryRoot)
+  const beforeReplay = await snapshotTree(repositoryRoot)
+
+  const replay = await runReleaseAcceptance({ repositoryRoot, arguments: arguments_ })
+
+  assert.deepEqual(replay, {
+    changedPaths: [],
+    output: "linux platform already has identical passed evidence.",
+    status: "unchanged",
+  })
+  assert.deepEqual(await snapshotTree(repositoryRoot), beforeReplay)
+
+  await assertRejectsWithoutWrites(
+    repositoryRoot,
+    () => runReleaseAcceptance({
+      repositoryRoot,
+      arguments: platformPassArguments({
+        evidenceUrl: "https://evidence.example.test/platform/linux/rerun",
+      }),
+    }),
+    /linux already passed with different evidence/iu,
+    "different platform evidence",
+  )
+})
+
+test("platform and live passes bind both directions to one candidate commit", async (t) => {
+  {
+    const repositoryRoot = await createRepository(t)
+    await runReleaseAcceptance({ repositoryRoot, arguments: platformPassArguments() })
+    await assertRejectsWithoutWrites(
+      repositoryRoot,
+      () => runReleaseAcceptance({
+        repositoryRoot,
+        arguments: textStreamPassArguments({ testedCommit: OTHER_COMMIT }),
+      }),
+      /testedCommit does not match/iu,
+      "live check with a different platform-bound commit",
+    )
+
+    const liveResult = await runReleaseAcceptance({
+      repositoryRoot,
+      arguments: textStreamPassArguments(),
+    })
+    assert.equal(liveResult.status, "changed")
+    const acceptance = await readAcceptance(repositoryRoot)
+    assert.equal(acceptance.testedCommit, TESTED_COMMIT)
+    assert.equal(acceptance.platforms.linux.status, "passed")
+    assert.equal(acceptance.liveAcceptance.textStream.status, "passed")
+  }
+
+  {
+    const repositoryRoot = await createRepository(t)
+    await runReleaseAcceptance({ repositoryRoot, arguments: textStreamPassArguments() })
+    await assertRejectsWithoutWrites(
+      repositoryRoot,
+      () => runReleaseAcceptance({
+        repositoryRoot,
+        arguments: platformPassArguments({ testedCommit: OTHER_COMMIT }),
+      }),
+      /testedCommit does not match/iu,
+      "platform with a different live-bound commit",
+    )
+  }
 })
 
 test("pass binds the first full candidate commit and changes only the selected live check", async (t) => {
@@ -501,6 +797,20 @@ test("an approved record permits identical replays but rejects every attempted m
   assert.deepEqual(identicalPass.changedPaths, [])
   assert.deepEqual(await snapshotTree(repositoryRoot), before)
 
+  const identicalPlatform = await runReleaseAcceptance({
+    repositoryRoot,
+    arguments: platformPassArguments({
+      dshVersion: acceptance.platforms.linux.dshVersion,
+      evidenceUrl: acceptance.platforms.linux.evidenceUrl,
+      nodeVersion: acceptance.platforms.linux.nodeVersion,
+      runner: acceptance.platforms.linux.runner,
+      testedAt: acceptance.platforms.linux.testedAt,
+    }),
+  })
+  assert.equal(identicalPlatform.status, "unchanged")
+  assert.deepEqual(identicalPlatform.changedPaths, [])
+  assert.deepEqual(await snapshotTree(repositoryRoot), before)
+
   await assertRejectsWithoutWrites(
     repositoryRoot,
     () => runReleaseAcceptance({
@@ -521,6 +831,21 @@ test("an approved record permits identical replays but rejects every attempted m
     }),
     /approved acceptance record is immutable/iu,
     "changed live evidence",
+  )
+  await assertRejectsWithoutWrites(
+    repositoryRoot,
+    () => runReleaseAcceptance({
+      repositoryRoot,
+      arguments: platformPassArguments({
+        dshVersion: acceptance.platforms.linux.dshVersion,
+        evidenceUrl: "https://evidence.example.test/platform/linux/replacement",
+        nodeVersion: acceptance.platforms.linux.nodeVersion,
+        runner: acceptance.platforms.linux.runner,
+        testedAt: acceptance.platforms.linux.testedAt,
+      }),
+    }),
+    /approved acceptance record is immutable/iu,
+    "changed platform evidence",
   )
 })
 
@@ -764,6 +1089,33 @@ test("the package command and its local dependency closure stay offline and cred
     }
   }
 })
+
+function platformPassArguments({
+  dshVersion = DSH_VERSION,
+  evidenceUrl,
+  nodeVersion = PLATFORM_NODE_VERSION,
+  platform = "linux",
+  profileSmoke = "passed",
+  runner,
+  testedAt = PASS_TIME,
+  testedCommit = TESTED_COMMIT,
+} = {}) {
+  const platformName = platform ?? "linux"
+  const arguments_ = ["pass-platform"]
+  if (platform !== null) arguments_.push(platform)
+  if (testedCommit !== null) arguments_.push(`--tested-commit=${testedCommit}`)
+  if (testedAt !== null) arguments_.push(`--tested-at=${testedAt}`)
+  if (runner !== null) arguments_.push(`--runner=${runner ?? `${platformName}-controlled-runner`}`)
+  if (nodeVersion !== null) arguments_.push(`--node-version=${nodeVersion}`)
+  if (dshVersion !== null) arguments_.push(`--dsh-version=${dshVersion}`)
+  if (profileSmoke !== null) arguments_.push(`--profile-smoke=${profileSmoke}`)
+  if (evidenceUrl !== null) {
+    arguments_.push(
+      `--evidence-url=${evidenceUrl ?? `https://evidence.example.test/platform/${platformName}`}`,
+    )
+  }
+  return arguments_
+}
 
 function textStreamPassArguments(options = {}) {
   return livePassArguments({

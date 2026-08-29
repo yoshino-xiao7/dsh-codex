@@ -53,4 +53,19 @@ The fixture disables lifecycle scripts, so this level verifies DSH Web/profile i
 5. Real network: the repository owner manually uses a test account in a controlled local environment to verify Web OAuth, the model catalog, text/reasoning streams, terminal usage, a safe tool round trip, two-turn replay, the `maxPixels=4194304` image path, all four transports, and Fast; this consumes account quota, and every fixed boolean assertion in the acceptance JSON must be true;
 6. Release readback: exact equality between npm `dist.integrity` and the candidate SRI, a passing signature/attestation audit, and byte equality between GitHub assets and the locally built tarball.
 
-Real OAuth, quota, and network smoke must not require contributors to place secrets in CI, and secrets must never be exposed to external pull requests. `release:acceptance` is only an offline evidence recorder: it does not access the network, read credentials, infer or automatically pass assertions, or replace human approval; `status` shows only counts and check names, never evidence values. The first `pass` binds the full candidate SHA, and every later `pass`/`approve` must use the same SHA. The CLI checks only format and record consistency; the strict publish gate still verifies commit existence and ancestry.
+After a maintainer verifies a platform's CI and profile smoke, record that result offline with every parameter:
+
+```sh
+pnpm run release:acceptance -- pass-platform <linux|macos|windows> \
+  --tested-commit=<full-40-character-lowercase-SHA> \
+  --tested-at=<RFC3339-with-timezone> \
+  --runner=<single-line-runner-id> \
+  --node-version=<22.x.y-or-24.x.y> \
+  --dsh-version=0.1.1-rc.2 \
+  --profile-smoke=passed \
+  --evidence-url=<sanitized-HTTPS>
+```
+
+All seven options are required exactly once in `--name=value` form. The runner must be trimmed, non-placeholder, no more than 128 characters, and a single line without control characters. Node must be a stable three-part 22 release (at least `22.19.0`) or 24, optionally prefixed with `v`. Evidence must be an absolute HTTPS URL without userinfo, query data, or a fragment.
+
+Real OAuth, quota, and network smoke must not require contributors to place secrets in CI, and secrets must never be exposed to external pull requests. `release:acceptance` is only an offline evidence recorder: `pass-platform` records only CI/profile-smoke evidence already verified by a maintainer and does not run tests, access the network, or check that the commit exists; `pass` neither reads credentials nor infers or automatically passes assertions; neither replaces human approval. `status` shows only counts and check names, never evidence values. The first `pass-platform` or `pass` binds the full candidate SHA, and all later platform/live records plus `approve` must use that same SHA. A passed item permits only an identical idempotent replay; differing evidence cannot overwrite it. The strict publish gate still verifies commit existence and ancestry.

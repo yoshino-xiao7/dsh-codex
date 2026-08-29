@@ -23,7 +23,7 @@ This project follows the Keep a Changelog structure; `0.0.x` is a technical prev
 - 发布候选在 Web/profile smoke 成功后记录 DSH 版本、夹具 lock SHA-256、Node、pnpm、平台、架构与生命周期脚本状态，并由严格门禁重新验证。
 - 中英文文档、社区治理、Issue/PR、跨平台 CI，以及最小权限、SHA 固定、离线确定性 SBOM 和可恢复重跑的发布流程。
 - 幂等且离线的 `release:prepare` 命令，用于生成下一版本的双语 CHANGELOG/Release 草稿和全新 schema v3 验收记录；它会保护人工内容、在冲突发生时写入前失败，并拒绝受管文件或父目录符号链接。
-- 不联网、不读取凭据的 `release:acceptance` 离线证据记录器；只有明确列齐固定断言才记录通过，全部证据必须绑定同一候选 SHA，`status` 不显示证据值，提交存在性/祖先关系由严格门禁验证，审批仍由维护者人工作出。
+- 不联网、不读取凭据的 `release:acceptance` 离线证据记录器；新增 `pass-platform <linux|macos|windows>`，只记录维护者已核验的 CI/profile smoke，不检查提交是否存在；平台与真实网络证据必须绑定同一候选 SHA，已通过项只允许相同证据的幂等重放，不能覆盖不同证据；真实检查只有明确列齐固定断言才记录通过，`status` 不显示证据值，提交存在性/祖先关系仍由严格门禁验证，审批仍由维护者人工作出。
 
 #### 修复
 
@@ -59,7 +59,7 @@ This project follows the Keep a Changelog structure; `0.0.x` is a technical prev
 - Release candidates record the DSH version, fixture-lock SHA-256, Node, pnpm, platform, architecture, and lifecycle-script state only after Web/profile smoke succeeds, and the strict gate re-verifies them.
 - Chinese and English documentation, governance, issue/PR templates, cross-platform CI, and a least-privilege release flow with pinned Actions, an offline deterministic SBOM, and recoverable reruns.
 - An idempotent offline `release:prepare` command that creates the next bilingual CHANGELOG/Release drafts and a fresh schema-v3 acceptance record, preserves human-authored content, fails before writing on conflicts, and rejects managed-file or parent-directory symlinks.
-- An offline `release:acceptance` evidence recorder that neither accesses the network nor reads credentials; it records a pass only when every fixed assertion is explicitly listed, binds all evidence to one candidate SHA, hides evidence values from `status`, leaves commit existence/ancestry checks to the strict gate, and leaves approval to a maintainer.
+- An offline `release:acceptance` evidence recorder that neither accesses the network nor reads credentials, now with `pass-platform <linux|macos|windows>` to record only maintainer-verified CI/profile smoke without checking that the commit exists. Platform and live-network evidence must bind to one candidate SHA; a passed item permits only an idempotent replay of identical evidence and cannot be overwritten with different evidence. Live checks pass only when every fixed assertion is explicitly listed, `status` hides evidence values, the strict gate still checks commit existence/ancestry, and approval remains a maintainer decision.
 
 #### Fixed
 

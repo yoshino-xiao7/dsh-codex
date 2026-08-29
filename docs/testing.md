@@ -53,4 +53,19 @@ pnpm run verify:release
 5. 真实网络：由仓库所有者在受控本地环境中使用测试账号人工逐项验证 Web OAuth、模型目录、文本/reasoning 流、终态 usage、安全工具闭环、两轮 replay、`maxPixels=4194304` 图片路径、四种 transport 与 Fast；该过程会消耗账号额度，验收 JSON 的固定布尔断言全部为真后才能通过；
 6. 发布读回：npm `dist.integrity` 与候选 SRI 精确一致，签名/attestation 审计通过，GitHub 资产与本地 tarball 逐字节一致。
 
-真实 OAuth、配额或网络 smoke 不应要求贡献者在 CI 提交秘密，也不能使用外部 PR 可访问的 secret。`release:acceptance` 只是离线证据记录器：它不联网、不读取凭据、不推断或自动通过断言，也不替代人工审批；`status` 只显示计数和检查项名称，不显示证据值。第一次 `pass` 绑定完整候选 SHA，后续 `pass`/`approve` 必须使用同一 SHA；CLI 只校验格式与记录一致性，提交存在性和祖先关系仍由严格 publish gate 验证。
+维护者核验一个平台的 CI 与 profile smoke 后，用完整参数离线记录该结论：
+
+```sh
+pnpm run release:acceptance -- pass-platform <linux|macos|windows> \
+  --tested-commit=<完整40位小写SHA> \
+  --tested-at=<带时区的RFC3339> \
+  --runner=<运行环境单行标识> \
+  --node-version=<22.x.y或24.x.y> \
+  --dsh-version=0.1.1-rc.2 \
+  --profile-smoke=passed \
+  --evidence-url=<脱敏HTTPS>
+```
+
+七个选项都必须且只能用 `--name=value` 提供一次。runner 必须去除首尾空格、不是占位词、最长 128 字符且不含控制字符；Node 必须是可带 `v` 前缀的稳定三段 22（至少 `22.19.0`）或 24；证据必须是没有 userinfo、查询参数或片段的绝对 HTTPS URL。
+
+真实 OAuth、配额或网络 smoke 不应要求贡献者在 CI 提交秘密，也不能使用外部 PR 可访问的 secret。`release:acceptance` 只是离线证据记录器：`pass-platform` 只记录维护者已核验的 CI/profile smoke，既不运行测试、不联网，也不检查提交是否存在；`pass` 不读取凭据、不推断或自动通过断言；两者都不替代人工审批。`status` 只显示计数和检查项名称，不显示证据值。第一次 `pass-platform` 或 `pass` 绑定完整候选 SHA，后续所有平台/live 记录和 `approve` 必须使用同一 SHA。已通过项目只允许完全相同的幂等重放，任何不同证据都不能覆盖；严格 publish gate 仍负责验证提交存在性和祖先关系。

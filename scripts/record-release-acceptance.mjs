@@ -34,6 +34,60 @@ export async function acceptanceStatus({ repositoryRoot }) {
   }
 }
 
+export async function recordPlatformAcceptance({
+  dshVersion,
+  evidenceUrl,
+  nodeVersion,
+  platform,
+  profileSmoke,
+  repositoryRoot,
+  runner,
+  testedAt,
+  testedCommit,
+}) {
+  const context = await readAcceptanceContext(repositoryRoot)
+  assert(
+    Object.hasOwn(context.acceptance.platforms, platform),
+    "Unknown release platform; use status to list the fixed platforms",
+  )
+  assertTestedCommit(testedCommit)
+  assert(
+    context.acceptance.testedCommit === "TBD"
+      || context.acceptance.testedCommit === testedCommit,
+    "testedCommit does not match the release candidate already bound to this record",
+  )
+  assert(profileSmoke === "passed", "profileSmoke must be explicitly confirmed as passed")
+
+  const nextResult = {
+    status: "passed",
+    testedAt,
+    runner,
+    nodeVersion,
+    dshVersion,
+    profileSmoke: "passed",
+    evidenceUrl,
+  }
+  const currentResult = context.acceptance.platforms[platform]
+  const nextAcceptance = structuredClone(context.acceptance)
+  nextAcceptance.testedCommit = testedCommit
+  nextAcceptance.platforms[platform] = nextResult
+  if (sameJson(context.acceptance, nextAcceptance)) {
+    return { path: context.acceptancePath, platform, status: "unchanged" }
+  }
+  assert(
+    context.acceptance.releaseStatus !== "approved",
+    "An approved acceptance record is immutable",
+  )
+  assert(
+    currentResult.status === "pending",
+    `${platform} already passed with different evidence and cannot be overwritten`,
+  )
+
+  validateAcceptance(nextAcceptance, context.version, context.acceptancePath)
+  await writeAcceptance(context, nextAcceptance)
+  return { path: context.acceptancePath, platform, status: "changed" }
+}
+
 export async function recordLiveAcceptance({
   assertions,
   check,
@@ -256,6 +310,42 @@ export async function runReleaseAcceptance({ arguments: rawArguments, repository
     }
   }
 
+  if (command === "pass-platform") {
+    assert(
+      typeof arguments_[1] === "string" && !arguments_[1].startsWith("-"),
+      "Usage: pnpm run release:acceptance -- pass-platform <platform> --tested-commit=<40hex> --tested-at=<RFC3339> --runner=<name> --node-version=<version> --dsh-version=<version> --profile-smoke=passed --evidence-url=<HTTPS>",
+    )
+    const options = parseOptions(arguments_.slice(2), {
+      allowed: new Set([
+        "dsh-version",
+        "evidence-url",
+        "node-version",
+        "profile-smoke",
+        "runner",
+        "tested-at",
+        "tested-commit",
+      ]),
+    })
+    const result = await recordPlatformAcceptance({
+      dshVersion: requireOption(options, "dsh-version"),
+      evidenceUrl: requireOption(options, "evidence-url"),
+      nodeVersion: requireOption(options, "node-version"),
+      platform: arguments_[1],
+      profileSmoke: requireOption(options, "profile-smoke"),
+      repositoryRoot,
+      runner: requireOption(options, "runner"),
+      testedAt: requireOption(options, "tested-at"),
+      testedCommit: requireOption(options, "tested-commit"),
+    })
+    return {
+      changedPaths: result.status === "changed" ? [result.path] : [],
+      output: result.status === "changed"
+        ? `Recorded ${result.platform} platform smoke as passed.`
+        : `${result.platform} platform already has identical passed evidence.`,
+      status: result.status,
+    }
+  }
+
   if (command === "pass") {
     assert(
       typeof arguments_[1] === "string" && !arguments_[1].startsWith("-"),
@@ -303,7 +393,7 @@ export async function runReleaseAcceptance({ arguments: rawArguments, repository
   }
 
   throw new ReleaseFileError(
-    "Usage: pnpm run release:acceptance -- <status|pass|approve>",
+    "Usage: pnpm run release:acceptance -- <status|pass-platform|pass|approve>",
   )
 }
 

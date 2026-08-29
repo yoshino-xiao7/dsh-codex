@@ -118,6 +118,8 @@ test("platform evidence must use the exact DSH runtime and a tested Node line", 
     ["nodeVersion", "20.19.0", /must use the tested Node 22 or 24 line/u],
     ["nodeVersion", "22.18.9", /must be at least 22\.19\.0/u],
     ["nodeVersion", "23.11.0", /must use the tested Node 22 or 24 line/u],
+    ["runner", "TBD", /runner must not be a placeholder/u],
+    ["runner", "x".repeat(129), /runner must be a bounded printable line/u],
   ]) {
     const approved = approvedFixture()
     approved.platforms.linux[field] = value

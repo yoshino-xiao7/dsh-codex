@@ -52,25 +52,27 @@ Do not bypass the gate with fabricated environment variables. Keep the release i
 ## Acceptance record
 
 1. Run cross-platform CI and live-network acceptance against a committed release candidate.
-2. Put that candidate's full 40-character commit in `testedCommit`.
-3. Run the profile smoke on all three operating systems with exact DSH `0.1.1-rc.2` and a tested Node 22 release (at least `22.19.0`) or Node 24, then record `testedAt`, environment details, and HTTPS evidence links without sensitive parameters.
+2. Let the first `pass-platform` or `pass` bind that candidate's full 40-character commit to `testedCommit`.
+3. Run the profile smoke on all three operating systems with exact DSH `0.1.1-rc.2` and a tested Node 22 release (at least `22.19.0`) or Node 24. After a maintainer verifies the evidence, use `pass-platform` to record `testedAt`, environment details, and HTTPS evidence links without sensitive parameters.
 4. Manually complete every live check below with a test account in a controlled local environment. This consumes account quota. Mark a check `passed` only after every fixed assertion has sanitized evidence; a free-form scope statement is not a substitute.
 5. After every item passes, a maintainer records approval and changes `releaseStatus` to `approved`.
 6. From that point, only `docs/releases/v<version>.md`, its acceptance JSON, `README.md`, `README.en.md`, `CHANGELOG.md`, `docs/compatibility.md`, and `docs/compatibility.en.md` may change to record dates, evidence, and publication state. Any source, configuration, dependency, lockfile, or workflow change requires acceptance against a new commit.
 
-| Check | Required proof |
-| --- | --- |
-| `oauthWebSignIn` | OAuth starts from DSH Settings, the credential becomes configured, and a post-sign-in request succeeds |
-| `modelCatalog` | Settings shows the catalog and the conversation model selector can select a Codex model |
-| `textStream` | A non-empty text delta and a normal terminal event are observed |
-| `reasoningStream` | A reasoning block is observed and the request terminates normally |
-| `terminalUsage` | Terminal usage contains both input and output token counts |
-| `toolRoundTrip` | A safe test tool is requested, executed, returned, and followed by a successful response |
-| `replayContinuity` | Two turns succeed and the second correctly uses first-turn context |
-| `imageMaxPixels` | Native image input succeeds and the request projects `maxPixels=4194304` |
-| `transportAuto` / `transportSse` / `transportWebsocket` | At least one live request succeeds through each transport |
-| `transportWebsocketCached` | Two consecutive turns succeed in the same session |
-| `fastPriority` | Priority is requested, the live request succeeds, and no automatic downgrade replay occurs |
+| Check | Required proof | Copyable exact `--assert` arguments |
+| --- | --- | --- |
+| `oauthWebSignIn` | OAuth starts from DSH Settings, the credential becomes configured, and a post-sign-in request succeeds | `--assert=flowStartedFromSettings --assert=credentialConfigured --assert=postSignInRequestSucceeded` |
+| `modelCatalog` | Settings shows the catalog and the conversation model selector can select a Codex model | `--assert=settingsCatalogVisible --assert=conversationModelSelectable` |
+| `textStream` | A non-empty text delta and a normal terminal event are observed | `--assert=nonEmptyTextDelta --assert=terminalStopObserved` |
+| `reasoningStream` | A reasoning block is observed and the request terminates normally | `--assert=reasoningBlockObserved --assert=terminalStopObserved` |
+| `terminalUsage` | Terminal usage contains both input and output token counts | `--assert=inputTokensObserved --assert=outputTokensObserved` |
+| `toolRoundTrip` | A safe test tool is requested, executed, returned, and followed by a successful response | `--assert=toolCallObserved --assert=toolExecuted --assert=toolResultReturned --assert=followUpSucceeded` |
+| `replayContinuity` | Two turns succeed and the second correctly uses first-turn context | `--assert=firstTurnSucceeded --assert=secondTurnUsedPriorContext --assert=secondTurnSucceeded` |
+| `imageMaxPixels` | Native image input succeeds and the request projects `maxPixels=4194304` | `--assert=nativeImageAccepted --assert=maxPixels4194304Projected --assert=requestSucceeded` |
+| `transportAuto` | At least one live request succeeds through the auto transport | `--assert=requestSucceeded` |
+| `transportSse` | At least one live request succeeds through the SSE transport | `--assert=requestSucceeded` |
+| `transportWebsocket` | At least one live request succeeds through the WebSocket transport | `--assert=requestSucceeded` |
+| `transportWebsocketCached` | Two consecutive turns succeed in the same session | `--assert=firstTurnSucceeded --assert=secondTurnSucceeded` |
+| `fastPriority` | Priority is requested, the live request succeeds, and no automatic downgrade replay occurs | `--assert=priorityRequested --assert=requestSucceeded --assert=noAutomaticDowngrade` |
 
 Each check contains only `status`, `testedAt`, an HTTPS `evidenceUrl` without query data, and the gate-defined boolean `assertions`. Evidence must not contain a token, OAuth code, cookie, account identifier, or complete private conversation.
 
@@ -86,6 +88,25 @@ Windows PowerShell:
 $env:DSH_BIN = "C:\path\to\dsh.exe"
 pnpm run smoke:dsh-profile
 ```
+
+### Cross-platform CI/profile-smoke recording
+
+After a maintainer verifies the CI and profile-smoke evidence for a platform, record the result with this offline command:
+
+```sh
+pnpm run release:acceptance -- pass-platform <linux|macos|windows> \
+  --tested-commit=<full-40-character-lowercase-SHA> \
+  --tested-at=<RFC3339-with-timezone> \
+  --runner=<single-line-runner-id> \
+  --node-version=<22.x.y-or-24.x.y> \
+  --dsh-version=0.1.1-rc.2 \
+  --profile-smoke=passed \
+  --evidence-url=<sanitized-HTTPS>
+```
+
+All seven options are required exactly once and must use the `--name=value` form. `--runner` must be a trimmed, non-placeholder, single-line identifier of at most 128 characters with no control characters. `--node-version` accepts a stable three-part Node 22 release (at least `22.19.0`) or Node 24, optionally prefixed with `v`. `--dsh-version` and `--profile-smoke` must be exactly `0.1.1-rc.2` and `passed`, respectively. `--evidence-url` must be an absolute HTTPS URL without userinfo, query data, or a fragment.
+
+`pass-platform` only writes a CI/profile-smoke result that a maintainer has already verified to the acceptance record; it does not run the smoke, access the network, or check that the commit exists. The first `pass-platform` or `pass` binds the full candidate SHA, and all later platform and live-network evidence must use that same SHA. A passed item permits only a semantically identical idempotent replay; any differing field conflicts and cannot overwrite existing evidence. The same identical-replay-only rule applies after approval.
 
 ### Local controlled-account acceptance recording
 
@@ -108,7 +129,7 @@ pnpm run release:acceptance -- pass <check> \
   --assert=<fixed-assertion>
 ```
 
-The first `pass` binds the candidate while the record's `testedCommit` is still `TBD`. Every later `pass` and `approve` must provide the same full 40-character lowercase SHA, preventing evidence from different candidates from being mixed. The command records `passed` only when the assertion names are complete and exactly match the fixed list; it never infers, fills, or passes assertions automatically. After a maintainer has manually confirmed every check, record the approval:
+The first `pass-platform` or `pass` binds the candidate while the record's `testedCommit` is still `TBD`. Every later `pass-platform`, `pass`, and `approve` must provide the same full 40-character lowercase SHA, preventing platform and live-network evidence from different candidates from being mixed. `pass` records `passed` only when the assertion names are complete and exactly match the fixed table above; it never infers, fills, or passes assertions automatically. After a maintainer has manually confirmed every check, record the approval:
 
 ```sh
 pnpm run release:acceptance -- approve \

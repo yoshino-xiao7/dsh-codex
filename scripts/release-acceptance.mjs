@@ -2,6 +2,7 @@ const PLATFORM_NAMES = Object.freeze(["linux", "macos", "windows"])
 const SUPPORTED_DSH_VERSION = "0.1.1-rc.2"
 const SUPPORTED_NODE_MAJORS = new Set([22, 24])
 const MINIMUM_NODE_22 = Object.freeze([22, 19, 0])
+const PLACEHOLDER_PATTERN = /\b(?:TBD|TODO|PENDING|DRAFT|UNRELEASED)\b|待补|未发布|草稿/iu
 
 export const LIVE_ACCEPTANCE_ASSERTIONS = Object.freeze({
   oauthWebSignIn: Object.freeze([
@@ -146,7 +147,7 @@ export function assertAcceptanceRecord(acceptance, { version, requirePassed = fa
   if (requireAllPassed) {
     assert(acceptance.releaseStatus === "approved", "Acceptance releaseStatus must be approved")
     assertFullCommit(acceptance.testedCommit, "Acceptance testedCommit")
-    assertNonEmptyString(acceptance.approvedBy, "Acceptance approvedBy")
+    assertEvidenceLabel(acceptance.approvedBy, "Acceptance approvedBy")
     assertIsoTimestamp(acceptance.approvedAt, "Acceptance approvedAt")
     assertEvidenceUrl(acceptance.approvalEvidenceUrl, "Acceptance approvalEvidenceUrl")
     const latestEvidenceTime = Math.max(
@@ -187,6 +188,7 @@ function assertPlatformResult(result, platform, requirePassed) {
   if (result.status === "passed" || requirePassed) {
     assert(result.status === "passed", `${platform} acceptance must pass before publication`)
     assertIsoTimestamp(result.testedAt, `${platform}.testedAt`)
+    assertEvidenceLabel(result.runner, `${platform}.runner`)
     assertSupportedNodeVersion(result.nodeVersion, `${platform}.nodeVersion`)
     assert(
       result.dshVersion === SUPPORTED_DSH_VERSION,
@@ -256,6 +258,17 @@ function assertObject(value, label) {
 
 function assertNonEmptyString(value, label) {
   assert(typeof value === "string" && value.length > 0, `${label} is required`)
+}
+
+function assertEvidenceLabel(value, label) {
+  assertNonEmptyString(value, label)
+  assert(
+    value.trim() === value
+      && value.length <= 128
+      && !/[\u0000-\u001f\u007f]/u.test(value),
+    `${label} must be a bounded printable line`,
+  )
+  assert(!PLACEHOLDER_PATTERN.test(value), `${label} must not be a placeholder`)
 }
 
 function assertFullCommit(value, label) {

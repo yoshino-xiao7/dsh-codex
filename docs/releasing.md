@@ -52,25 +52,27 @@ pnpm run verify:release:publish
 ## 验收记录
 
 1. 在已提交的 release candidate 上运行跨平台 CI 和真实网络验收；
-2. 把该提交的完整 40 位 commit 写入 `testedCommit`；
-3. 在三个系统分别使用精确 DSH `0.1.1-rc.2` 和已测试的 Node 22（至少 `22.19.0`）或 24 运行 profile smoke，填写 `testedAt`、环境信息和不含敏感参数的 HTTPS 证据链接；
+2. 由第一次 `pass-platform` 或 `pass` 把该提交的完整 40 位 commit 绑定到 `testedCommit`；
+3. 在三个系统分别使用精确 DSH `0.1.1-rc.2` 和已测试的 Node 22（至少 `22.19.0`）或 24 运行 profile smoke，由维护者核验证据后通过 `pass-platform` 记录 `testedAt`、环境信息和不含敏感参数的 HTTPS 证据链接；
 4. 在受控本地环境中使用测试账号人工完成下表的真实验收；该过程会消耗账号额度，每项只能在对应断言均有脱敏证据后改为 `passed`，不能用自由文本概括代替；
 5. 所有项目通过后由维护者填写审批信息，并把 `releaseStatus` 改为 `approved`；
 6. 此后只允许修改 `docs/releases/v<version>.md`、对应验收 JSON、`README.md`、`README.en.md`、`CHANGELOG.md`、`docs/compatibility.md` 和 `docs/compatibility.en.md`，用于填写日期、证据和发布状态。源码、配置、依赖、锁文件或工作流有任何变化，都必须基于新提交重新验收。
 
-| 验收项 | 必须证明 |
-| --- | --- |
-| `oauthWebSignIn` | 从 DSH 设置页启动 OAuth、凭据显示已配置，并能完成登录后的请求 |
-| `modelCatalog` | 设置页能看到目录，且会话模型选择器可选择 Codex 模型 |
-| `textStream` | 收到非空文本 delta 和正常终止事件 |
-| `reasoningStream` | reasoning block 可见且请求正常终止 |
-| `terminalUsage` | 终态同时提供 input/output token usage |
-| `toolRoundTrip` | 收到工具调用、执行安全测试工具、返回结果，并成功完成后续回复 |
-| `replayContinuity` | 连续两轮请求成功，第二轮正确使用第一轮上下文 |
-| `imageMaxPixels` | 原生图片输入成功，且实际请求投影了 `maxPixels=4194304` |
-| `transportAuto` / `transportSse` / `transportWebsocket` | 每种 transport 至少完成一次真实请求 |
-| `transportWebsocketCached` | 同一会话连续两轮请求均成功 |
-| `fastPriority` | 请求了 priority、真实请求成功，并确认没有自动降级重放 |
+| 验收项 | 必须证明 | 可复制的精确 `--assert` 参数 |
+| --- | --- | --- |
+| `oauthWebSignIn` | 从 DSH 设置页启动 OAuth、凭据显示已配置，并能完成登录后的请求 | `--assert=flowStartedFromSettings --assert=credentialConfigured --assert=postSignInRequestSucceeded` |
+| `modelCatalog` | 设置页能看到目录，且会话模型选择器可选择 Codex 模型 | `--assert=settingsCatalogVisible --assert=conversationModelSelectable` |
+| `textStream` | 收到非空文本 delta 和正常终止事件 | `--assert=nonEmptyTextDelta --assert=terminalStopObserved` |
+| `reasoningStream` | reasoning block 可见且请求正常终止 | `--assert=reasoningBlockObserved --assert=terminalStopObserved` |
+| `terminalUsage` | 终态同时提供 input/output token usage | `--assert=inputTokensObserved --assert=outputTokensObserved` |
+| `toolRoundTrip` | 收到工具调用、执行安全测试工具、返回结果，并成功完成后续回复 | `--assert=toolCallObserved --assert=toolExecuted --assert=toolResultReturned --assert=followUpSucceeded` |
+| `replayContinuity` | 连续两轮请求成功，第二轮正确使用第一轮上下文 | `--assert=firstTurnSucceeded --assert=secondTurnUsedPriorContext --assert=secondTurnSucceeded` |
+| `imageMaxPixels` | 原生图片输入成功，且实际请求投影了 `maxPixels=4194304` | `--assert=nativeImageAccepted --assert=maxPixels4194304Projected --assert=requestSucceeded` |
+| `transportAuto` | 通过 auto transport 至少完成一次真实请求 | `--assert=requestSucceeded` |
+| `transportSse` | 通过 SSE transport 至少完成一次真实请求 | `--assert=requestSucceeded` |
+| `transportWebsocket` | 通过 WebSocket transport 至少完成一次真实请求 | `--assert=requestSucceeded` |
+| `transportWebsocketCached` | 同一会话连续两轮请求均成功 | `--assert=firstTurnSucceeded --assert=secondTurnSucceeded` |
+| `fastPriority` | 请求了 priority、真实请求成功，并确认没有自动降级重放 | `--assert=priorityRequested --assert=requestSucceeded --assert=noAutomaticDowngrade` |
 
 每项记录只允许 `status`、`testedAt`、无查询参数的 HTTPS `evidenceUrl` 和门禁定义的布尔 `assertions`。证据不得包含 token、OAuth code、Cookie、账号标识或完整私人会话。
 
@@ -86,6 +88,25 @@ Windows PowerShell：
 $env:DSH_BIN = "C:\path\to\dsh.exe"
 pnpm run smoke:dsh-profile
 ```
+
+### 跨平台 CI/profile smoke 记录
+
+维护者核验某个平台的 CI 与 profile smoke 证据后，用以下离线命令记录结果：
+
+```sh
+pnpm run release:acceptance -- pass-platform <linux|macos|windows> \
+  --tested-commit=<完整40位小写SHA> \
+  --tested-at=<带时区的RFC3339> \
+  --runner=<运行环境单行标识> \
+  --node-version=<22.x.y或24.x.y> \
+  --dsh-version=0.1.1-rc.2 \
+  --profile-smoke=passed \
+  --evidence-url=<脱敏HTTPS>
+```
+
+七个选项都必须且只能提供一次，并使用 `--name=value` 形式。`--runner` 必须是去除首尾空格、非占位、最长 128 字符且不含控制字符的单行标识；`--node-version` 接受可带 `v` 前缀的稳定三段 Node 22（至少 `22.19.0`）或 Node 24；`--dsh-version` 和 `--profile-smoke` 必须分别精确为 `0.1.1-rc.2` 与 `passed`；`--evidence-url` 必须是没有 userinfo、查询参数或片段的绝对 HTTPS URL。
+
+`pass-platform` 只把维护者已经核验的 CI/profile smoke 结论写入验收记录；它不运行 smoke、不联网，也不检查提交是否存在。第一次 `pass-platform` 或 `pass` 会绑定完整候选 SHA，此后所有平台和真实网络证据都必须使用同一 SHA。已通过项目只允许完全相同的幂等重放；任一字段不同都会冲突，不能覆盖已有证据。记录批准后同样只接受完全相同的重放。
 
 ### 本地受控账号验收记录
 
@@ -108,7 +129,7 @@ pnpm run release:acceptance -- pass <check> \
   --assert=<固定断言>
 ```
 
-第一次 `pass` 会在记录中的 `testedCommit` 仍为 `TBD` 时绑定该候选；后续 `pass` 和 `approve` 必须提供同一个完整 40 位小写 SHA，防止跨候选混用证据。只有断言名称完整且与固定清单精确一致时，命令才会记录 `passed`；它不会自动推断、补齐或通过断言。所有检查项都已由维护者人工确认后，再记录审批：
+第一次 `pass-platform` 或 `pass` 会在记录中的 `testedCommit` 仍为 `TBD` 时绑定该候选；后续 `pass-platform`、`pass` 和 `approve` 必须提供同一个完整 40 位小写 SHA，防止平台与真实网络证据跨候选混用。只有断言名称完整且与上表固定清单精确一致时，`pass` 才会记录 `passed`；它不会自动推断、补齐或通过断言。所有检查项都已由维护者人工确认后，再记录审批：
 
 ```sh
 pnpm run release:acceptance -- approve \

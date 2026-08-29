@@ -8,6 +8,7 @@ import {
   releaseDocumentPaths,
   releaseVersionHasBuildMetadata,
 } from "../scripts/release-version.mjs"
+import { LIVE_ACCEPTANCE_ASSERTIONS } from "../scripts/release-acceptance.mjs"
 
 async function readText(url) {
   return (await readFile(url, "utf8")).replace(/\r\n?/gu, "\n")
@@ -165,6 +166,28 @@ test("root DSH package pins stay aligned with the compatibility runtime", async 
   assert.ok(dshPins.length > 0)
   for (const [name, version] of dshPins) {
     assert.equal(version, fixtureVersion, `${name} drifted from the DSH runtime fixture`)
+  }
+})
+
+test("bilingual release docs keep every copyable live assertion aligned with the gate", async () => {
+  const documents = await Promise.all([
+    readText(new URL("../docs/releasing.md", import.meta.url)),
+    readText(new URL("../docs/releasing.en.md", import.meta.url)),
+  ])
+
+  for (const source of documents) {
+    for (const [check, expectedAssertions] of Object.entries(LIVE_ACCEPTANCE_ASSERTIONS)) {
+      const rowPrefix = `| \`${check}\` |`
+      const row = source.split("\n").find((line) => line.startsWith(rowPrefix))
+      assert.ok(row, `release docs are missing the ${check} acceptance row`)
+      const documentedAssertions = [...row.matchAll(/--assert=([A-Za-z][A-Za-z0-9]*)/gu)]
+        .map((match) => match[1])
+      assert.deepEqual(
+        documentedAssertions,
+        [...expectedAssertions],
+        `release docs drifted from the ${check} gate assertions`,
+      )
+    }
   }
 })
 
