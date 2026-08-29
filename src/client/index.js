@@ -15,9 +15,9 @@ window.__ModuleLoader__.load({
     const STYLE_REF_KEY = Symbol.for(`${STYLE_ID}/references`)
 
     const zh = {
-      nav: "Codex 登录",
-      title: "Codex 登录",
-      description: "使用 ChatGPT 账户授权 Codex。凭据由 DeepSeek Harness 凭据服务保存，本页面不会读取或显示令牌。",
+      nav: "OpenAI Codex",
+      title: "OpenAI Codex",
+      description: "使用 ChatGPT 订阅在 dsh 中调用 Codex 模型，无需 API Key。",
       loading: "正在读取登录状态…",
       signedIn: "已登录",
       signedOut: "尚未登录",
@@ -28,6 +28,7 @@ window.__ModuleLoader__.load({
       writableNo: "当前凭据存储不可写。",
       refresh: "刷新",
       signIn: "登录",
+      signInWithChatGPT: "使用 ChatGPT 登录",
       signInAgain: "重新登录",
       cancelling: "正在取消登录",
       cancel: "取消登录",
@@ -46,18 +47,20 @@ window.__ModuleLoader__.load({
       logoutFailed: "退出登录失败，请重试。",
       responseFailed: "提交登录信息失败，请重试。",
       requestFailed: "暂时无法连接本机授权服务。",
-      quotaTitle: "Codex 额度观测",
-      quotaUnknown: "暂无近期额度观测。插件不会调用未公开的账户额度接口。",
+      quotaTitle: "使用额度",
+      quotaProduct: "Codex",
+      quotaUnknown: "尚无可验证的额度观测。",
+      quotaUnknownHelp: "完成一次 Codex 请求后，此处会更新可验证状态；插件不会调用未公开的账户额度接口。",
       quotaRecentSuccess: "最近一次 Codex 请求成功",
       quotaSuccessCaution: "这只表示最近一次请求成功，不代表账户剩余额度。",
-      quotaExhausted: "最近观测到 Codex 账户额度耗尽。",
+      quotaExhausted: "最近观测到 Codex 账户额度已用尽。",
       quotaObservedAt: "观测时间",
       quotaResetAt: "观测到的重置时间",
       quotaResetIn: "预计还有约",
       quotaMinutes: "分钟",
       quotaNoReset: "未获得通过校验的重置时间；状态会在有限时间后自动回到未知。",
-      modelsTitle: "Codex 模型启用管理",
-      modelsDescription: "选择在模型选择器中显示的 Codex 模型。隐藏模型不会让旧会话中已保存的精确模型失效。",
+      modelsTitle: "模型选择器中显示的模型",
+      modelsDescription: "选择要在模型选择器中显示的 Codex 模型。隐藏后，已有会话中保存的精确模型仍可继续使用。",
       modelsLoading: "正在读取 Codex 模型目录…",
       modelsUnavailable: "当前环境没有可用的 Codex 模型管理接口。",
       modelsReadOnly: "当前设置存储为只读，无法修改启用模型。",
@@ -73,9 +76,9 @@ window.__ModuleLoader__.load({
       modelsSaveFailed: "保存模型启用设置失败。",
     }
     const en = {
-      nav: "Codex sign-in",
-      title: "Codex sign-in",
-      description: "Authorize Codex with your ChatGPT account. Credentials are stored by the DeepSeek Harness credential service; this page never reads or displays tokens.",
+      nav: "OpenAI Codex",
+      title: "OpenAI Codex",
+      description: "Use your ChatGPT subscription to access Codex models in dsh—no API key required.",
       loading: "Reading sign-in status…",
       signedIn: "Signed in",
       signedOut: "Not signed in",
@@ -86,6 +89,7 @@ window.__ModuleLoader__.load({
       writableNo: "The credential store is currently read-only.",
       refresh: "Refresh",
       signIn: "Sign in",
+      signInWithChatGPT: "Sign in with ChatGPT",
       signInAgain: "Sign in again",
       cancelling: "Cancelling sign-in",
       cancel: "Cancel sign-in",
@@ -104,8 +108,10 @@ window.__ModuleLoader__.load({
       logoutFailed: "Could not sign out. Please try again.",
       responseFailed: "Could not submit the sign-in response. Please try again.",
       requestFailed: "The local authorization service is temporarily unavailable.",
-      quotaTitle: "Codex quota observation",
-      quotaUnknown: "No recent quota observation. The plugin does not call undocumented account-quota endpoints.",
+      quotaTitle: "Usage",
+      quotaProduct: "Codex",
+      quotaUnknown: "No verifiable quota observation yet.",
+      quotaUnknownHelp: "This area updates after a Codex request; the plugin does not call undocumented account-quota endpoints.",
       quotaRecentSuccess: "The latest Codex request succeeded",
       quotaSuccessCaution: "This only describes the latest request; it does not represent remaining account quota.",
       quotaExhausted: "Codex account quota was exhausted in the latest observation.",
@@ -114,8 +120,8 @@ window.__ModuleLoader__.load({
       quotaResetIn: "Approximately",
       quotaMinutes: "minutes remaining",
       quotaNoReset: "No reset time passed validation; this state automatically returns to unknown after a bounded interval.",
-      modelsTitle: "Enabled Codex models",
-      modelsDescription: "Choose which Codex models appear in the model selector. Hiding a model does not invalidate an exact model already saved in an older session.",
+      modelsTitle: "Models shown in the model selector",
+      modelsDescription: "Choose which Codex models appear in the model selector. Hidden models remain available to existing conversations that saved an exact model.",
       modelsLoading: "Reading the Codex model catalog…",
       modelsUnavailable: "Codex model management is unavailable in this environment.",
       modelsReadOnly: "The settings store is read-only, so enabled models cannot be changed.",
@@ -575,11 +581,11 @@ window.__ModuleLoader__.load({
       }
 
       if (snapshot.status === "loading") {
-        return h("section", { className: "dshCodexPanel", "aria-busy": "true" },
+        return h("section", { className: "dshCodexPanel dshCodexCard dshCodexAuthorizationCard", "aria-busy": "true" },
           h("p", { className: "dshCodexMuted" }, t("loading")))
       }
       if (snapshot.status === "error") {
-        return h("section", { className: "dshCodexPanel" },
+        return h("section", { className: "dshCodexPanel dshCodexCard dshCodexAuthorizationCard" },
           h("p", { role: "alert", className: "dshCodexError" }, t("requestFailed")),
           h("button", { type: "button", className: "dshCodexButton", onClick: refresh }, t("refresh")))
       }
@@ -606,6 +612,39 @@ window.__ModuleLoader__.load({
               ? t("signedIn")
               : t("signedOut")
       const quota = safeQuotaSnapshot(view.quota)
+      const statusTone = authorizationBusy || cancelling || loggingOut
+        ? "busy"
+        : credentialState === "invalid"
+          ? "invalid"
+          : signedIn
+            ? "active"
+            : "inactive"
+      const authorizationActions = flow === undefined
+        ? null
+        : h("div", { className: "dshCodexActions dshCodexAuthActions" },
+            ...flow.methods.map((method) => h("button", {
+              key: method.id,
+              type: "button",
+              className: configured ? "dshCodexButton" : "dshCodexButton dshCodexPrimary",
+              disabled: authorizationBusy || actionBusy || view.credential.writable === false,
+              onClick: () => void begin(method.id),
+            }, configured
+              ? t("signInAgain")
+              : flow.methods.length === 1
+                ? t("signInWithChatGPT")
+                : `${t("signIn")} · ${method.label}`)),
+            authorizationBusy ? h("button", {
+              type: "button",
+              className: "dshCodexButton",
+              disabled: actionBusy,
+              onClick: () => void cancel(),
+            }, t("cancel")) : null,
+            configured && !authorizationBusy ? h("button", {
+              type: "button",
+              className: "dshCodexButton",
+              disabled: actionBusy,
+              onClick: () => void logout(),
+            }, loggingOut ? t("signingOut") : t("signOut")) : null)
 
       let quotaBody
       if (quota.status === "recent-success") {
@@ -620,60 +659,34 @@ window.__ModuleLoader__.load({
             ? h("p", { className: "dshCodexMuted" }, t("quotaNoReset"))
             : h("p", { className: "dshCodexMuted" }, `${t("quotaResetAt")} · ${new Date(quota.resetAt).toLocaleString()} · ${t("quotaResetIn")} ${quota.remainingMinutes} ${t("quotaMinutes")}`))
       } else {
-        quotaBody = h("p", { className: "dshCodexMuted" }, t("quotaUnknown"))
+        quotaBody = h(React.Fragment, null,
+          h("p", { className: "dshCodexQuotaState dshCodexQuotaUnknown" }, t("quotaUnknown")),
+          h("p", { className: "dshCodexMuted" }, t("quotaUnknownHelp")))
       }
 
       return h("section", {
-        className: "dshCodexPanel",
+        className: "dshCodexPanel dshCodexCard dshCodexAuthorizationCard",
         "aria-busy": authorizationBusy || actionBusy ? "true" : undefined,
       },
-        h("header", { className: "dshCodexHeader" },
-          h("div", null,
-            h("h2", null, t("title")),
-            h("p", { className: "dshCodexMuted" }, t("description"))),
-          h("span", {
-            className: "dshCodexBadge",
-            "data-active": signedIn ? "true" : undefined,
+        h("div", { className: "dshCodexAuthToolbar" },
+          h("div", {
+            className: "dshCodexStatus",
+            "data-state": statusTone,
             role: "status",
             "aria-live": "polite",
-          }, statusText)),
+          },
+          h("span", { className: "dshCodexStatusDot", "aria-hidden": "true" }),
+          h("strong", null, statusText)),
+          authorizationActions),
         credentialState === "invalid"
           ? h("p", { role: "alert", className: "dshCodexError" }, t("credentialInvalidHelp"))
           : null,
         flow === undefined
           ? h("p", { role: "status", className: "dshCodexMuted" }, t("unavailable"))
-          : h("div", { className: "dshCodexActions" },
-              ...flow.methods.map((method) => h("button", {
-                key: method.id,
-                type: "button",
-                className: "dshCodexButton dshCodexPrimary",
-                disabled: authorizationBusy || actionBusy || view.credential.writable === false,
-                onClick: () => void begin(method.id),
-              }, configured ? t("signInAgain") : `${t("signIn")} · ${method.label}`)),
-              authorizationBusy ? h("button", {
-                type: "button",
-                className: "dshCodexButton",
-                disabled: actionBusy,
-                onClick: () => void cancel(),
-              }, t("cancel")) : null,
-              configured && !authorizationBusy ? h("button", {
-                type: "button",
-                className: "dshCodexButton",
-                disabled: actionBusy,
-                onClick: () => void logout(),
-              }, loggingOut ? t("signingOut") : t("signOut")) : null,
-              h("button", {
-                type: "button",
-                className: "dshCodexButton",
-                disabled: actionBusy,
-                onClick: refresh,
-              }, t("refresh"))),
+          : null,
         view.credential.writable === false
           ? h("p", { className: "dshCodexMuted" }, t("writableNo"))
           : null,
-        h("section", { className: "dshCodexQuota", "aria-live": "polite" },
-          h("h3", null, t("quotaTitle")),
-          quotaBody),
         notices.length > 0
           ? h("ol", { className: "dshCodexNotices", "aria-live": "polite" },
               ...notices.map((notice, index) => h("li", { key: `${index}-${notice.message}` },
@@ -716,7 +729,23 @@ window.__ModuleLoader__.load({
         outcome === "authorized" ? h("p", { role: "status", className: "dshCodexSuccess" }, t("authorized")) : null,
         outcome === "cancelled" ? h("p", { role: "status", className: "dshCodexMuted" }, t("cancelled")) : null,
         outcome === "commit-in-progress" ? h("p", { role: "status", className: "dshCodexMuted" }, t("commitInProgress")) : null,
-        failure === null ? null : h("p", { role: "alert", className: "dshCodexError", "data-error-code": failure }, t(failureCopyKey(failure))))
+        failure === null ? null : h("p", { role: "alert", className: "dshCodexError", "data-error-code": failure }, t(failureCopyKey(failure))),
+        h("section", {
+          className: "dshCodexQuota",
+          "data-quota-status": quota.status,
+          "aria-live": "polite",
+          "aria-labelledby": "dsh-codex-quota-title",
+        },
+        h("div", { className: "dshCodexQuotaHeader" },
+          h("h3", { id: "dsh-codex-quota-title" }, t("quotaTitle")),
+          h("button", {
+            type: "button",
+            className: "dshCodexButton dshCodexRefreshButton",
+            disabled: actionBusy,
+            onClick: refresh,
+          }, t("refresh"))),
+        h("p", { className: "dshCodexQuotaProduct" }, t("quotaProduct")),
+        quotaBody))
     }
 
     function failureCopyKey(failure) {
@@ -823,7 +852,10 @@ window.__ModuleLoader__.load({
         const dirty = selected.size !== original.size || [...selected].some((id) => !original.has(id))
         const plan = modelSavePlan(snapshot, selectedIds)
         const modelItems = snapshot.models.map((model) => h("li", { key: model.id },
-          h("label", { className: "dshCodexModelOption" },
+          h("label", {
+            className: "dshCodexModelOption",
+            "data-selected": selected.has(model.id) ? "true" : undefined,
+          },
             h("input", {
               type: "checkbox",
               checked: selected.has(model.id),
@@ -835,11 +867,14 @@ window.__ModuleLoader__.load({
               model.name === undefined || model.name === model.id ? null : h("code", null, model.id)))))
         content = h(React.Fragment, null,
           snapshot.writable ? null : h("p", { className: "dshCodexMuted" }, t("modelsReadOnly")),
-          h("ul", { className: "dshCodexModelList" }, ...modelItems),
+          h("ul", {
+            className: "dshCodexModelList",
+            "aria-labelledby": "dsh-codex-models-title",
+          }, ...modelItems),
           plan.allCatalogSelected ? h("p", { className: "dshCodexMuted" }, t(plan.unsetOverride
             ? "modelsAllEnabledFollow"
             : "modelsAllEnabledPreserve")) : null,
-          h("div", { className: "dshCodexActions" },
+          h("div", { className: "dshCodexActions dshCodexModelActions" },
             h("button", {
               type: "button",
               className: "dshCodexButton dshCodexPrimary",
@@ -856,16 +891,19 @@ window.__ModuleLoader__.load({
           failure === null ? null : h("p", { role: "alert", className: "dshCodexError" }, failure))
       }
 
-      return h("section", { className: "dshCodexPanel dshCodexModelPanel" },
+      return h("section", { className: "dshCodexPanel dshCodexCard dshCodexModelPanel" },
         h("header", { className: "dshCodexHeader" },
           h("div", null,
-            h("h2", null, t("modelsTitle")),
+            h("h3", { id: "dsh-codex-models-title" }, t("modelsTitle")),
             h("p", { className: "dshCodexWarning" }, t("modelsDescription")))),
         content)
     }
 
     function CodexSettings({ client, modelClient, t }) {
       return h("div", { className: "dshCodexPage" },
+        h("header", { className: "dshCodexHero" },
+          h("h2", null, t("title")),
+          h("p", null, t("description"))),
         h(AuthorizationSettings, { client, t }),
         h(ModelEnablementSettings, { client: modelClient, t }))
     }
@@ -898,45 +936,71 @@ window.__ModuleLoader__.load({
         document.head.appendChild(style)
       }
       style.textContent = [
-        ".dshCodexPage{display:flex;min-width:0;flex-direction:column;gap:28px}",
-        ".dshCodexPanel{box-sizing:border-box;width:100%;min-width:0;max-width:760px;color:var(--dsw-alias-label-primary);display:flex;flex-direction:column;gap:16px}",
+        "[role=dialog]:has(.dshCodexPage){width:min(1180px,calc(100vw - 48px))}",
+        ".dshCodexPage{box-sizing:border-box;display:flex;width:100%;max-width:1120px;min-width:0;flex-direction:column;gap:28px;padding:6px 0 40px;color:var(--dsw-alias-label-primary)}",
+        ".dshCodexPage *{box-sizing:border-box}",
+        ".dshCodexHero{display:flex;min-width:0;flex-direction:column;gap:8px}",
+        ".dshCodexHero h2,.dshCodexHero p{margin:0}",
+        ".dshCodexHero h2{font-size:16px;font-weight:500;line-height:24px}",
+        ".dshCodexHero p{max-width:760px;color:var(--dsw-alias-label-tertiary);font-size:14px;line-height:22px}",
+        ".dshCodexPanel{display:flex;width:100%;min-width:0;max-width:none;color:var(--dsw-alias-label-primary);flex-direction:column;gap:18px}",
         ".dshCodexPanel p,.dshCodexPanel label{overflow-wrap:anywhere;word-break:break-word}",
-        ".dshCodexModelPanel{border-top:1px solid var(--dsw-alias-border-l2);padding-top:24px}",
+        ".dshCodexCard{border:1px solid var(--dsw-alias-border-l2);border-radius:18px;background:var(--dsw-alias-bg-module-platform,var(--dsw-alias-bg-layer-3));padding:clamp(24px,3vw,34px)}",
         ".dshCodexHeader{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}",
         ".dshCodexHeader>div{min-width:0}",
-        ".dshCodexHeader h2,.dshCodexHeader p,.dshCodexNotices p,.dshCodexQuota p{margin:0}",
-        ".dshCodexHeader h2{font-size:18px;line-height:26px}",
-        ".dshCodexQuota{display:flex;min-width:0;flex-direction:column;gap:6px;border:1px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-bg-layer-3);padding:12px 14px}",
-        ".dshCodexQuota h3{margin:0;font-size:14px;line-height:20px}",
-        ".dshCodexQuotaState{font-size:13px;line-height:20px}",
+        ".dshCodexHeader h3,.dshCodexHeader p,.dshCodexNotices p,.dshCodexQuota p{margin:0}",
+        ".dshCodexHeader h3{font-size:16px;font-weight:500;line-height:24px}",
+        ".dshCodexAuthToolbar{display:flex;min-width:0;align-items:center;justify-content:space-between;gap:18px}",
+        ".dshCodexStatus{display:flex;min-width:0;align-items:center;gap:10px;font-size:14px;line-height:22px}",
+        ".dshCodexStatus strong{font-weight:500;white-space:nowrap}",
+        ".dshCodexStatusDot{width:11px;height:11px;flex:none;border-radius:50%;background:var(--dsw-alias-label-tertiary)}",
+        ".dshCodexStatus[data-state=active] .dshCodexStatusDot{background:var(--dsw-alias-state-success-primary)}",
+        ".dshCodexStatus[data-state=invalid] .dshCodexStatusDot{background:var(--dsw-alias-state-error-primary)}",
+        ".dshCodexStatus[data-state=busy] .dshCodexStatusDot{background:var(--dsw-alias-state-business-primary)}",
+        ".dshCodexQuota{display:flex;min-width:0;flex-direction:column;gap:10px;border-top:1px solid var(--dsw-alias-border-l2);padding-top:24px}",
+        ".dshCodexQuotaHeader{display:flex;min-width:0;align-items:center;justify-content:space-between;gap:12px}",
+        ".dshCodexQuota h3{margin:0;font-size:16px;font-weight:500;line-height:24px}",
+        ".dshCodexQuotaProduct{font-size:14px;font-weight:500;line-height:22px}",
+        ".dshCodexQuotaState{display:flex;align-items:center;gap:8px;font-size:14px;line-height:22px}",
+        ".dshCodexQuotaState::before{width:8px;height:8px;flex:none;border-radius:50%;background:var(--dsw-alias-state-success-primary);content:\"\"}",
+        ".dshCodexQuotaUnknown::before{background:var(--dsw-alias-label-tertiary)}",
+        ".dshCodexQuotaExhausted::before{background:var(--dsw-alias-state-error-primary)}",
         ".dshCodexQuotaExhausted{color:var(--dsw-alias-state-error-primary)}",
-        ".dshCodexMuted{color:var(--dsw-alias-label-tertiary);font-size:13px;line-height:20px}",
-        ".dshCodexWarning{color:var(--dsw-alias-label-secondary);font-size:13px;line-height:20px;max-width:680px}",
-        ".dshCodexBadge{flex:none;border-radius:999px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-secondary);padding:4px 9px;font-size:12px}",
-        ".dshCodexBadge[data-active=true]{background:color-mix(in srgb,var(--dsw-alias-state-success-primary) 12%,transparent);color:var(--dsw-alias-state-success-primary)}",
+        ".dshCodexMuted{color:var(--dsw-alias-label-tertiary);font-size:14px;line-height:22px}",
+        ".dshCodexWarning{max-width:820px;color:var(--dsw-alias-label-secondary);font-size:14px;line-height:22px}",
         ".dshCodexActions{display:flex;min-width:0;flex-wrap:wrap;gap:8px}",
-        ".dshCodexButton{box-sizing:border-box;max-width:100%;white-space:normal;overflow-wrap:anywhere;word-break:break-word;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit;cursor:pointer;padding:7px 12px}",
+        ".dshCodexAuthActions{margin-left:auto;justify-content:flex-end}",
+        ".dshCodexAuthActions .dshCodexButton{height:36px;min-height:36px;border-radius:18px;padding:0 14px;font-size:14px;line-height:22px}",
+        ".dshCodexQuotaHeader .dshCodexRefreshButton{min-height:28px;border:none;border-radius:14px;background:transparent;color:var(--dsw-alias-label-tertiary);padding:0 10px;font-size:12px;line-height:18px}",
+        ".dshCodexButton{box-sizing:border-box;max-width:100%;white-space:normal;overflow-wrap:anywhere;word-break:break-word;border:1px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit;cursor:pointer;padding:8px 14px;transition:background-color .15s ease,border-color .15s ease}",
+        ".dshCodexButton:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover,var(--dsw-alias-bg-layer-2))}",
+        ".dshCodexButton:focus-visible,.dshCodexModelOption:has(input:focus-visible){outline:2px solid var(--dsw-alias-brand-primary,var(--dsw-alias-border-l3));outline-offset:2px}",
         ".dshCodexButton:disabled{cursor:not-allowed;opacity:.5}",
-        ".dshCodexPrimary{border-color:var(--dsw-alias-state-business-primary);background:var(--dsw-alias-state-business-primary);color:white}",
-        ".dshCodexModelList{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px;margin:0;padding:0;list-style:none}",
-        ".dshCodexModelOption{display:flex;min-width:0;align-items:flex-start;gap:10px;border:1px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-bg-layer-3);padding:10px 12px;cursor:pointer}",
+        ".dshCodexPrimary{border-color:var(--dsw-alias-button-primary-fill,var(--dsw-alias-state-business-primary));background:var(--dsw-alias-button-primary-fill,var(--dsw-alias-state-business-primary));color:var(--dsw-alias-label-primary-foreground,#fff)}",
+        ".dshCodexPrimary:hover:not(:disabled){background:var(--dsw-alias-button-primary-hover,var(--dsw-alias-state-business-primary))}",
+        ".dshCodexModelList{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:36px;row-gap:8px;margin:0;padding:0;list-style:none}",
+        ".dshCodexModelOption{display:flex;min-width:0;align-items:flex-start;gap:12px;border-radius:10px;padding:10px 8px;cursor:pointer;transition:background-color .15s ease}",
+        ".dshCodexModelOption:hover{background:var(--dsw-alias-interactive-bg-hover,var(--dsw-alias-bg-layer-2))}",
         ".dshCodexModelOption:has(input:disabled){cursor:not-allowed;opacity:.65}",
-        ".dshCodexModelOption input{margin-top:3px}",
-        ".dshCodexModelOption span{display:flex;min-width:0;flex-direction:column;gap:2px}",
-        ".dshCodexModelOption strong{overflow-wrap:anywhere;font-size:13px;line-height:20px}",
-        ".dshCodexModelOption code{overflow-wrap:anywhere;color:var(--dsw-alias-label-tertiary);font-size:11px;line-height:16px}",
+        ".dshCodexModelOption:has(input:disabled):hover{background:transparent}",
+        ".dshCodexModelOption input{width:18px;height:18px;flex:none;margin:2px 0 0;accent-color:var(--dsw-alias-state-business-primary)}",
+        ".dshCodexModelOption span{display:flex;min-width:0;flex-wrap:wrap;align-items:baseline;column-gap:8px;row-gap:2px}",
+        ".dshCodexModelOption strong{overflow-wrap:anywhere;font-size:14px;font-weight:500;line-height:22px}",
+        ".dshCodexModelOption code{overflow-wrap:anywhere;color:var(--dsw-alias-label-tertiary);font-family:inherit;font-size:12px;line-height:18px}",
+        ".dshCodexModelActions{justify-content:flex-end;border-top:1px solid var(--dsw-alias-border-l2);padding-top:20px}",
         ".dshCodexNotices{display:flex;min-width:0;flex-direction:column;gap:10px;margin:0;padding:0;list-style:none}",
-        ".dshCodexNotices li,.dshCodexPrompt{box-sizing:border-box;min-width:0;border:1px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-bg-layer-3);padding:12px 14px}",
+        ".dshCodexNotices li,.dshCodexPrompt{box-sizing:border-box;min-width:0;border:1px solid var(--dsw-alias-border-l2);border-radius:12px;background:var(--dsw-alias-bg-layer-1);padding:14px 16px}",
         ".dshCodexNotices a{display:inline-block;max-width:100%;margin-top:8px;color:var(--dsw-alias-state-business-primary)}",
         ".dshCodexCode{display:flex;min-width:0;flex-wrap:wrap;align-items:center;gap:8px;margin-top:8px;color:var(--dsw-alias-label-secondary);font-size:12px}",
-        ".dshCodexCode code{min-width:0;max-width:100%;overflow-wrap:anywhere;word-break:break-all;font-size:15px;color:var(--dsw-alias-label-primary);user-select:all}",
+        ".dshCodexCode code{min-width:0;max-width:100%;overflow-wrap:anywhere;word-break:break-all;color:var(--dsw-alias-label-primary);font-family:inherit;font-size:14px;line-height:22px;user-select:all}",
         ".dshCodexPrompt{display:flex;flex-direction:column;gap:12px}",
         ".dshCodexPrompt label{display:flex;min-width:0;flex-direction:column;gap:8px}",
         ".dshCodexPrompt input,.dshCodexPrompt select{box-sizing:border-box;width:100%;min-width:0;height:38px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit;padding:0 10px}",
-        ".dshCodexError{margin:0;color:var(--dsw-alias-state-error-primary);font-size:13px}",
-        ".dshCodexSuccess{margin:0;color:var(--dsw-alias-state-success-primary);font-size:13px}",
-        "@media(max-width:640px){.dshCodexHeader{flex-direction:column}.dshCodexBadge{align-self:flex-start}.dshCodexModelList{grid-template-columns:1fr}}",
-        "@media(max-width:480px){[role=dialog]:has(.dshCodexPage){flex-direction:column}[role=dialog]:has(.dshCodexPage)>nav{box-sizing:border-box;width:100%;height:auto;flex:none;gap:0;overflow:hidden;padding:10px 12px 8px}[role=dialog]:has(.dshCodexPage)>nav>div:first-child{display:none}[role=dialog]:has(.dshCodexPage)>nav>div:last-child{display:flex;width:100%;flex-direction:row;gap:4px;overflow-x:auto;padding-bottom:2px}[role=dialog]:has(.dshCodexPage)>nav>div:last-child>*{flex:none}[role=dialog]:has(.dshCodexPage)>:not(nav){width:100%;min-width:0;min-height:0;overflow:hidden;flex:1 1 0%}.dshCodexActions{align-items:stretch;flex-direction:column}.dshCodexButton{width:100%}}",
+        ".dshCodexError{margin:0;color:var(--dsw-alias-state-error-primary);font-size:12px;line-height:18px}",
+        ".dshCodexSuccess{margin:0;color:var(--dsw-alias-state-success-primary);font-size:12px;line-height:18px}",
+        "@media(max-width:760px){.dshCodexCard{padding:24px}.dshCodexModelList{grid-template-columns:1fr}.dshCodexModelActions{justify-content:flex-start}}",
+        "@media(max-width:640px){.dshCodexAuthToolbar,.dshCodexHeader{align-items:stretch;flex-direction:column}.dshCodexAuthActions{margin-left:0;justify-content:flex-start}}",
+        "@media(max-width:480px){[role=dialog]:has(.dshCodexPage){flex-direction:column}[role=dialog]:has(.dshCodexPage)>nav{box-sizing:border-box;width:100%;height:auto;flex:none;gap:0;overflow:hidden;padding:10px 12px 8px}[role=dialog]:has(.dshCodexPage)>nav>div:first-child{display:none}[role=dialog]:has(.dshCodexPage)>nav>div:last-child{display:flex;width:100%;flex-direction:row;gap:4px;overflow-x:auto;padding-bottom:2px}[role=dialog]:has(.dshCodexPage)>nav>div:last-child>*{flex:none}[role=dialog]:has(.dshCodexPage)>:not(nav){width:100%;min-width:0;min-height:0;overflow:hidden;flex:1 1 0%}.dshCodexPage{gap:20px;padding:0 0 28px}.dshCodexCard{border-radius:14px;padding:18px}.dshCodexActions{align-items:stretch;flex-direction:column}.dshCodexButton{width:100%}}",
       ].join("")
       const references = style[STYLE_REF_KEY]
       style[STYLE_REF_KEY] = Number.isSafeInteger(references) && references > 0

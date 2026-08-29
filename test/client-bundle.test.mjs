@@ -478,8 +478,12 @@ test("classic web bundle registers the package id and Codex settings section", a
 
   assert.equal(dictionaries.length, 1)
   assert.equal(dictionaries[0].namespace, "settings.codex")
-  assert.equal(dictionaries[0].value.zh.title, "Codex 登录")
-  assert.equal(dictionaries[0].value.en.title, "Codex sign-in")
+  assert.equal(dictionaries[0].value.zh.title, "OpenAI Codex")
+  assert.equal(dictionaries[0].value.en.title, "OpenAI Codex")
+  assert.equal(dictionaries[0].value.zh.nav, "OpenAI Codex")
+  assert.equal(dictionaries[0].value.en.nav, "OpenAI Codex")
+  assert.equal(dictionaries[0].value.zh.signInWithChatGPT, "使用 ChatGPT 登录")
+  assert.equal(dictionaries[0].value.en.signInWithChatGPT, "Sign in with ChatGPT")
   assert.deepEqual(
     Object.keys(dictionaries[0].value.zh).sort(),
     Object.keys(dictionaries[0].value.en).sort(),
@@ -492,12 +496,31 @@ test("classic web bundle registers the package id and Codex settings section", a
   assert.equal(sections[0].spec.label(), "nav")
   assert.equal(typeof sections[0].component, "function")
   assert.equal(sections[0].spec.inject().modelClient.available, false)
-  assert.match(dictionaries[0].value.zh.modelsDescription, /模型选择器.*旧会话.*精确模型失效/)
-  assert.match(dictionaries[0].value.en.modelsDescription, /model selector.*does not invalidate.*older session/)
+  assert.match(dictionaries[0].value.zh.modelsDescription, /模型选择器.*已有会话.*继续使用/)
+  assert.match(dictionaries[0].value.en.modelsDescription, /model selector.*existing conversations.*exact model/)
   assert.match(dictionaries[0].value.zh.modelsAllEnabledFollow, /清除覆盖.*未来新增/)
   assert.match(dictionaries[0].value.zh.modelsAllEnabledPreserve, /保留现有模型参数.*不会自动启用/)
   assert.match(dictionaries[0].value.en.modelsAllEnabledFollow, /clear it.*future catalog additions/)
   assert.match(dictionaries[0].value.en.modelsAllEnabledPreserve, /preserve existing model parameters.*will not be enabled automatically/)
+})
+
+test("settings page keeps one hero above the authorization and model cards", async () => {
+  const harness = hookHarness()
+  const clientModule = await loadClientModule(harness.React)
+  const page = clientModule.CodexSettings({
+    client: {},
+    modelClient: {},
+    t: (key) => key,
+  })
+
+  assert.equal(page.type, "div")
+  assert.equal(page.props.className, "dshCodexPage")
+  const hero = findElement(page, (element) => element.type === "header" && element.props.className === "dshCodexHero")
+  assert.ok(hero)
+  assert.equal(findElements(hero, (element) => element.type === "h2").length, 1)
+  assert.match(textContent(hero), /titledescription/u)
+  assert.equal(page.children[1].type, clientModule.AuthorizationSettings)
+  assert.equal(page.children[2].type, clientModule.ModelEnablementSettings)
 })
 
 test("settings section selection reaches the public settings API and live route directory", async () => {
@@ -646,8 +669,9 @@ async function renderQuotaView(quota, language) {
   await settle()
   harness.flush()
   const text = textContent(harness.tree())
+  const tree = harness.tree()
   harness.unmount()
-  return { dictionaries, text }
+  return { dictionaries, text, tree }
 }
 
 test("authorization settings distinguish an invalid stored credential from a signed-in session", async () => {
@@ -673,6 +697,27 @@ test("authorization settings distinguish an invalid stored credential from a sig
     harness.tree(),
     (element) => element.type === "button" && textContent(element) === "signOut",
   ))
+  harness.unmount()
+})
+
+test("a single OAuth method uses the concise ChatGPT sign-in label", async () => {
+  const harness = hookHarness()
+  const clientModule = await loadClientModule(harness.React)
+  const dictionaries = registeredClientDictionaries(clientModule)
+  const client = { describe: async () => authorizationStatus(false) }
+
+  harness.mount(clientModule.AuthorizationSettings, {
+    client,
+    t: (key) => dictionaries.zh[key] ?? key,
+  })
+  await settle()
+  harness.flush()
+
+  assert.ok(findElement(
+    harness.tree(),
+    (element) => element.type === "button" && textContent(element) === "使用 ChatGPT 登录",
+  ))
+  assert.equal(textContent(harness.tree()).includes("Sign in with ChatGPT"), false)
   harness.unmount()
 })
 
@@ -1124,6 +1169,14 @@ test("client styles bound narrow-screen provider text and actions", async () => 
   assert.match(css, /\.dshCodexCode\{[^}]*flex-wrap:wrap/u)
   assert.match(css, /\.dshCodexCode code\{[^}]*max-width:100%[^}]*overflow-wrap:anywhere/u)
   assert.match(css, /\.dshCodexButton\{[^}]*max-width:100%[^}]*white-space:normal/u)
+  assert.match(css, /\.dshCodexPage\{[^}]*max-width:1120px/u)
+  assert.match(css, /\[role=dialog\]:has\(\.dshCodexPage\)\{width:min\(1180px,calc\(100vw - 48px\)\)\}/u)
+  assert.match(css, /\.dshCodexHero h2\{font-size:16px;font-weight:500;line-height:24px\}/u)
+  assert.match(css, /\.dshCodexCard\{[^}]*var\(--dsw-alias-bg-module-platform/u)
+  assert.match(css, /\.dshCodexModelList\{[^}]*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/u)
+  assert.match(css, /@media\(max-width:760px\)\{\.dshCodexCard\{[^}]*\}\.dshCodexModelList\{grid-template-columns:1fr\}/u)
+  assert.match(css, /\.dshCodexButton:focus-visible,[^{]+input:focus-visible/u)
+  assert.match(css, /\.dshCodexModelOption code\{[^}]*font-family:inherit/u)
   assert.match(css, /@media\(max-width:480px\)\{\[role=dialog\]:has\(\.dshCodexPage\)\{flex-direction:column\}/u)
   assert.match(css, /\[role=dialog\]:has\(\.dshCodexPage\)>nav>div:last-child\{[^}]*flex-direction:row[^}]*overflow-x:auto/u)
   assert.match(css, /\[role=dialog\]:has\(\.dshCodexPage\)>:not\(nav\)\{[^}]*min-height:0[^}]*overflow:hidden[^}]*flex:1 1 0%/u)
@@ -1261,7 +1314,7 @@ test("quota UI renders an exhausted observation with a validated reset in Chines
     assert.ok(text.includes(new Date(resetAt).toLocaleString()))
     assert.ok(text.includes(messages.quotaResetIn))
     assert.ok(text.includes(messages.quotaMinutes))
-    assert.match(text, language === "zh" ? /账户额度耗尽.*重置时间/u : /account quota was exhausted.*reset time/iu)
+    assert.match(text, language === "zh" ? /账户额度已用尽.*重置时间/u : /account quota was exhausted.*reset time/iu)
     assert.equal(text.includes(messages.quotaUnknown), false)
     assert.equal(text.includes(messages.quotaNoReset), false)
     assert.equal(text.includes(requestId), false)
@@ -1287,7 +1340,7 @@ test("quota UI renders an exhausted observation without reset in Chinese and Eng
     assert.ok(text.includes(messages.quotaObservedAt))
     assert.ok(text.includes(new Date(observedAt).toLocaleString()))
     assert.ok(text.includes(messages.quotaNoReset))
-    assert.match(text, language === "zh" ? /账户额度耗尽.*未获得通过校验的重置时间/u : /account quota was exhausted.*no reset time passed validation/iu)
+    assert.match(text, language === "zh" ? /账户额度已用尽.*未获得通过校验的重置时间/u : /account quota was exhausted.*no reset time passed validation/iu)
     assert.equal(text.includes(messages.quotaResetAt), false)
     assert.equal(text.includes(messages.quotaUnknown), false)
     assert.equal(text.includes(requestId), false)
@@ -1317,6 +1370,22 @@ test("quota UI renders a recent success observation in Chinese and English", asy
     assert.equal(text.includes(messages.quotaUnknown), false)
     assert.equal(text.includes(requestId), false)
     assert.equal(text.includes(extra), false)
+  }
+})
+
+test("quota UI never invents percentages or progress bars", async () => {
+  for (const quota of [
+    { status: "unknown" },
+    { status: "recent-success", observedAt: Date.now() - 1_000 },
+    { status: "exhausted", observedAt: Date.now() - 1_000, resetAt: Date.now() + 60_000 },
+  ]) {
+    const { text, tree } = await renderQuotaView(quota, "zh")
+    assert.equal(text.includes("%"), false)
+    assert.equal(findElements(tree, (element) => element.type === "progress").length, 0)
+    assert.equal(findElements(tree, (element) => element.props?.role === "progressbar").length, 0)
+    assert.equal(findElements(tree, (element) => element.props?.["aria-valuenow"] !== undefined).length, 0)
+    const section = findElement(tree, (element) => element.props?.["data-quota-status"] === quota.status)
+    assert.ok(section)
   }
 })
 
