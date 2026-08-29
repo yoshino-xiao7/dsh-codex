@@ -19,6 +19,7 @@ This project follows the Keep a Changelog structure; `0.0.x` is a technical prev
 - 模型卡片的上下文与最大输出改用 `272K`、`128K` 一类紧凑标签，不再展示冗长的原始 token 数字。
 - 保存了 `Off` 或 `Minimal` 的旧会话不再被静默迁移；只有用户点击带有默认模型影响说明的修复按钮后，才切换到当前模型默认档位。
 - Fast 仅在支持的 GPT-5.4、GPT-5.5 和 GPT-5.6 系列请求上发送 priority service tier，会消耗更多额度；关闭或开启均从下一次请求生效，进程重启后恢复关闭。
+- DSH profile smoke 改为核对新版模型设置标题，避免 UI 文案更新被误判为插件加载失败。
 
 ### English
 
@@ -34,6 +35,7 @@ This project follows the Keep a Changelog structure; `0.0.x` is a technical prev
 - Model cards format context and maximum output as compact labels such as `272K` and `128K` instead of long raw token counts.
 - Older conversations that saved `Off` or `Minimal` are no longer migrated silently. They switch to the current model default only after the user clicks a repair action that discloses its default-model effect.
 - Fast sends the priority service tier only for supported GPT-5.4, GPT-5.5, and GPT-5.6-family requests and consumes more usage. Enabling or disabling it applies to the next request, and a process restart restores off.
+- The DSH profile smoke now checks the current model-settings title so a UI copy update is not misreported as a plugin-load failure.
 
 ## [Unreleased]
 

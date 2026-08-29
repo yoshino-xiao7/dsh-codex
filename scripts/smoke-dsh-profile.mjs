@@ -409,7 +409,7 @@ async function probeClientBundle(baseUrl) {
     '"/dsh-codex"',
     '"OpenAI Codex"',
     '"Usage"',
-    '"Models shown in the model selector"',
+    '"Codex models in this installation"',
   ]) {
     if (!source.includes(marker)) throw new Error(`Codex client bundle is missing ${marker}`)
   }
