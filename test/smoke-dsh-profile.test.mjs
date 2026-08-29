@@ -4,6 +4,7 @@ import os from "node:os"
 import path from "node:path"
 import test from "node:test"
 
+import { resolveNpmCommand } from "../scripts/npm-command.mjs"
 import {
   assertInstalledConfig,
   commandFromDshManifest,
@@ -26,6 +27,31 @@ const additions = `# == dsh-codex-community
   config:
     partialResponseRecovery: true
 `
+
+test("npm command resolution avoids Windows shims and uses a safe fallback", () => {
+  const configured = path.resolve("runtime", "npm-cli.js")
+  assert.deepEqual(resolveNpmCommand({
+    environment: { npm_execpath: configured },
+    nodeExecutable: "node.exe",
+    platform: "win32",
+    fileExists: (candidate) => candidate === configured,
+  }), {
+    executable: "node.exe",
+    prefixArgs: [configured],
+    shell: false,
+  })
+
+  assert.deepEqual(resolveNpmCommand({
+    environment: {},
+    nodeExecutable: "node.exe",
+    platform: "win32",
+    fileExists: () => false,
+  }), {
+    executable: "npm.cmd",
+    prefixArgs: [],
+    shell: true,
+  })
+})
 
 test("profile assertion accepts independent enabled entries", () => {
   assert.doesNotThrow(() => assertInstalledConfig(originalConfig, `${originalConfig}${additions}`))

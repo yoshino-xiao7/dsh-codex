@@ -1,10 +1,11 @@
 import { spawn, spawnSync } from "node:child_process"
 import { randomUUID } from "node:crypto"
-import { existsSync } from "node:fs"
 import { access, copyFile, mkdir, mkdtemp, readFile, rm } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
+
+import { resolveNpmCommand } from "./npm-command.mjs"
 
 const root = path.resolve(fileURLToPath(new URL("..", import.meta.url)))
 const supportedDshVersion = "0.1.1-rc.2"
@@ -226,25 +227,6 @@ function pack(destination) {
     throw new Error("npm pack did not report an artifact filename")
   }
   return path.join(destination, filename)
-}
-
-function resolveNpmCommand() {
-  const configured = process.env.npm_execpath
-  if (configured !== undefined && /npm-cli\.[cm]?js$/iu.test(configured) && existsSync(configured)) {
-    return { executable: process.execPath, prefixArgs: [configured], shell: false }
-  }
-  const executableDirectory = path.dirname(process.execPath)
-  const bundled = process.platform === "win32"
-    ? path.join(executableDirectory, "node_modules", "npm", "bin", "npm-cli.js")
-    : path.resolve(executableDirectory, "..", "lib", "node_modules", "npm", "bin", "npm-cli.js")
-  if (existsSync(bundled)) {
-    return { executable: process.execPath, prefixArgs: [bundled], shell: false }
-  }
-  return {
-    executable: process.platform === "win32" ? "npm.cmd" : "npm",
-    prefixArgs: [],
-    shell: process.platform === "win32",
-  }
 }
 
 function assertDshVersion(command, environment) {

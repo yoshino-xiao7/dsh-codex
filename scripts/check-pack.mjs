@@ -7,23 +7,30 @@ import {
   validatePackedMarkdownLinks,
   validatePackedPaths,
 } from "./pack-policy.mjs"
+import { resolveNpmCommand } from "./npm-command.mjs"
 
 const cache = await mkdtemp(path.join(os.tmpdir(), "dsh-codex-community-npm-"))
 let packed
 try {
+  const npm = resolveNpmCommand()
   packed = spawnSync(
-    "npm",
-    ["pack", "--dry-run", "--json", "--ignore-scripts"],
+    npm.executable,
+    [...npm.prefixArgs, "pack", "--dry-run", "--json", "--ignore-scripts"],
     {
       encoding: "utf8",
       env: { ...process.env, npm_config_cache: cache },
+      shell: npm.shell,
+      windowsHide: true,
     },
   )
 } finally {
   await rm(cache, { recursive: true, force: true })
 }
 if (packed.status !== 0) {
-  process.stderr.write(packed.stderr)
+  const detail = [packed.error?.message, packed.stdout, packed.stderr]
+    .filter((value) => typeof value === "string" && value.length > 0)
+    .join("\n")
+  if (detail.length > 0) process.stderr.write(`${detail}\n`)
   process.exit(packed.status ?? 1)
 }
 
