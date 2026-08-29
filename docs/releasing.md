@@ -40,14 +40,19 @@ pnpm run verify:release
 - 验收后的提交修改了允许的发布证据文件以外的文件；允许清理发布状态的文件仅包括双语 Release 正文、验收 JSON、双语 README、`CHANGELOG.md` 和双语兼容性文档；
 - `.tgz`、SHA-256、SRI、锁定参考 SBOM、实际安装树、生产依赖审计或隔离导入证据缺失或不匹配。
 
-严格命令由发布工作流和 `prepublishOnly` 同时调用：
+严格命令由发布工作流和 `prepublishOnly` 同时调用。`publish=true` 时，候选 job 会先把候选包、隔离导入证据和当前发布提交绑定到严格校验；只有该校验通过，工作流才请求受保护 environment 审批。审批后，发布 job 下载同一不可变候选并再次执行完全相同的校验；在仓库根目录复现时使用：
 
 ```sh
+PACKAGE_VERSION="$(node -p "require('./package.json').version")"
+RELEASE_PACKAGE_FILE="release/dsh-codex-community-${PACKAGE_VERSION}.tgz" \
+RELEASE_ISOLATED_IMPORT_EVIDENCE=release/isolated-import.json \
+RELEASE_SOURCE_COMMIT="$(git rev-parse HEAD)" \
 pnpm run verify:release:publish
+# Registry 发布与 provenance/签名回读完成后，上传不可变 Registry 证据；无 OIDC 的 GitHub Release job 下载并复核后才写入 Release
 ```
 
 不要通过设置伪造环境变量绕过门禁。缺少真实证据时保持草稿状态。
-`prepublishOnly` 保护从仓库 checkout 发起的发布；npm 对现成 tarball 不执行该生命周期，因此工作流会在发布同一 `.tgz` 的前一步显式运行严格门禁，并只在受保护 environment 审批后申请短期 OIDC identity token。
+`prepublishOnly` 保护从仓库 checkout 发起的发布；npm 对现成 tarball 不执行该生命周期，因此工作流会在审批前和发布同一 `.tgz` 的前一步各运行一次严格门禁，并只在受保护 environment 审批后申请短期 OIDC identity token。
 
 ## 验收记录
 
@@ -162,12 +167,26 @@ pnpm run release:acceptance -- reset-candidate \
 发布工作流按以下顺序执行：
 
 ```sh
-pnpm install --frozen-lockfile
+PACKAGE_VERSION="$(node -p "require('./package.json').version")"
+PACKAGE_FILE="release/dsh-codex-community-${PACKAGE_VERSION}.tgz"
+pnpm install --frozen-lockfile --ignore-scripts
+pnpm --dir test/fixtures/dsh-runtime install --frozen-lockfile --ignore-scripts
 pnpm run check
 pnpm run verify:release
-npm pack --ignore-scripts --json --pack-destination release
-pnpm --dir test/fixtures/dsh-runtime install --frozen-lockfile --ignore-scripts
-# 从最终 tarball 生成 SHA-256、SRI 与锁定参考 SBOM，并完成实际安装树、生产依赖审计和隔离导入取证
+mkdir -p release
+npm install --global --ignore-scripts --no-audit --no-fund npm@11.16.0
+npm --version > release/npm-cli-version.txt
+npm pack --ignore-scripts --json --pack-destination release > release/pack.json
+# 以 ./$PACKAGE_FILE 做本地 tarball dry-run，再生成 SHA-256、SRI 与锁定参考 SBOM
+npm publish "./$PACKAGE_FILE" --dry-run --force --ignore-scripts --json
+DSH_CLI_ROOT="$PWD/test/fixtures/dsh-runtime" DSH_PLUGIN_PACKAGE="$PACKAGE_FILE" pnpm run smoke:dsh-profile
+# 记录 DSH 环境、实际安装树、生产依赖审计和隔离导入证据，上传不可变候选并生成含双重 SHA-256 与下载链接的审批摘要
+# publish=true 时先在 candidate job 执行以下严格门禁；通过后才请求 environment 审批，publish job 下载同一候选并再执行一次：
+npm install --global --ignore-scripts --no-audit --no-fund npm@11.16.0
+pnpm install --frozen-lockfile --ignore-scripts
+RELEASE_PACKAGE_FILE="$PACKAGE_FILE" \
+RELEASE_ISOLATED_IMPORT_EVIDENCE=release/isolated-import.json \
+RELEASE_SOURCE_COMMIT="$(git rev-parse HEAD)" \
 pnpm run verify:release:publish
 ```
 
@@ -177,7 +196,7 @@ CycloneDX SBOM 是从已提交 `pnpm-lock.yaml` 与 package manifest 离线生�
 
 根目录 `pnpm-lock.yaml` 锁定插件的构建与发布依赖；`test/fixtures/dsh-runtime/pnpm-lock.yaml` 则锁定兼容性 smoke 使用的完整 DSH runtime 与 peer 图。CI、兼容性监测和发布候选都使用 `pnpm --dir test/fixtures/dsh-runtime install --frozen-lockfile --ignore-scripts`，不会在运行时用 `npm install @deepseek-ai/dsh@...` 重新解算无界 peer 图。后者既可能造成内存失控，也会让相同源码随 Registry 状态得到不同运行时。
 
-同一包体随后由夹具中的精确 `0.1.1-rc.2` DSH runtime 安装到隔离 profile 并启动 Web smoke，同时在空目录用 `--ignore-scripts` 安装并导入 Host。两次实际安装分别保存 `dsh-runtime-dependency-tree.json` 和 `isolated-dependency-tree.json`，与参考 SBOM 并列取证。Web/profile smoke 成功后才生成 `dsh-runtime-environment.json`，记录 DSH 版本、夹具 lock SHA-256、Node 完整版本、pnpm 版本、平台、架构和生命周期脚本禁用状态；严格门禁会根据发布提交重新计算并核对这些值。隔离安装还执行 `npm audit --omit=dev --audit-level=high --json` 并保存 `npm-audit.json`；出现 high 或 critical 生产依赖漏洞会阻止发布。候选 job 只有 `contents: read` 权限，候选产物与证据保留 90 天；只有 `publish=true`、`refs/heads/main` 且通过 `npm-release` 受保护 environment 审批后，发布 job 才获得 `contents: write` 与 `id-token: write`。
+同一包体随后由夹具中的精确 `0.1.1-rc.2` DSH runtime 安装到隔离 profile 并启动 Web smoke，同时在空目录用 `--ignore-scripts` 安装并导入 Host。两次实际安装分别保存 `dsh-runtime-dependency-tree.json` 和 `isolated-dependency-tree.json`，与参考 SBOM 并列取证。Web/profile smoke 成功后才生成 `dsh-runtime-environment.json`，记录 DSH 版本、夹具 lock SHA-256、Node 完整版本、pnpm 版本、平台、架构和生命周期脚本禁用状态；严格门禁会根据发布提交重新计算并核对这些值。隔离安装还执行 `npm audit --omit=dev --audit-level=high --json` 并保存 `npm-audit.json`；出现 high 或 critical 生产依赖漏洞会阻止发布。候选 job 只有 `contents: read` 权限，候选产物与证据保留 90 天；审批摘要会显示版本、源提交、包体 SHA-256、Actions 归档 SHA-256、验收进度和候选下载链接。只有 `publish=true`、`refs/heads/main` 且审批前严格门禁通过后，才会请求 `npm-release` environment 审批。Registry job 只有 `contents: read` 与 `id-token: write`，完成 npm 发布、逐字节回读、签名检查及 provenance 对包摘要、仓库、`release.yml`、`main` 和源提交的绑定后，上传不可变 Registry 证据。随后 GitHub Release job 只持有 `contents: write`、没有 OIDC；它下载并复核该证据后才写入 Release。Release 从非公开转为公开后会重新核对双语正文、标题、标签、精确附件集合及每个附件字节，再确认标签提交。
 
 冻结夹具使用 `--ignore-scripts`，因此该层只证明 DSH Web/profile 与本插件的兼容性，不声称验证 DSH 依赖中需要生命周期脚本的原生终端或本机构建能力。
 
@@ -190,7 +209,7 @@ CycloneDX SBOM 是从已提交 `pnpm-lock.yaml` 与 package manifest 离线生�
 1. 配置至少一名 required reviewer；
 2. deployment branches 只允许 `main`；
 3. 不添加普通仓库级 npm token；只有首次发布引导期间，才临时添加 environment secret `NPM_BOOTSTRAP_TOKEN`；
-4. 发布人手工触发工作流，并在核对版本、提交和候选 job 后审批 environment。
+4. 发布人手工触发工作流；确认候选 job 的审批前严格门禁通过，并根据摘要核对版本、源提交、两个 SHA-256、验收进度和不可变候选下载内容后，再审批 environment。
 
 发布工作流固定使用 npm `11.16.0`，在任何网络写入前精确校验并记录版本。Trusted Publishing 最低需要 npm CLI `11.5.1`，`--include-attestations` 至少需要 `11.12.0`；升级 npm 时必须更新固定版本、测试和发布说明。
 

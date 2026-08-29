@@ -25,6 +25,9 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
+    outputs:
+      artifact_digest: ${{ steps.upload-candidate.outputs.artifact-digest }}
+      artifact_url: ${{ steps.upload-candidate.outputs.artifact-url }}
     env:
       PACKAGE_FILE: release/dsh-codex-community-${{ inputs.version }}.tgz
     steps:
@@ -190,6 +193,58 @@ jobs:
           overwrite: true
           retention-days: 90
           path: release/
+      - name: Summarize the exact candidate for release approval
+        env:
+          CANDIDATE_ARTIFACT_DIGEST: ${{ steps.upload-candidate.outputs.artifact-digest }}
+          CANDIDATE_ARTIFACT_URL: ${{ steps.upload-candidate.outputs.artifact-url }}
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          set -eu
+          node --input-type=module -e '
+            import fs from "node:fs"
+            import path from "node:path"
+            const archiveDigest = process.env.CANDIDATE_ARTIFACT_DIGEST ?? ""
+            if (!/^[0-9a-f]{64}$/u.test(archiveDigest)) process.exit(1)
+            const artifactUrl = new URL(process.env.CANDIDATE_ARTIFACT_URL ?? "")
+            const expectedPrefix = `/${process.env.GITHUB_REPOSITORY}/actions/runs/`
+            if (
+              artifactUrl.origin !== "https://github.com"
+              || !artifactUrl.pathname.startsWith(expectedPrefix)
+              || !artifactUrl.pathname.includes("/artifacts/")
+              || artifactUrl.search !== ""
+              || artifactUrl.hash !== ""
+              || artifactUrl.username !== ""
+              || artifactUrl.password !== ""
+            ) process.exit(1)
+            const checksum = fs.readFileSync(`${process.env.PACKAGE_FILE}.sha256`, "utf8").trim()
+            const checksumMatch = /^([0-9a-f]{64})  ([^/]+)$/u.exec(checksum)
+            if (!checksumMatch || checksumMatch[2] !== path.basename(process.env.PACKAGE_FILE)) process.exit(1)
+            const acceptance = JSON.parse(fs.readFileSync(`docs/releases/v${process.env.REQUESTED_VERSION}.acceptance.json`, "utf8"))
+            const platformPassed = Object.values(acceptance.platforms).filter(({ status }) => status === "passed").length
+            const livePassed = Object.values(acceptance.liveAcceptance).filter(({ status }) => status === "passed").length
+            const summary = [
+              "## Release candidate / 发布候选",
+              "",
+              `- Version / 版本: \`${process.env.REQUESTED_VERSION}\``,
+              `- Source commit / 源提交: \`${process.env.GITHUB_SHA}\``,
+              `- Package SHA-256: \`${checksumMatch[1]}\``,
+              `- Actions archive SHA-256: \`${archiveDigest}\``,
+              `- Acceptance / 验收: \`${acceptance.releaseStatus}\` (${platformPassed}/3 platforms, ${livePassed}/${Object.keys(acceptance.liveAcceptance).length} live checks)`,
+              `- [Download immutable candidate / 下载不可变候选](${artifactUrl.href})`,
+              "",
+              "When publish=true, the strict publication gate must pass after this summary and again after environment approval.",
+              "publish=true 时，严格发布门禁必须在本摘要之后和 environment 审批之后各通过一次。",
+              "",
+            ].join("\n")
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary)
+          '
+      - name: Enforce the strict publication gate before requesting approval
+        if: inputs.publish
+        env:
+          RELEASE_PACKAGE_FILE: ${{ env.PACKAGE_FILE }}
+          RELEASE_ISOLATED_IMPORT_EVIDENCE: release/isolated-import.json
+          RELEASE_SOURCE_COMMIT: ${{ github.sha }}
+        run: pnpm run verify:release:publish
 
   publish:
     if: inputs.publish && github.ref == 'refs/heads/main'
@@ -198,8 +253,9 @@ jobs:
     timeout-minutes: 20
     environment:
       name: npm-release
+      url: ${{ needs.candidate.outputs.artifact_url }}
     permissions:
-      contents: write
+      contents: read
       id-token: write
     env:
       PACKAGE_FILE: release/dsh-codex-community-${{ inputs.version }}.tgz
@@ -416,21 +472,62 @@ jobs:
             if (installed.name !== "dsh-codex-community" || installed.version !== process.env.REQUESTED_VERSION) process.exit(1)
           '
           npm audit signatures --json --include-attestations > "$GITHUB_WORKSPACE/release/npm-signatures.json"
+          node "$GITHUB_WORKSPACE/scripts/verify-npm-provenance.mjs" \
+            "$GITHUB_WORKSPACE/release/npm-signatures.json" \
+            "$GITHUB_WORKSPACE/$PACKAGE_FILE"
+      - name: Upload the Registry-verified evidence without GitHub write permission
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: dsh-codex-community-${{ inputs.version }}-${{ github.sha }}-registry-evidence
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 90
+          path: release/
+
+  release:
+    if: inputs.publish && github.ref == 'refs/heads/main'
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      PACKAGE_FILE: release/dsh-codex-community-${{ inputs.version }}.tgz
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: dsh-codex-community-${{ inputs.version }}-${{ github.sha }}-registry-evidence
+          path: release
+      - name: Recheck the Registry evidence before granting GitHub write access
+        run: |
+          set -eu
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          node scripts/verify-npm-provenance.mjs \
+            release/npm-signatures.json \
+            "$PACKAGE_FILE"
           node --input-type=module -e '
+            import crypto from "node:crypto"
             import fs from "node:fs"
-            const report = JSON.parse(fs.readFileSync(`${process.env.GITHUB_WORKSPACE}/release/npm-signatures.json`, "utf8"))
-            if (!Array.isArray(report.verified)) process.exit(1)
-            if (!Array.isArray(report.invalid) || report.invalid.length !== 0) process.exit(1)
-            if (!Array.isArray(report.missing) || report.missing.length !== 0) process.exit(1)
-            const target = report.verified.find((entry) => (
-              entry?.name === "dsh-codex-community" && entry?.version === process.env.REQUESTED_VERSION
-            ))
-            if (!target) process.exit(1)
-            const slsaPredicate = "https://slsa.dev/provenance/v1"
-            if (target.attestations?.provenance?.predicateType !== slsaPredicate) process.exit(1)
-            if (!Array.isArray(target.attestationBundles) || target.attestationBundles.length === 0) process.exit(1)
-            const provenance = target.attestationBundles.find((entry) => entry?.predicateType === slsaPredicate)
-            if (!provenance?.bundle?.dsseEnvelope || !provenance.bundle.verificationMaterial) process.exit(1)
+            import path from "node:path"
+            const artifact = process.env.PACKAGE_FILE
+            const bytes = fs.readFileSync(artifact)
+            const sha256 = crypto.createHash("sha256").update(bytes).digest("hex")
+            const sidecar = fs.readFileSync(`${artifact}.sha256`, "utf8")
+            if (sidecar !== `${sha256}  ${path.basename(artifact)}\n`) process.exit(1)
+            const sri = `sha512-${crypto.createHash("sha512").update(bytes).digest("base64")}`
+            if (fs.readFileSync(`${artifact}.sri`, "utf8") !== `${sri}\n`) process.exit(1)
+            const readback = JSON.parse(fs.readFileSync("release/registry-readback.json", "utf8"))
+            if (readback.integrity !== sri) process.exit(1)
           '
       - name: Create, verify, and publish the bilingual GitHub Release
         env:
@@ -495,41 +592,54 @@ jobs:
             gh release upload "$tag" "${assets[@]}" --clobber
           fi
 
-          gh release view "$tag" --json assets,body,isDraft,name > release/github-release-assets.json
-          EXPECTED_VERSION="$REQUESTED_VERSION" RELEASE_STATE="$release_state" node --input-type=module -e '
-            import fs from "node:fs"
-            const release = JSON.parse(fs.readFileSync("release/github-release-assets.json", "utf8"))
-            const base = `dsh-codex-community-${process.env.EXPECTED_VERSION}.tgz`
-            const expectedTitle = `v${process.env.EXPECTED_VERSION} 社区版本 / Community Release`
-            const notes = fs.readFileSync(`docs/releases/v${process.env.EXPECTED_VERSION}.md`, "utf8")
-            const normalize = (value) => value.replaceAll("\r\n", "\n").trimEnd()
-            const expected = [
-              base,
-              `${base}.sha256`,
-              `${base}.sri`,
-              `${base}.cdx.json`,
-              "dsh-runtime-dependency-tree.json",
-              "dsh-runtime-environment.json",
-              "isolated-dependency-tree.json",
-              "isolated-import.json",
-              "npm-audit.json",
-              "npm-cli-version.txt",
-              "npm-attestations.json",
-              "npm-signatures.json",
-              "registry-readback.json",
-              `v${process.env.EXPECTED_VERSION}.acceptance.json`,
-            ].sort()
-            const actual = release.assets.map(({ name }) => name).sort()
-            if (JSON.stringify(actual) !== JSON.stringify(expected)) process.exit(1)
-            if (release.name !== expectedTitle || normalize(release.body) !== normalize(notes)) process.exit(1)
-            if (release.isDraft !== (process.env.RELEASE_STATE !== "published")) process.exit(1)
-          '
-          download_dir="$RUNNER_TEMP/github-release-assets"
-          mkdir "$download_dir"
-          gh release download "$tag" --dir "$download_dir"
-          for asset in "${assets[@]}"; do
-            cmp "$asset" "$download_dir/$(basename "$asset")"
-          done
+          verify_release() {
+            expected_draft="$1"
+            metadata_path="$2"
+            download_dir="$3"
+            gh release view "$tag" --json assets,body,isDraft,name,tagName > "$metadata_path"
+            EXPECTED_DRAFT="$expected_draft" EXPECTED_VERSION="$REQUESTED_VERSION" RELEASE_METADATA_PATH="$metadata_path" node --input-type=module -e '
+              import fs from "node:fs"
+              const release = JSON.parse(fs.readFileSync(process.env.RELEASE_METADATA_PATH, "utf8"))
+              const base = `dsh-codex-community-${process.env.EXPECTED_VERSION}.tgz`
+              const expectedTitle = `v${process.env.EXPECTED_VERSION} 社区版本 / Community Release`
+              const notes = fs.readFileSync(`docs/releases/v${process.env.EXPECTED_VERSION}.md`, "utf8")
+              const normalize = (value) => value.replaceAll("\r\n", "\n").trimEnd()
+              const expected = [
+                base,
+                `${base}.sha256`,
+                `${base}.sri`,
+                `${base}.cdx.json`,
+                "dsh-runtime-dependency-tree.json",
+                "dsh-runtime-environment.json",
+                "isolated-dependency-tree.json",
+                "isolated-import.json",
+                "npm-audit.json",
+                "npm-cli-version.txt",
+                "npm-attestations.json",
+                "npm-signatures.json",
+                "registry-readback.json",
+                `v${process.env.EXPECTED_VERSION}.acceptance.json`,
+              ].sort()
+              const actual = release.assets.map(({ name }) => name).sort()
+              if (JSON.stringify(actual) !== JSON.stringify(expected)) process.exit(1)
+              if (release.name !== expectedTitle || normalize(release.body) !== normalize(notes)) process.exit(1)
+              if (release.tagName !== `v${process.env.EXPECTED_VERSION}`) process.exit(1)
+              if (release.isDraft !== (process.env.EXPECTED_DRAFT === "true")) process.exit(1)
+            '
+            test ! -e "$download_dir"
+            mkdir "$download_dir"
+            gh release download "$tag" --dir "$download_dir"
+            for asset in "${assets[@]}"; do
+              cmp "$asset" "$download_dir/$(basename "$asset")"
+            done
+          }
+
+          if [ "$release_state" = "published" ]; then
+            initial_draft=false
+          else
+            initial_draft=true
+          fi
+          verify_release "$initial_draft" release/github-release-assets.json "$RUNNER_TEMP/github-release-assets"
 
           if [ "$release_state" != "published" ]; then
             gh release view "$tag" --json isDraft,tagName,targetCommitish > release/prepublish-release.json
@@ -555,12 +665,7 @@ jobs:
               exit "$tag_status"
             fi
             gh release edit "$tag" --draft=false
+            verify_release false release/published-release.json "$RUNNER_TEMP/published-github-release-assets"
           fi
-          gh release view "$tag" --json isDraft,tagName > release/published-release.json
-          node --input-type=module -e '
-            import fs from "node:fs"
-            const release = JSON.parse(fs.readFileSync("release/published-release.json", "utf8"))
-            if (release.isDraft !== false || release.tagName !== `v${process.env.REQUESTED_VERSION}`) process.exit(1)
-          '
           published_commit="$(gh api "repos/$GITHUB_REPOSITORY/commits/$tag" --jq .sha)"
           test "$published_commit" = "$GITHUB_SHA"

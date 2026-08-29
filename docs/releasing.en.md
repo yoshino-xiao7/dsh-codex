@@ -40,14 +40,19 @@ pnpm run verify:release
 - files outside the permitted release-evidence set changed after the accepted commit; only the bilingual Release body, acceptance JSON, bilingual READMEs, `CHANGELOG.md`, and bilingual compatibility documents may be updated to clear publication state;
 - the `.tgz`, SHA-256, SRI, locked reference SBOM, actual install trees, production-dependency audit, or isolated-import evidence is missing or inconsistent.
 
-Both the release workflow and `prepublishOnly` invoke the strict command:
+Both the release workflow and `prepublishOnly` invoke the strict command. With `publish=true`, the candidate job first binds the candidate package, isolated-import evidence, and current release commit to strict verification; the protected environment is not requested until that verification passes. After approval, the publication job downloads the same immutable candidate and repeats the identical verification. To reproduce that invocation from the repository root, use:
 
 ```sh
+PACKAGE_VERSION="$(node -p "require('./package.json').version")"
+RELEASE_PACKAGE_FILE="release/dsh-codex-community-${PACKAGE_VERSION}.tgz" \
+RELEASE_ISOLATED_IMPORT_EVIDENCE=release/isolated-import.json \
+RELEASE_SOURCE_COMMIT="$(git rev-parse HEAD)" \
 pnpm run verify:release:publish
+# After Registry publication and provenance/signature readback, upload immutable Registry evidence; the GitHub Release job has no OIDC and downloads and rechecks that evidence before writing the Release
 ```
 
 Do not bypass the gate with fabricated environment variables. Keep the release in draft state until real evidence exists.
-`prepublishOnly` protects publication from a repository checkout. npm does not run that lifecycle when publishing an existing tarball, so the workflow explicitly runs the strict gate immediately before publishing that same `.tgz` and requests a short-lived OIDC identity token only after the protected environment approves the job.
+`prepublishOnly` protects publication from a repository checkout. npm does not run that lifecycle when publishing an existing tarball, so the workflow runs the strict gate once before approval and again immediately before publishing that same `.tgz`; it requests a short-lived OIDC identity token only after the protected environment approves the job.
 
 ## Acceptance record
 
@@ -162,12 +167,26 @@ Before publication, fill in the Release date and accepted commit from `testedCom
 The release workflow runs these stages in order:
 
 ```sh
-pnpm install --frozen-lockfile
+PACKAGE_VERSION="$(node -p "require('./package.json').version")"
+PACKAGE_FILE="release/dsh-codex-community-${PACKAGE_VERSION}.tgz"
+pnpm install --frozen-lockfile --ignore-scripts
+pnpm --dir test/fixtures/dsh-runtime install --frozen-lockfile --ignore-scripts
 pnpm run check
 pnpm run verify:release
-npm pack --ignore-scripts --json --pack-destination release
-pnpm --dir test/fixtures/dsh-runtime install --frozen-lockfile --ignore-scripts
-# Generate SHA-256, SRI, and the locked reference SBOM from the final tarball, then capture actual install trees, audit production dependencies, and import in isolation
+mkdir -p release
+npm install --global --ignore-scripts --no-audit --no-fund npm@11.16.0
+npm --version > release/npm-cli-version.txt
+npm pack --ignore-scripts --json --pack-destination release > release/pack.json
+# Dry-run the local tarball through ./$PACKAGE_FILE, then generate SHA-256, SRI, and the locked reference SBOM
+npm publish "./$PACKAGE_FILE" --dry-run --force --ignore-scripts --json
+DSH_CLI_ROOT="$PWD/test/fixtures/dsh-runtime" DSH_PLUGIN_PACKAGE="$PACKAGE_FILE" pnpm run smoke:dsh-profile
+# Record the DSH environment, actual install trees, production-dependency audit, and isolated-import evidence, then upload the immutable candidate and write an approval summary with both SHA-256 values and its download link
+# With publish=true, run this strict gate in the candidate job first; only then request environment approval, after which the publish job downloads the same candidate and repeats it:
+npm install --global --ignore-scripts --no-audit --no-fund npm@11.16.0
+pnpm install --frozen-lockfile --ignore-scripts
+RELEASE_PACKAGE_FILE="$PACKAGE_FILE" \
+RELEASE_ISOLATED_IMPORT_EVIDENCE=release/isolated-import.json \
+RELEASE_SOURCE_COMMIT="$(git rev-parse HEAD)" \
 pnpm run verify:release:publish
 ```
 
@@ -177,7 +196,7 @@ The CycloneDX SBOM is a **locked reference dependency graph** generated offline 
 
 The root `pnpm-lock.yaml` locks the plugin's build and release dependencies. `test/fixtures/dsh-runtime/pnpm-lock.yaml` separately locks the complete DSH runtime and peer graph used by compatibility smoke. CI, compatibility monitoring, and release candidates all run `pnpm --dir test/fixtures/dsh-runtime install --frozen-lockfile --ignore-scripts`; they never resolve an unbounded peer graph at runtime through `npm install @deepseek-ai/dsh@...`. Direct npm resolution can consume uncontrolled memory and can produce a different runtime for identical source as Registry state changes.
 
-That same artifact is then installed into an isolated profile by the fixture's exact `0.1.1-rc.2` DSH runtime for a Web startup smoke, and it is also installed with `--ignore-scripts` in an empty directory and imported as a Host plugin. The two actual installations are recorded separately as `dsh-runtime-dependency-tree.json` and `isolated-dependency-tree.json`, alongside the reference SBOM. Only after the Web/profile smoke passes does the workflow generate `dsh-runtime-environment.json`, recording the DSH version, fixture-lock SHA-256, complete Node version, pnpm version, platform, architecture, and disabled-lifecycle-script state; the strict gate recomputes and verifies those values from the release commit. The isolated install also runs `npm audit --omit=dev --audit-level=high --json` and saves `npm-audit.json`; any high or critical production-dependency vulnerability blocks publication. The candidate job has only `contents: read`, and its artifact plus evidence are retained for 90 days. The publication job receives `contents: write` and `id-token: write` only when `publish=true`, the ref is `refs/heads/main`, and the protected `npm-release` environment approves it.
+That same artifact is then installed into an isolated profile by the fixture's exact `0.1.1-rc.2` DSH runtime for a Web startup smoke, and it is also installed with `--ignore-scripts` in an empty directory and imported as a Host plugin. The two actual installations are recorded separately as `dsh-runtime-dependency-tree.json` and `isolated-dependency-tree.json`, alongside the reference SBOM. Only after the Web/profile smoke passes does the workflow generate `dsh-runtime-environment.json`, recording the DSH version, fixture-lock SHA-256, complete Node version, pnpm version, platform, architecture, and disabled-lifecycle-script state; the strict gate recomputes and verifies those values from the release commit. The isolated install also runs `npm audit --omit=dev --audit-level=high --json` and saves `npm-audit.json`; any high or critical production-dependency vulnerability blocks publication. The candidate job has only `contents: read`, and its artifact plus evidence are retained for 90 days. Its approval summary shows the version, source commit, package SHA-256, Actions archive SHA-256, acceptance progress, and candidate download link. Only `publish=true`, `refs/heads/main`, and a passing pre-approval strict gate can request approval from the protected `npm-release` environment. The Registry job has only `contents: read` and `id-token: write`; after npm publication, byte-for-byte readback, signature checks, and provenance binding to the package digest, repository, `release.yml`, `main`, and source commit, it uploads immutable Registry evidence. The following GitHub Release job has only `contents: write` and no OIDC; it downloads and rechecks that evidence before writing the Release. After the Release becomes public, the workflow rechecks its bilingual body, title, tag, exact asset set, and every asset byte before confirming the tag commit.
 
 Because the frozen fixture uses `--ignore-scripts`, this layer proves DSH Web/profile compatibility with this plugin; it does not claim to validate native terminal or native-build capabilities in DSH dependencies that require lifecycle scripts.
 
@@ -190,7 +209,7 @@ Create `npm-release` under **GitHub repository Settings → Environments**:
 1. configure at least one required reviewer;
 2. restrict deployment branches to `main`;
 3. do not add a normal repository-level npm token; only during the first-publish bootstrap, temporarily add the environment secret `NPM_BOOTSTRAP_TOKEN`;
-4. have the releaser manually dispatch the workflow and approve the environment only after checking the version, commit, and candidate job.
+4. have the releaser manually dispatch the workflow; approve the environment only after the candidate job's pre-approval strict gate passes and its summary confirms the version, source commit, both SHA-256 values, acceptance progress, and immutable candidate download.
 
 The release workflow pins npm `11.16.0` and verifies and records that exact version before any network write. Trusted Publishing requires npm CLI `11.5.1` or newer, while `--include-attestations` requires at least `11.12.0`; an npm upgrade must update the pin, tests, and release documentation together.
 

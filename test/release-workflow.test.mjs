@@ -46,6 +46,16 @@ function workflowJob(source, jobName) {
   return source.slice(start, next?.index ?? source.length)
 }
 
+function workflowStep(jobSource, stepName) {
+  const header = `      - name: ${stepName}\n`
+  const start = jobSource.indexOf(header)
+  assert.notEqual(start, -1, `workflow step ${stepName} is missing`)
+  const nextHeader = /^      - (?:name:|uses:)/gmu
+  nextHeader.lastIndex = start + header.length
+  const next = nextHeader.exec(jobSource)
+  return jobSource.slice(start, next?.index ?? jobSource.length)
+}
+
 test("workflow job parsing accepts Windows CRLF checkouts", async () => {
   const source = (await readFile(new URL("ci.yml", workflowRoot), "utf8"))
     .replace(/\r?\n/gu, "\r\n")
@@ -125,14 +135,71 @@ test("every full-suite job installs the frozen DSH fixture before collecting tes
   }
 })
 
+test("release dispatch is manual and defaults to the candidate-only control path", async () => {
+  const source = await workflow("release.yml")
+  const triggerStart = source.indexOf("\non:\n")
+  const triggerEnd = source.indexOf("\npermissions:", triggerStart)
+  assert.notEqual(triggerStart, -1, "release trigger section is missing")
+  assert.notEqual(triggerEnd, -1, "release trigger section is not bounded by permissions")
+  const triggers = source.slice(triggerStart + 1, triggerEnd)
+  assert.deepEqual(
+    [...triggers.matchAll(/^  ([a-zA-Z][a-zA-Z0-9_-]*):/gmu)].map((match) => match[1]),
+    ["workflow_dispatch"],
+  )
+  assert.match(
+    triggers,
+    /^  workflow_dispatch:\n    inputs:\n      version:\n(?:        description:.*\n)?        required: true\n        type: string$/mu,
+  )
+  assert.match(
+    triggers,
+    /^      publish:\n(?:        description:.*\n)?        required: true\n        default: false\n        type: boolean$/mu,
+  )
+
+  const candidate = workflowJob(source, "candidate")
+  const publish = workflowJob(source, "publish")
+  assert.doesNotMatch(candidate, /^    if:/mu)
+  assert.match(
+    candidate,
+    /^    outputs:\n      artifact_digest: \$\{\{ steps\.upload-candidate\.outputs\.artifact-digest \}\}\n      artifact_url: \$\{\{ steps\.upload-candidate\.outputs\.artifact-url \}\}$/mu,
+  )
+  assert.deepEqual(
+    [...candidate.matchAll(/^        if: (.+)$/gmu)].map((match) => match[1]),
+    ["inputs.publish"],
+  )
+  assert.match(publish, /^\s+if: inputs\.publish && github\.ref == 'refs\/heads\/main'$/mu)
+  assert.match(publish, /^    needs: candidate$/mu)
+  assert.match(
+    publish,
+    /^    environment:\n      name: npm-release\n      url: \$\{\{ needs\.candidate\.outputs\.artifact_url \}\}$/mu,
+  )
+
+  const upload = workflowStep(candidate, "Upload the immutable candidate and evidence")
+  const summary = workflowStep(candidate, "Summarize the exact candidate for release approval")
+  const candidateGate = workflowStep(
+    candidate,
+    "Enforce the strict publication gate before requesting approval",
+  )
+  const publishGate = workflowStep(
+    publish,
+    "Enforce the strict publication gate against the downloaded candidate",
+  )
+  assert.ok(candidate.indexOf(upload) < candidate.indexOf(summary))
+  assert.ok(candidate.indexOf(summary) < candidate.indexOf(candidateGate))
+  assert.match(candidateGate, /^\s+if: inputs\.publish$/mu)
+  assert.match(candidateGate, /run: pnpm run verify:release:publish/u)
+  assert.doesNotMatch(publishGate, /^\s+if:/mu)
+  assert.match(publishGate, /run: pnpm run verify:release:publish/u)
+  assert.equal((source.match(/pnpm run verify:release:publish/gu) ?? []).length, 2)
+})
+
 test("release candidate is read-only, fails explicitly off main, and is built once", async () => {
   const source = await workflow("release.yml")
   const candidate = workflowJob(source, "candidate")
   assert.match(source, /permissions: \{\}/u)
-  assert.doesNotMatch(candidate, /^\s+if:/mu)
+  assert.doesNotMatch(candidate, /^    if:/mu)
   assert.match(candidate, /test "\$GITHUB_REF" = "refs\/heads\/main"/u)
   assert.match(source, /candidate:[\s\S]*?permissions:\n\s+contents: read/u)
-  assert.equal((source.match(/persist-credentials: false/gu) ?? []).length, 2)
+  assert.equal((source.match(/persist-credentials: false/gu) ?? []).length, 3)
   assert.equal((source.match(/npm pack --ignore-scripts --json --pack-destination release/gu) ?? []).length, 1)
   assert.equal((source.match(/pnpm run check/gu) ?? []).length, 1)
   assert.match(source, /pnpm install --frozen-lockfile --ignore-scripts/u)
@@ -158,7 +225,7 @@ test("release uses no dependency cache and dry-runs the local tarball spec with 
   const pack = candidate.indexOf("npm pack --ignore-scripts --json --pack-destination release")
   const dryRun = candidate.indexOf('npm publish "./$PACKAGE_FILE" --dry-run --force --ignore-scripts --json')
 
-  assert.equal((source.match(/package-manager-cache: false/gu) ?? []).length, 2)
+  assert.equal((source.match(/package-manager-cache: false/gu) ?? []).length, 3)
   assert.doesNotMatch(source, /^\s+cache:/mu)
   assert.notEqual(pack, -1)
   assert.ok(dryRun > pack, "local publish dry-run must inspect the once-built candidate")
@@ -228,13 +295,20 @@ test("release checksum sidecar is portable outside the CI release directory", as
   assert.doesNotMatch(source, /`\$\{sha256\}  \$\{artifact\}\\n`/u)
 })
 
-test("publication uses a protected OIDC job and the downloaded candidate", async () => {
+test("publication separates protected npm OIDC from GitHub Release write permission", async () => {
   const source = await workflow("release.yml")
+  const publish = workflowJob(source, "publish")
+  const release = workflowJob(source, "release")
   assert.doesNotMatch(source, /^\s+authentication:/mu)
-  assert.match(source, /publish:\n\s+if: inputs\.publish && github\.ref == 'refs\/heads\/main'/u)
-  assert.match(source, /needs: candidate/u)
-  assert.match(source, /environment:\n\s+name: npm-release/u)
-  assert.match(source, /permissions:\n\s+contents: write\n\s+id-token: write/u)
+  assert.match(publish, /^  publish:\n\s+if: inputs\.publish && github\.ref == 'refs\/heads\/main'/u)
+  assert.match(publish, /^    needs: candidate$/mu)
+  assert.match(publish, /environment:\n\s+name: npm-release/u)
+  assert.match(publish, /permissions:\n\s+contents: read\n\s+id-token: write/u)
+  assert.doesNotMatch(publish, /contents: write/u)
+  assert.match(release, /^  release:\n\s+if: inputs\.publish && github\.ref == 'refs\/heads\/main'/u)
+  assert.match(release, /^    needs: publish$/mu)
+  assert.match(release, /permissions:\n\s+contents: write/u)
+  assert.doesNotMatch(release, /id-token: write|environment:/u)
   assert.match(
     source,
     /actions\/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8/u,
@@ -270,6 +344,74 @@ test("Registry state automatically selects the isolated bootstrap or routine OID
     (publishSource.match(/npm publish "\.\/\$PACKAGE_FILE" --access public --provenance/gu) ?? []).length,
     2,
   )
+})
+
+test("publication writes only for an absent version and always verifies the identical rerun path", async () => {
+  const source = await workflow("release.yml")
+  const publish = workflowJob(source, "publish")
+  const release = workflowJob(source, "release")
+  const registry = workflowStep(publish, "Detect an existing immutable npm version")
+  const authentication = workflowStep(
+    publish,
+    "Select the only permitted authentication for this Registry state",
+  )
+  const bootstrap = workflowStep(
+    publish,
+    "Publish the exact candidate with the one-time bootstrap token",
+  )
+  const trusted = workflowStep(
+    publish,
+    "Publish the exact candidate with npm Trusted Publisher",
+  )
+  const readback = workflowStep(publish, "Verify Registry bytes, metadata, and provenance")
+  const signatures = workflowStep(
+    publish,
+    "Verify Registry signatures and provenance attestations",
+  )
+  const evidenceUpload = workflowStep(
+    publish,
+    "Upload the Registry-verified evidence without GitHub write permission",
+  )
+  const githubRelease = workflowStep(
+    release,
+    "Create, verify, and publish the bilingual GitHub Release",
+  )
+
+  const compare = registry.indexOf(
+    'cmp "$PACKAGE_FILE" "registry/preflight/dsh-codex-community-$REQUESTED_VERSION.tgz"',
+  )
+  const identical = registry.indexOf("printf 'state=identical\\n'")
+  assert.notEqual(compare, -1, "an existing version must be compared with the candidate")
+  assert.ok(identical > compare, "only byte-identical Registry contents may enter recovery")
+  assert.match(registry, /printf 'state=absent\\n'/u)
+  assert.match(authentication, /^\s+if: steps\.registry\.outputs\.state == 'absent'$/mu)
+  assert.match(
+    bootstrap,
+    /^\s+if: steps\.registry\.outputs\.state == 'absent' && steps\.registry\.outputs\.package_state == 'absent'$/mu,
+  )
+  assert.match(bootstrap, /secrets\.NPM_BOOTSTRAP_TOKEN/u)
+  assert.match(
+    trusted,
+    /^\s+if: steps\.registry\.outputs\.state == 'absent' && steps\.registry\.outputs\.package_state == 'present'$/mu,
+  )
+  assert.doesNotMatch(trusted, /secrets\./u)
+
+  for (const step of [readback, signatures, githubRelease]) {
+    assert.doesNotMatch(step, /^\s+if:/mu)
+  }
+  assert.ok(publish.indexOf(bootstrap) < publish.indexOf(readback))
+  assert.ok(publish.indexOf(trusted) < publish.indexOf(readback))
+  assert.ok(publish.indexOf(readback) < publish.indexOf(signatures))
+  assert.ok(publish.indexOf(signatures) < publish.indexOf(evidenceUpload))
+  assert.match(
+    evidenceUpload,
+    /name: dsh-codex-community-\$\{\{ inputs\.version \}\}-\$\{\{ github\.sha \}\}-registry-evidence/u,
+  )
+  assert.match(
+    release,
+    /name: dsh-codex-community-\$\{\{ inputs\.version \}\}-\$\{\{ github\.sha \}\}-registry-evidence/u,
+  )
+  assert.ok(release.indexOf("registry-evidence") < release.indexOf(githubRelease))
 })
 
 test("publication pins npm independently and compares the immutable candidate toolchain evidence", async () => {
@@ -317,8 +459,13 @@ test("registry readback verifies exact integrity and downloads provenance only f
   assert.doesNotMatch(source, /response\.text\(\)/u)
 })
 
-test("publication verifies registry signatures and attestations from a clean exact install", async () => {
+test("publication verifies registry signatures and source-bound provenance from a clean exact install", async () => {
   const source = await workflow("release.yml")
+  const publish = workflowJob(source, "publish")
+  const signatures = workflowStep(
+    publish,
+    "Verify Registry signatures and provenance attestations",
+  )
   assert.match(source, /signature_dir="\$RUNNER_TEMP\/npm-signature-audit"/u)
   assert.match(source, /test ! -e "\$signature_dir"/u)
   assert.match(source, /mkdir "\$signature_dir"/u)
@@ -331,25 +478,14 @@ test("publication verifies registry signatures and attestations from a clean exa
     /npm audit signatures --json --include-attestations > "\$GITHUB_WORKSPACE\/release\/npm-signatures\.json"/u,
   )
   assert.match(
-    source,
-    /JSON\.parse\(fs\.readFileSync\(`\$\{process\.env\.GITHUB_WORKSPACE\}\/release\/npm-signatures\.json`, "utf8"\)\)/u,
+    signatures,
+    /node "\$GITHUB_WORKSPACE\/scripts\/verify-npm-provenance\.mjs" \\\n\s+"\$GITHUB_WORKSPACE\/release\/npm-signatures\.json" \\\n\s+"\$GITHUB_WORKSPACE\/\$PACKAGE_FILE"/u,
   )
-  assert.match(source, /Array\.isArray\(report\.verified\)/u)
-  assert.match(source, /Array\.isArray\(report\.invalid\)/u)
-  assert.match(source, /report\.invalid\.length !== 0/u)
-  assert.match(source, /Array\.isArray\(report\.missing\)/u)
-  assert.match(source, /report\.missing\.length !== 0/u)
-  assert.match(
-    source,
-    /entry\?\.name === "dsh-codex-community" && entry\?\.version === process\.env\.REQUESTED_VERSION/u,
+  assert.ok(
+    signatures.indexOf("npm audit signatures")
+      < signatures.indexOf("verify-npm-provenance.mjs"),
+    "source binding must consume npm's verified signature report",
   )
-  assert.match(source, /const slsaPredicate = "https:\/\/slsa\.dev\/provenance\/v1"/u)
-  assert.match(source, /target\.attestations\?\.provenance\?\.predicateType !== slsaPredicate/u)
-  assert.match(source, /!Array\.isArray\(target\.attestationBundles\)/u)
-  assert.match(source, /target\.attestationBundles\.length === 0/u)
-  assert.match(source, /entry\?\.predicateType === slsaPredicate/u)
-  assert.match(source, /!provenance\?\.bundle\?\.dsseEnvelope/u)
-  assert.match(source, /!provenance\.bundle\.verificationMaterial/u)
 })
 
 test("every release carries the complete evidence set under a version-neutral bilingual title", async () => {
@@ -393,12 +529,27 @@ test("publication is safely repeatable and verifies every GitHub Release asset b
   assert.match(source, /process\.stdout\.write\("published"\)/u)
   assert.match(source, /overwrite: true/u)
   assert.match(source, /if \[ "\$release_state" != "published" \]; then[\s\S]*?gh release upload/u)
-  assert.match(source, /gh release view "\$tag" --json assets,body,isDraft,name/u)
+  assert.match(source, /gh release view "\$tag" --json assets,body,isDraft,name,tagName/u)
   assert.match(source, /normalize\(release\.body\) !== normalize\(notes\)/u)
+  assert.match(source, /release\.tagName !== `v\$\{process\.env\.EXPECTED_VERSION\}`/u)
+  assert.match(
+    source,
+    /release\.isDraft !== \(process\.env\.EXPECTED_DRAFT === "true"\)/u,
+  )
   assert.match(source, /gh release download "\$tag" --dir "\$download_dir"/u)
   assert.match(source, /cmp "\$asset" "\$download_dir\/\$\(basename "\$asset"\)"/u)
-  assert.match(source, /gh release edit "\$tag" --draft=false/u)
-  assert.match(source, /release\.isDraft !== false/u)
+  const publishOffset = source.indexOf('gh release edit "$tag" --draft=false')
+  assert.notEqual(publishOffset, -1)
+  const afterPublication = source.slice(publishOffset)
+  assert.match(
+    afterPublication,
+    /verify_release false release\/published-release\.json "\$RUNNER_TEMP\/published-github-release-assets"/u,
+  )
+  assert.ok(
+    afterPublication.indexOf("verify_release false")
+      < afterPublication.indexOf('published_commit="$(gh api'),
+    "the public Release must be fully rechecked before the final tag assertion",
+  )
 })
 
 test("draft recovery verifies its target and any existing tag before publication", async () => {
