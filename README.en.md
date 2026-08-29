@@ -4,7 +4,7 @@
 
 A Codex plugin for DeepSeek Harness with ChatGPT OAuth sign-in, Codex models, image input, and reliable streaming responses.
 
-> Current version: `0.0.1` technical preview, published under npm `latest` with a full GitHub Release. npm package: `dsh-codex-community`.
+> Current version: `0.0.2` technical preview, published under npm `latest` with a full GitHub Release. npm package: `dsh-codex-community`.
 
 ## Features
 
@@ -15,7 +15,8 @@ A Codex plugin for DeepSeek Harness with ChatGPT OAuth sign-in, Codex models, im
 - provide valid pixel and byte budgets for request images, preventing invalid `maxPixels` values;
 - classify `AccountQuotaExceeded` as non-retryable account quota and show a sanitized reset time;
 - preserve safe partial text after a stream failure, while incomplete tool calls stop without replaying the request;
-- use `/codex` to choose Fast and transport for the current session, with Fast off and transport automatic by default.
+- read the real five-hour and weekly usage limits whenever the settings page opens or is refreshed manually, with a safe fallback and no OAuth credentials exposed to the Web page;
+- use the lightning button to the left of the model selector or `/codex` to choose official Fast (1.5×) and transport for the current session, with Fast off and transport automatic by default.
 
 ## Requirements
 
@@ -27,7 +28,7 @@ A Codex plugin for DeepSeek Harness with ChatGPT OAuth sign-in, Codex models, im
 Install an exact version:
 
 ```sh
-dsh plugin --profile web add dsh-codex-community@0.0.1
+dsh plugin --profile web add dsh-codex-community@0.0.2
 dsh web
 ```
 
@@ -35,7 +36,7 @@ dsh web
 
 1. Open **Settings → OpenAI Codex** and complete the ChatGPT OAuth prompts.
 2. Enable models on the same page.
-3. Choose a Codex model from the conversation model selector.
+3. Choose a Codex model from the conversation model selector; click the lightning button to its left when Fast is needed.
 
 Available commands:
 
@@ -50,12 +51,12 @@ Available commands:
 /codex set transport auto|sse|websocket|websocket-cached
 ```
 
-Fast and transport preferences are kept only for the current session in the current process; they are not persisted. Fast requests the priority service tier, whose availability depends on the account and service; a failure is not automatically replayed on a lower tier.
+Fast and transport preferences are kept only for the current session in the current process; they are not persisted and return to their defaults after a process restart. For GPT-5.4, GPT-5.5, GPT-5.6 Luna, Sol, and Terra, Fast uses the official priority service tier starting with the next request, targets 1.5× speed, and consumes more usage. Turning it off restores standard speed on the next request. A failed request is not automatically replayed on a lower tier.
 
 Update:
 
 ```sh
-dsh plugin --profile web update dsh-codex-community@0.0.1
+dsh plugin --profile web update dsh-codex-community@0.0.2
 dsh web
 ```
 
@@ -78,10 +79,11 @@ See [Troubleshooting](docs/troubleshooting.en.md) for diagnostic steps.
 ## Support boundaries
 
 - The `0.0.x` line does not promise a stable API; pin the exact version.
-- Before publication, `0.0.1` must pass the Linux, macOS, and Windows platform gates, the complete supply-chain verification, and maintainer approval. It may be formally published with controlled-account validation at `0/13`, provided every unverified capability remains clearly disclosed and validation continues after release.
-- Problems found after publication are fixed and iterated in `0.0.2`; the published `0.0.1` is never overwritten.
-- Quota state comes from recent requests; it is not a live balance or proactive account query.
-- Fast is an explicitly enabled experimental capability; controlled post-release validation continues to confirm real-account entitlement.
+- The Linux, macOS, and Windows candidate-run evidence for `0.0.2` is currently `TBD / pending`. Formal publication still requires all three platform gates, complete supply-chain verification, and maintainer approval.
+- Live OAuth, conversation, image, transport, and Fast network acceptance is currently `0/13 pending`. These unverified capabilities remain clearly disclosed and will be completed individually after publication; `0.0.2` does not overwrite the published `0.0.1`.
+- The settings page reads usage through the Web-backend compatibility endpoint used by the official Codex client. If that endpoint is unavailable or malformed, the page retains the latest safe reading and falls back to request observation or an unknown state instead of presenting the error as zero remaining usage.
+- Model names, context windows, and maximum outputs come from the installed provider catalog. The reasoning picker exposes only subscription-Codex levels through Max that the Provider can fully implement, plus each model's verified default. Generic `Default`, `Off`, and `Minimal` entries are hidden, and agent-level `Ultra` is not disguised as a plain reasoning effort.
+- Fast is limited to GPT-5.4, GPT-5.5, GPT-5.6 Luna, Sol, and Terra and consumes more usage. Other models never receive the Fast service tier.
 - Image generation and editing are not provided.
 - See [Compatibility](docs/compatibility.en.md) for Windows, Linux, real OAuth, and real Codex network acceptance status.
 

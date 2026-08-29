@@ -8,16 +8,17 @@
 
 ```text
 DSH Web 设置 ── loopback RPC ── AuthorizationBridge
-                                      │
-                         dsh-codex/openai-codex
-                                      │
-                         CodexCredentialStore
-                                      │
-                             ChatGPT OAuth grant
+        │                             │
+        │ 进入页面 / 手动刷新          │
+        ▼                             ▼
+AccountUsageReader ────────── CodexCredentialStore
+        │                             │
+        ▼                             ▼
+Codex Web usage endpoint      ChatGPT OAuth grant
 
 Harness Agent Loop
         │
-        ├── SessionPreferences ── Fast / transport
+        ├── SessionPreferences ── 闪电按钮、Fast / transport
         │
         ▼
 StreamResilience ── CodexRouteAdapter (`dsh-codex`)
@@ -48,15 +49,21 @@ Host 端通过 DSH authorization service 启动、取消和观察登录流程，
 
 `/codex-login status|cancel|logout` 使用同一边界，并禁止把命令输入写入会话记录。
 
+## AccountUsageReader
+
+设置页每次挂载以及用户点击“刷新”时，Host 端 `AccountUsageReader` 使用当前 OAuth grant 请求官方 Codex 客户端使用的 Web 后端 usage 兼容接口。它严格解析使用百分比、窗口时长和 reset 时间，并把五小时与每周窗口转换为不含凭据的最小快照；access token、refresh token、account ID、原始响应和任意响应头都不会跨过 loopback RPC。
+
+该接口是 Web 后端兼容边界，不被当作稳定的插件公共 API。请求具有超时、响应大小和数值范围限制；网络失败、鉴权失败或结构变化不会被显示成零余额，也不会清除最近一次已验证读数。若没有可保留的实时读数，页面会安全降级为最近请求产生的 `QuotaObserver` 状态或“未知”，而不是推断额度。
+
 ## SessionPreferences
 
-`/codex` 只修改接收命令的当前会话：
+模型选择器左侧的闪电按钮和 `/codex` 修改同一份当前会话状态：
 
-- `fast on|off` 控制是否发送 priority service tier，默认关闭；
+- 闪电按钮或 `fast on|off` 控制是否发送 Fast priority service tier，默认关闭；
 - `transport` 可选 `auto`、`sse`、`websocket` 或 `websocket-cached`，默认 `auto`；
 - `reset` 恢复当前会话默认值。
 
-偏好保存在有容量上限的内存表中，返回不可变快照，不写入全局 provider 设置。Fast 请求失败后不会自动以另一 service tier 重放，避免重复工具副作用。真实账号是否允许该 tier 必须通过发布验收确认。
+偏好保存在有容量上限的内存表中，返回不可变快照，不写入全局 provider 设置，进程重启后恢复默认。Fast 只对 GPT-5.4、GPT-5.5、GPT-5.6 Luna、Sol 和 Terra 请求生效，使用官方 priority service tier，目标速度为 1.5 倍并消耗更多额度；其他模型不会携带该 tier。切换只影响下一次请求，已经开始的请求不变。Fast 请求失败后不会自动以另一 service tier 重放，避免重复工具副作用。
 
 DSH 原始 session ID 只用于偏好查询和消息/replay provenance；传给 pi-ai 的 transport/cache session ID 带有 `dsh-codex:` 命名空间。`/codex reset`、`agent/disposed` 和 runtime dispose 只通过 pi-ai 的公开、精确 session API 清理本插件拥有的 WebSocket 连接、fallback 与 debug 状态，不调用无参全局清理，也不影响同进程其他 pi-ai consumer 的 session。该命名空间只进入 pi-ai stream options，不改写历史消息或 replay envelope。
 
@@ -65,6 +72,8 @@ DSH 原始 session ID 只用于偏好查询和消息/replay provenance；传给 
 本插件的设置页通过 `llm.discoverModels` 从当前 pi-ai catalog 展示可请求模型，并把选择写入 `dsh-codex` 设置命名空间。Runtime 只注册该命名空间的直接 discovery handler，不为本 route 注册通用 configurable-provider directory，避免干扰 DSH 的通用模型编辑器。
 
 设置页至少要求选中一个模型。全选且条目没有自定义字段时移除 `models` 覆盖，使目录随 pi-ai 版本更新；部分选择、额外字段和自定义参数保留显式配置。目录筛选只影响模型发现，精确指定的隐藏模型仍可解析，因此旧会话不会仅因模型被隐藏而失效。
+
+模型名称、上下文窗口与输入能力来自当前安装的 provider catalog，不声称是账号动态目录。推理选择器由 `CodexRouteAdapter` 按已核验的订阅 Codex 模型目录重新投影：删除通用 `Default`、`Off` 与 `Minimal`，写入逐模型默认值，并只暴露可以由 Provider 请求层诚实表达的 Low 至 Max。Codex 的 `Ultra` 同时代表最高普通推理与主动任务委派，属于 Agent 编排模式；本插件不会只发送一个伪造的 `ultra` 值，也不会静默退化成 `Max`。未知模型不获得推断能力，route 边界也拒绝直接注入未核验档位。
 
 ## ImagePolicy
 
@@ -80,7 +89,7 @@ DSH 原始 session ID 只用于偏好查询和消息/replay provenance；传给 
 
 `QUOTA`、`QUOTA_OR_RATE_LIMIT` 和已确认 transport 的输出均重新构造为最小 failure，只保留固定脱敏消息、code，以及可选的有效 HTTP status/受限字符集 request ID；不回显任意 provider 字段或 WebSocket close reason。`QUOTA_OR_RATE_LIMIT` 不写入 `QuotaObserver`：无 partial 输出时直接失败且不重试，已有安全纯文本时只保存 partial。
 
-`QuotaObserver` 只记录成功终止、`QUOTA` 和通过严格格式及有限时距校验的 reset timestamp。快照只有 `unknown`、`recent-success` 和 `exhausted` 三态。它不轮询账户、不展示余额或百分比，也不调用未公开的套餐额度接口。
+`QuotaObserver` 只记录成功终止、`QUOTA` 和通过严格格式及有限时距校验的 reset timestamp。快照只有 `unknown`、`recent-success` 和 `exhausted` 三态。它不轮询账户，也不展示余额或百分比；它作为 `AccountUsageReader` 无可用实时快照时的请求观测降级，两类证据不会互相伪装。
 
 ## StreamResilience
 

@@ -2,7 +2,9 @@ import assert from "node:assert/strict"
 import test from "node:test"
 
 import { Config, apply, inject, name } from "../src/host/index.mjs"
+import { AUTHORIZATION_RPC_CHANNEL } from "../src/internal/authorization-bridge.mjs"
 import { CODEX_ROUTE_ID } from "../src/internal/codex-route-adapter.mjs"
+import { SESSION_PREFERENCE_RPC_CHANNEL } from "../src/internal/session-preference-bridge.mjs"
 
 test("host entry exports a valid Cordis plugin and scoped stream listener", async () => {
   const listeners = []
@@ -90,7 +92,7 @@ test("host entry exports a valid Cordis plugin and scoped stream listener", asyn
   assert.deepEqual(output, [{ type: "finish", reason: { kind: "stop" } }])
   assert.deepEqual(warnings, [])
 
-  let rpcHandler
+  const rpcHandlers = new Map()
   dynamicInjections.find(({ services }) => services[0] === "connection").callback({
     authorization: {
       describe: () => undefined,
@@ -102,8 +104,9 @@ test("host entry exports a valid Cordis plugin and scoped stream listener", asyn
     },
     connection: {
       rpc: {
-        handle(_channel, handler) {
-          rpcHandler = handler
+        handle(channel, handler, options) {
+          assert.deepEqual(options, { authority: "loopback" })
+          rpcHandlers.set(channel, handler)
         },
       },
     },
@@ -111,9 +114,23 @@ test("host entry exports a valid Cordis plugin and scoped stream listener", asyn
       return callback()
     },
   })
-  const status = await rpcHandler("status", {}, new AbortController().signal)
+  assert.deepEqual([...rpcHandlers.keys()], [
+    AUTHORIZATION_RPC_CHANNEL,
+    SESSION_PREFERENCE_RPC_CHANNEL,
+  ])
+  const status = await rpcHandlers.get(AUTHORIZATION_RPC_CHANNEL)(
+    "status",
+    {},
+    new AbortController().signal,
+  )
   assert.equal(status.ok, true)
   assert.equal(status.value.quota.status, "recent-success")
+  const fast = await rpcHandlers.get(SESSION_PREFERENCE_RPC_CHANNEL)(
+    "set-fast",
+    { sessionId: "host-session", fast: true },
+    new AbortController().signal,
+  )
+  assert.deepEqual(fast, { ok: true, value: { fast: true } })
 
   const commands = []
   dynamicInjections.find(({ services }) => services[0] === "commands").callback({
@@ -320,8 +337,8 @@ function createHostObservationHarness() {
     },
     connection: {
       rpc: {
-        handle(_channel, handler) {
-          rpcHandler = handler
+        handle(channel, handler) {
+          if (channel === AUTHORIZATION_RPC_CHANNEL) rpcHandler = handler
         },
       },
     },

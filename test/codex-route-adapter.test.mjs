@@ -38,6 +38,77 @@ test("same-model replay maps the external history source and keeps canonical sta
   assert.deepEqual(chunks.at(-1).replayState, replayState)
 })
 
+test("exposes the verified Codex reasoning controls and model-specific default", async () => {
+  const delegate = fakeCanonicalAdapter()
+  const adapter = new CodexRouteAdapter(delegate)
+
+  const sol = await adapter.resolveModel(CODEX_ROUTE_ID, "gpt-5.6-sol")
+  assert.deepEqual(sol.reasoning.efforts.map(({ id }) => id), [
+    "low",
+    "medium",
+    "high",
+    "xhigh",
+    "max",
+  ])
+  assert.equal(sol.reasoning.defaultEffort, "low")
+
+  const spark = await adapter.resolveModel(CODEX_ROUTE_ID, "gpt-5.3-codex-spark")
+  assert.deepEqual(spark.reasoning.efforts.map(({ id }) => id), [
+    "low",
+    "medium",
+    "high",
+    "xhigh",
+  ])
+  assert.equal(spark.reasoning.defaultEffort, "high")
+
+  const unknown = await adapter.resolveModel(CODEX_ROUTE_ID, "gpt-future")
+  assert.equal(unknown.reasoning, undefined)
+})
+
+test("passes verified reasoning levels and rejects hidden or agent-level modes", async () => {
+  const delegate = fakeCanonicalAdapter()
+  const adapter = new CodexRouteAdapter(delegate)
+
+  const prepared = await adapter.prepareCall(CODEX_ROUTE_ID, "gpt-5.6-sol")
+  await collect(adapter.stream({
+    ...options("gpt-5.6-sol", []),
+    reasoningEffort: "max",
+  }))
+  assert.equal(delegate.calls.at(-1).reasoningEffort, "max")
+
+  for (const reasoningEffort of ["off", "minimal", "ultra"]) {
+    assert.throws(
+      () => adapter.stream({
+        ...options("gpt-5.6-sol", []),
+        reasoningEffort,
+      }),
+      (error) => error?.code === "UNSUPPORTED_REASONING_EFFORT",
+      reasoningEffort,
+    )
+  }
+  assert.throws(
+    () => prepared.stream({
+      ...options("gpt-5.6-sol", []),
+      reasoningEffort: "minimal",
+    }),
+    (error) => error?.code === "UNSUPPORTED_REASONING_EFFORT",
+  )
+  assert.throws(
+    () => adapter.stream({
+      ...options("gpt-5.4", []),
+      reasoningEffort: "max",
+    }),
+    (error) => error?.code === "UNSUPPORTED_REASONING_EFFORT",
+  )
+  assert.throws(
+    () => adapter.stream({
+      ...options("gpt-future", []),
+      reasoningEffort: "high",
+    }),
+    (error) => error?.code === "UNSUPPORTED_REASONING_EFFORT",
+  )
+})
+
 test("cross-model replay preserves the producing model while routing the new model canonically", async () => {
   const delegate = fakeCanonicalAdapter()
   const adapter = new CodexRouteAdapter(delegate)
@@ -144,7 +215,17 @@ function fakeCanonicalAdapter() {
       return [{ provider, id: "gpt-5.4", name: "GPT-5.4" }]
     },
     async resolveModel(provider, model) {
-      return { provider, id: model, name: model }
+      return {
+        provider,
+        id: model,
+        name: model,
+        reasoning: {
+          efforts: [
+            { id: "off", name: "Off" },
+            { id: "minimal", name: "Minimal" },
+          ],
+        },
+      }
     },
     async prepareCall(provider, model) {
       return {

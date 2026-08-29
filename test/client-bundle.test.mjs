@@ -473,6 +473,18 @@ test("classic web bundle registers the package id and Codex settings section", a
         return () => undefined
       },
     },
+    inject(services, callback) {
+      assert.deepEqual([...services], ["slots", "modelDirectories"])
+      callback({
+        slots: context.slots,
+        modelDirectories: {
+          directoryFor: () => ({
+            store: { getSnapshot: () => ({ current: null }) },
+            select: async () => undefined,
+          }),
+        },
+      })
+    },
   }
   clientModule.apply(context)
 
@@ -484,20 +496,59 @@ test("classic web bundle registers the package id and Codex settings section", a
   assert.equal(dictionaries[0].value.en.nav, "OpenAI Codex")
   assert.equal(dictionaries[0].value.zh.signInWithChatGPT, "使用 ChatGPT 登录")
   assert.equal(dictionaries[0].value.en.signInWithChatGPT, "Sign in with ChatGPT")
+  assert.match(
+    dictionaries[0].value.zh.legacyReasoningRepair,
+    /新会话.*默认模型/u,
+  )
+  assert.match(
+    dictionaries[0].value.zh.legacyReasoningRepairRetry,
+    /新会话.*默认模型/u,
+  )
+  assert.match(
+    dictionaries[0].value.zh.legacyReasoningRepairHelp,
+    /模型选择器.*未来新会话.*默认模型/u,
+  )
+  assert.match(
+    dictionaries[0].value.en.legacyReasoningRepair,
+    /future.*default/iu,
+  )
+  assert.match(
+    dictionaries[0].value.en.legacyReasoningRepairRetry,
+    /future.*default/iu,
+  )
+  assert.match(
+    dictionaries[0].value.en.legacyReasoningRepairHelp,
+    /model selector.*default model.*future (?:new )?conversations/iu,
+  )
   assert.deepEqual(
     Object.keys(dictionaries[0].value.zh).sort(),
     Object.keys(dictionaries[0].value.en).sort(),
   )
-  assert.deepEqual(injectedSlots, ["settings.section"])
-  assert.equal(sections.length, 1)
-  assert.equal(sections[0].spec.name, "settings.section")
-  assert.equal(sections[0].spec.id, "codex")
-  assert.equal(sections[0].spec.order, 15)
-  assert.equal(sections[0].spec.label(), "nav")
-  assert.equal(typeof sections[0].component, "function")
-  assert.equal(sections[0].spec.inject().modelClient.available, false)
+  assert.deepEqual(injectedSlots, ["settings.section", "conversation.input.right"])
+  assert.equal(sections.length, 2)
+  const settingsSection = sections.find(({ spec }) => spec.name === "settings.section")
+  const fastEntry = sections.find(({ spec }) => spec.name === "conversation.input.right")
+  assert.ok(settingsSection)
+  assert.equal(settingsSection.spec.id, "codex")
+  assert.equal(settingsSection.spec.order, 15)
+  assert.equal(settingsSection.spec.label(), "nav")
+  assert.equal(typeof settingsSection.component, "function")
+  assert.equal(settingsSection.spec.inject().modelClient.available, false)
+  assert.ok(fastEntry)
+  assert.equal(fastEntry.spec.id, "dsh-codex-fast")
+  assert.equal(fastEntry.spec.order, 100)
+  assert.equal(fastEntry.spec.locale, "settings.codex")
+  const fastProps = fastEntry.spec.inject("session-fast-entry")
+  assert.equal(typeof fastProps.preferenceClient.get, "function")
+  assert.equal(typeof fastProps.preferenceClient.setFast, "function")
+  assert.equal(typeof fastProps.selectModel, "function")
+  assert.equal(fastProps.hooks.modelDirectory.getSnapshot().current, null)
   assert.match(dictionaries[0].value.zh.modelsDescription, /模型选择器.*已有会话.*继续使用/)
   assert.match(dictionaries[0].value.en.modelsDescription, /model selector.*existing conversations.*exact model/)
+  assert.match(dictionaries[0].value.zh.modelsDescription, /当前安装.*provider catalog.*不推测/u)
+  assert.match(dictionaries[0].value.en.modelsDescription, /installed Codex provider catalog.*not inferred/u)
+  assert.equal(dictionaries[0].value.zh.modelsTitle, "当前安装的 Codex 模型")
+  assert.equal(dictionaries[0].value.en.modelsTitle, "Codex models in this installation")
   assert.match(dictionaries[0].value.zh.modelsAllEnabledFollow, /清除覆盖.*未来新增/)
   assert.match(dictionaries[0].value.zh.modelsAllEnabledPreserve, /保留现有模型参数.*不会自动启用/)
   assert.match(dictionaries[0].value.en.modelsAllEnabledFollow, /clear it.*future catalog additions/)
@@ -623,6 +674,7 @@ test("browser client calls only the loopback authorization RPC contract", async 
   await client.decline("attempt", "prompt")
   await client.cancel("attempt")
   await client.logout()
+  await client.usage(signal)
 
   assert.ok(calls.every((call) => call.channel === "/dsh-codex"))
   assert.deepEqual(calls.map((call) => call.endpoint), [
@@ -633,8 +685,222 @@ test("browser client calls only the loopback authorization RPC contract", async 
     "respond",
     "cancel",
     "logout",
+    "usage",
   ])
   assert.equal(Object.keys(calls.at(-1).payload).length, 0)
+})
+
+test("browser Fast client uses the dedicated session-scoped loopback contract", async () => {
+  const clientModule = await loadClientModule({ createElement: () => undefined })
+  const calls = []
+  const connection = {
+    rpc: {
+      async call(channel, endpoint, payload, signal) {
+        calls.push({ channel, endpoint, payload, signal })
+        return { ok: true, value: { fast: endpoint === "set-fast" ? payload.fast : false } }
+      },
+    },
+  }
+  const client = clientModule.createSessionPreferenceClient(connection).forSession("session-a")
+  const signal = new AbortController().signal
+
+  assert.deepEqual({ ...(await client.get(signal)) }, { fast: false })
+  assert.deepEqual({ ...(await client.setFast(true, signal)) }, { fast: true })
+  assert.deepEqual(calls.map(({ channel }) => channel), [
+    "/dsh-codex-session",
+    "/dsh-codex-session",
+  ])
+  assert.deepEqual(calls.map(({ endpoint }) => endpoint), ["get", "set-fast"])
+  assert.deepEqual(calls.map(({ payload }) => ({ ...payload })), [
+    { sessionId: "session-a" },
+    { sessionId: "session-a", fast: true },
+  ])
+})
+
+test("Fast lightning appears immediately for supported Codex models and toggles 1.5x per session", async () => {
+  const harness = hookHarness()
+  const clientModule = await loadClientModule(harness.React)
+  const calls = []
+  const preferenceClient = {
+    async get() {
+      calls.push(["get"])
+      return { fast: false }
+    },
+    async setFast(fast) {
+      calls.push(["set-fast", fast])
+      return { fast }
+    },
+  }
+  const t = (key) => key
+  const useModelDirectory = (select) => select({
+    current: { provider: "dsh-codex", model: "gpt-5.6-sol" },
+  })
+
+  harness.mount(clientModule.CodexFastToggle, {
+    sessionId: "session-fast",
+    session: { removed: false },
+    input: { phase: "idle" },
+    useModelDirectory,
+    preferenceClient,
+    t,
+  })
+  await settle()
+  harness.flush()
+
+  let button = findElement(
+    harness.tree(),
+    (element) => element.type === "button" && element.props.className?.includes("dshCodexFastToggle"),
+  )
+  assert.ok(button)
+  assert.equal(button.props["aria-pressed"], false)
+  assert.equal(button.props["aria-label"], "fastEnable")
+  assert.equal(button.props.disabled, false)
+  assert.equal(findElements(button, (element) => element.type === "svg").length, 1)
+
+  button.props.onClick()
+  harness.flush()
+  button = findElement(harness.tree(), (element) => element.type === "button")
+  assert.equal(button.props.disabled, true)
+  await settle()
+  harness.flush()
+  button = findElement(harness.tree(), (element) => element.type === "button")
+  assert.equal(button.props["aria-pressed"], true)
+  assert.equal(button.props["aria-label"], "fastDisable")
+  assert.equal(button.props["data-fast"], "true")
+  assert.deepEqual(calls, [["get"], ["set-fast", true]])
+
+  button.props.onClick()
+  await settle()
+  harness.flush()
+  button = findElement(harness.tree(), (element) => element.type === "button")
+  assert.equal(button.props["aria-pressed"], false)
+  assert.deepEqual(calls.at(-1), ["set-fast", false])
+  harness.unmount()
+})
+
+test("Fast lightning is hidden outside Codex and disabled for unsupported Codex models", async () => {
+  const harness = hookHarness()
+  const clientModule = await loadClientModule(harness.React)
+  const props = {
+    sessionId: "session-fast",
+    session: { removed: false },
+    input: { phase: "idle" },
+    preferenceClient: { get: async () => ({ fast: false }), setFast: async () => ({ fast: true }) },
+    t: (key) => key,
+  }
+
+  harness.mount(clientModule.CodexFastToggle, {
+    ...props,
+    useModelDirectory: (select) => select({ current: { provider: "other", model: "other" } }),
+  })
+  assert.equal(harness.tree(), null)
+  harness.unmount()
+
+  const unsupportedHarness = hookHarness()
+  unsupportedHarness.mount(clientModule.CodexFastToggle, {
+    ...props,
+    useModelDirectory: (select) => select({
+      current: { provider: "dsh-codex", model: "gpt-5.3-codex-spark" },
+    }),
+  })
+  await settle()
+  unsupportedHarness.flush()
+  const button = findElement(unsupportedHarness.tree(), (element) => element.type === "button")
+  assert.ok(button)
+  assert.equal(button.props.disabled, true)
+  assert.equal(button.props["aria-label"], "fastUnsupported")
+  unsupportedHarness.unmount()
+})
+
+test("legacy Off or Minimal selections require an explicit, disclosed repair action", async () => {
+  for (const reasoningEffort of ["off", "minimal"]) {
+    const harness = hookHarness()
+    const clientModule = await loadClientModule(harness.React)
+    const selections = []
+    let rejectNextSelection = true
+    const current = {
+      provider: "dsh-codex",
+      model: "gpt-5.6-sol",
+      reasoningEffort,
+    }
+    const disclosure = "像模型选择器一样切换到当前默认推理档位，并保存为未来新会话的默认模型"
+    const retryDisclosure = `重试：${disclosure}`
+    const translations = {
+      legacyReasoningRepair: disclosure,
+      legacyReasoningRepairRetry: retryDisclosure,
+      legacyReasoningRepairHelp: disclosure,
+    }
+    const t = (key) => translations[key] ?? key
+    const selectModel = async (selection) => {
+      selections.push(selection)
+      if (rejectNextSelection) {
+        rejectNextSelection = false
+        throw new Error("temporary selection failure")
+      }
+    }
+    const props = (select) => ({
+      session: { removed: false },
+      useModelDirectory: (project) => project({ current }),
+      preferenceClient: {
+        get: async () => ({ fast: false }),
+        setFast: async () => ({ fast: false }),
+      },
+      selectModel: select,
+      t,
+    })
+
+    harness.mount(clientModule.CodexFastToggle, props(selectModel))
+    await settle()
+    harness.flush()
+    await settle()
+
+    assert.deepEqual(plain(selections), [], `${reasoningEffort} must not mutate selection on mount`)
+    let repairButton = findElement(
+      harness.tree(),
+      (element) => element.type === "button"
+        && /未来新会话.*默认模型/u.test(element.props.title ?? ""),
+    )
+    assert.ok(repairButton, `${reasoningEffort} must expose an explicit repair button`)
+    assert.match(repairButton.props.title, /模型选择器.*未来新会话.*默认模型/u)
+    assert.match(textContent(repairButton), /模型选择器.*未来新会话.*默认模型/u)
+
+    repairButton.props.onClick()
+    await settle()
+    harness.flush()
+    await settle()
+
+    assert.deepEqual(plain(selections), [{
+      provider: "dsh-codex",
+      model: "gpt-5.6-sol",
+    }], `${reasoningEffort} must submit exactly once for one click`)
+
+    // A failed selection may expose a retry state, but must never retry merely
+    // because the component rerenders or receives a fresh callback identity.
+    harness.mount(clientModule.CodexFastToggle, props((selection) => selectModel(selection)))
+    await settle()
+    harness.flush()
+    await settle()
+    assert.equal(selections.length, 1, `${reasoningEffort} failure must not trigger an automatic retry`)
+
+    repairButton = findElement(
+      harness.tree(),
+      (element) => element.type === "button"
+        && /未来新会话.*默认模型/u.test(element.props.title ?? ""),
+    )
+    assert.ok(repairButton, `${reasoningEffort} failure must keep a manual retry action`)
+    assert.match(repairButton.props.title, /模型选择器.*未来新会话.*默认模型/u)
+    assert.match(textContent(repairButton), /重试.*模型选择器.*未来新会话.*默认模型/u)
+
+    repairButton.props.onClick()
+    await settle()
+    harness.flush()
+    await settle()
+    assert.deepEqual(plain(selections), [
+      { provider: "dsh-codex", model: "gpt-5.6-sol" },
+      { provider: "dsh-codex", model: "gpt-5.6-sol" },
+    ], `${reasoningEffort} must retry only after a second user click`)
+    harness.unmount()
+  }
 })
 
 function authorizationStatus(
@@ -1119,16 +1385,16 @@ test("client style reload refreshes CSS and survives disposal of the old module"
     { document: harness.document, source },
   )
   const disposeOld = applyClientModule(oldModule)
-  assert.match(harness.styles[0].textContent, /gap:28px/u)
+  assert.match(harness.styles[0].textContent, /gap:14px/u)
 
   const reloadedModule = await loadClientModule(
     { createElement: () => undefined },
     {},
-    { document: harness.document, source: source.replace("gap:28px", "gap:29px") },
+    { document: harness.document, source: source.replace("gap:14px", "gap:15px") },
   )
   const disposeReloaded = applyClientModule(reloadedModule)
   assert.equal(harness.styles.length, 1)
-  assert.match(harness.styles[0].textContent, /gap:29px/u)
+  assert.match(harness.styles[0].textContent, /gap:15px/u)
 
   disposeOld()
   assert.equal(harness.styles.length, 1)
@@ -1169,17 +1435,19 @@ test("client styles bound narrow-screen provider text and actions", async () => 
   assert.match(css, /\.dshCodexCode\{[^}]*flex-wrap:wrap/u)
   assert.match(css, /\.dshCodexCode code\{[^}]*max-width:100%[^}]*overflow-wrap:anywhere/u)
   assert.match(css, /\.dshCodexButton\{[^}]*max-width:100%[^}]*white-space:normal/u)
-  assert.match(css, /\.dshCodexPage\{[^}]*max-width:1120px/u)
-  assert.match(css, /\[role=dialog\]:has\(\.dshCodexPage\)\{width:min\(1180px,calc\(100vw - 48px\)\)\}/u)
+  assert.match(css, /\.dshCodexPage\{[^}]*width:100%[^}]*font:inherit/u)
+  assert.doesNotMatch(css, /\[role=dialog\]/u)
   assert.match(css, /\.dshCodexHero h2\{font-size:16px;font-weight:500;line-height:24px\}/u)
   assert.match(css, /\.dshCodexCard\{[^}]*var\(--dsw-alias-bg-module-platform/u)
   assert.match(css, /\.dshCodexModelList\{[^}]*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/u)
-  assert.match(css, /@media\(max-width:760px\)\{\.dshCodexCard\{[^}]*\}\.dshCodexModelList\{grid-template-columns:1fr\}/u)
+  assert.match(css, /@media\(max-width:760px\)\{\.dshCodexModelList\{grid-template-columns:1fr\}/u)
   assert.match(css, /\.dshCodexButton:focus-visible,[^{]+input:focus-visible/u)
-  assert.match(css, /\.dshCodexModelOption code\{[^}]*font-family:inherit/u)
-  assert.match(css, /@media\(max-width:480px\)\{\[role=dialog\]:has\(\.dshCodexPage\)\{flex-direction:column\}/u)
-  assert.match(css, /\[role=dialog\]:has\(\.dshCodexPage\)>nav>div:last-child\{[^}]*flex-direction:row[^}]*overflow-x:auto/u)
-  assert.match(css, /\[role=dialog\]:has\(\.dshCodexPage\)>:not\(nav\)\{[^}]*min-height:0[^}]*overflow:hidden[^}]*flex:1 1 0%/u)
+  assert.match(css, /\.dshCodexModelId\{[^}]*font-family:inherit/u)
+  assert.match(css, /\.dshCodexModelCapabilities\{[^}]*flex-wrap:wrap/u)
+  assert.match(css, /\.dshCodexModelBadge\{[^}]*border-radius:999px[^}]*font-family:inherit/u)
+  assert.match(css, /\.dshCodexFastToggle\{[^}]*width:28px[^}]*font:inherit/u)
+  assert.match(css, /\.dshCodexFastToggle\[data-fast=true\]/u)
+  assert.match(css, /\.dshCodexQuotaWindow progress\{[^}]*width:100%[^}]*height:8px/u)
   dispose()
 })
 
@@ -1309,9 +1577,9 @@ test("quota UI renders an exhausted observation with a validated reset in Chines
 
     assert.ok(text.includes(messages.quotaExhausted))
     assert.ok(text.includes(messages.quotaObservedAt))
-    assert.ok(text.includes(new Date(observedAt).toLocaleString()))
+    assert.ok(text.includes(new Date(observedAt).toLocaleString(messages.locale)))
     assert.ok(text.includes(messages.quotaResetAt))
-    assert.ok(text.includes(new Date(resetAt).toLocaleString()))
+    assert.ok(text.includes(new Date(resetAt).toLocaleString(messages.locale)))
     assert.ok(text.includes(messages.quotaResetIn))
     assert.ok(text.includes(messages.quotaMinutes))
     assert.match(text, language === "zh" ? /账户额度已用尽.*重置时间/u : /account quota was exhausted.*reset time/iu)
@@ -1338,7 +1606,7 @@ test("quota UI renders an exhausted observation without reset in Chinese and Eng
 
     assert.ok(text.includes(messages.quotaExhausted))
     assert.ok(text.includes(messages.quotaObservedAt))
-    assert.ok(text.includes(new Date(observedAt).toLocaleString()))
+    assert.ok(text.includes(new Date(observedAt).toLocaleString(messages.locale)))
     assert.ok(text.includes(messages.quotaNoReset))
     assert.match(text, language === "zh" ? /账户额度已用尽.*未获得通过校验的重置时间/u : /account quota was exhausted.*no reset time passed validation/iu)
     assert.equal(text.includes(messages.quotaResetAt), false)
@@ -1364,7 +1632,7 @@ test("quota UI renders a recent success observation in Chinese and English", asy
 
     assert.ok(text.includes(messages.quotaRecentSuccess))
     assert.ok(text.includes(messages.quotaSuccessCaution))
-    assert.ok(text.includes(new Date(observedAt).toLocaleString()))
+    assert.ok(text.includes(new Date(observedAt).toLocaleString(messages.locale)))
     assert.match(text, language === "zh" ? /最近一次 Codex 请求成功.*不代表账户剩余额度/u : /latest Codex request succeeded.*does not represent remaining account quota/iu)
     assert.equal(text.includes(messages.quotaExhausted), false)
     assert.equal(text.includes(messages.quotaUnknown), false)
@@ -1387,6 +1655,125 @@ test("quota UI never invents percentages or progress bars", async () => {
     const section = findElement(tree, (element) => element.props?.["data-quota-status"] === quota.status)
     assert.ok(section)
   }
+})
+
+test("signed-in settings fetch real five-hour and weekly usage on entry and manual refresh", async () => {
+  const harness = hookHarness()
+  const clientModule = await loadClientModule(harness.React)
+  const dictionaries = registeredClientDictionaries(clientModule)
+  let usageCalls = 0
+  const observedAt = Date.UTC(2026, 7, 29, 6, 30)
+  const usage = {
+    observedAt,
+    rateLimits: [{
+      limitId: "codex",
+      limitName: "Codex",
+      primary: {
+        usedPercent: 25,
+        windowDurationMins: 300,
+        resetsAt: Date.UTC(2026, 7, 29, 9, 30),
+      },
+      secondary: {
+        usedPercent: 7.5,
+        windowDurationMins: 10_080,
+        resetsAt: Date.UTC(2026, 8, 4, 2, 29),
+      },
+    }],
+  }
+  const client = {
+    describe: async () => authorizationStatus(true),
+    usage: async () => {
+      usageCalls += 1
+      return usage
+    },
+  }
+
+  harness.mount(clientModule.AuthorizationSettings, {
+    client,
+    t: (key) => dictionaries.zh[key] ?? key,
+  })
+  await settle()
+  harness.flush()
+
+  assert.equal(usageCalls, 1)
+  const progress = findElements(harness.tree(), (element) => element.type === "progress")
+  assert.deepEqual(progress.map(({ props }) => props.value), [75, 92.5])
+  const text = textContent(harness.tree())
+  assert.match(text, /5 小时额度/u)
+  assert.match(text, /每周额度/u)
+  assert.match(text, /剩余 75%/u)
+  assert.match(text, /剩余 92\.5%/u)
+  assert.equal(text.match(/Codex/gu)?.length, 1)
+
+  const refresh = findElement(
+    harness.tree(),
+    (element) => element.type === "button" && textContent(element) === dictionaries.zh.refresh,
+  )
+  refresh.props.onClick()
+  await settle()
+  harness.flush()
+  assert.equal(usageCalls, 2)
+  harness.unmount()
+})
+
+test("usage refresh failure preserves the last verified percentages and marks them stale", async () => {
+  const harness = hookHarness()
+  const clientModule = await loadClientModule(harness.React)
+  let usageCalls = 0
+  const client = {
+    describe: async () => authorizationStatus(true),
+    async usage() {
+      usageCalls += 1
+      if (usageCalls > 1) throw new Error("sensitive upstream detail")
+      return {
+        observedAt: Date.now(),
+        rateLimits: [{
+          limitId: "codex",
+          primary: {
+            usedPercent: 40,
+            windowDurationMins: 300,
+            resetsAt: Date.now() + 60_000,
+          },
+        }],
+      }
+    },
+  }
+
+  harness.mount(clientModule.AuthorizationSettings, { client, t: (key) => key })
+  await settle()
+  harness.flush()
+  const refresh = findElement(
+    harness.tree(),
+    (element) => element.type === "button" && textContent(element) === "refresh",
+  )
+  refresh.props.onClick()
+  await settle()
+  harness.flush()
+
+  const progress = findElements(harness.tree(), (element) => element.type === "progress")
+  assert.deepEqual(progress.map(({ props }) => props.value), [60])
+  assert.match(textContent(harness.tree()), /quotaLoadFailed/u)
+  assert.doesNotMatch(textContent(harness.tree()), /sensitive upstream detail/u)
+  harness.unmount()
+})
+
+test("signed-out settings never request account usage", async () => {
+  const harness = hookHarness()
+  const clientModule = await loadClientModule(harness.React)
+  let usageCalls = 0
+  const client = {
+    describe: async () => authorizationStatus(false),
+    usage: async () => {
+      usageCalls += 1
+      return { observedAt: Date.now(), rateLimits: [] }
+    },
+  }
+
+  harness.mount(clientModule.AuthorizationSettings, { client, t: (key) => key })
+  await settle()
+  harness.flush()
+  assert.equal(usageCalls, 0)
+  harness.unmount()
 })
 
 test("quota presentation accepts only bounded timestamp shapes and expires observed resets", async () => {
@@ -1441,8 +1828,15 @@ test("model enablement client reads the plugin-owned Codex settings namespace di
           calls.push({ method: "discoverModels", payload, signal: receivedSignal })
           return ok({
             models: [
-              { id: "gpt-a", name: "GPT A", ignored: true },
-              { id: "gpt-b", name: "GPT B" },
+              {
+                id: "gpt-a",
+                name: "GPT A",
+                contextWindow: 272_000,
+                maxTokens: 128_000,
+                reasoningOptions: ["not-a-catalog-field"],
+                ignored: true,
+              },
+              { id: "gpt-b", name: "GPT B", contextWindow: 0, maxTokens: 1.5 },
               { id: "gpt-a", name: "duplicate" },
             ],
           })
@@ -1477,7 +1871,7 @@ test("model enablement client reads the plugin-owned Codex settings namespace di
   assert.equal(snapshot.settingsNs, "dsh-codex")
   assert.deepEqual([...snapshot.settingsPath], [])
   assert.deepEqual(plain(snapshot.models), [
-    { id: "gpt-a", name: "GPT A" },
+    { id: "gpt-a", name: "GPT A", contextWindow: 272_000, maxTokens: 128_000 },
     { id: "gpt-b", name: "GPT B" },
   ])
   assert.deepEqual([...snapshot.catalogIds], ["gpt-a", "gpt-b"])
@@ -1488,6 +1882,57 @@ test("model enablement client reads the plugin-owned Codex settings namespace di
   assert.deepEqual(calls.map((call) => call.method), ["discoverModels", "ensure"])
   assert.deepEqual(plain(calls[0].payload), { settingsNs: "dsh-codex", provider: "dsh-codex" })
   assert.equal(calls[0].signal, signal)
+})
+
+test("model settings shows exact catalog context and output metadata without inferred capabilities", async () => {
+  const ready = {
+    kind: "ready",
+    writable: true,
+    revision: 1,
+    settingsNs: "dsh-codex",
+    settingsPath: [],
+    models: [
+      { id: "gpt-codex", name: "GPT Codex", contextWindow: 272_000, maxTokens: 128_000 },
+      { id: "gpt-without-metadata", name: "No metadata" },
+    ],
+    catalogIds: ["gpt-codex", "gpt-without-metadata"],
+    selectedIds: ["gpt-codex", "gpt-without-metadata"],
+    configuredModels: [],
+  }
+
+  for (const { locale, contextLabel, outputLabel } of [
+    { locale: "zh", contextLabel: "上下文 272K", outputLabel: "最大输出 128K" },
+    { locale: "en", contextLabel: "Context 272K", outputLabel: "Max output 128K" },
+  ]) {
+    const harness = hookHarness()
+    const clientModule = await loadClientModule(harness.React)
+    const dictionaries = registeredClientDictionaries(clientModule)
+    harness.mount(clientModule.ModelEnablementSettings, {
+      client: {
+        available: true,
+        load: async () => ready,
+        save: async () => ready,
+        subscribe: () => () => undefined,
+      },
+      t: (key) => dictionaries[locale][key] ?? key,
+    })
+    await settle()
+    harness.flush()
+
+    const text = textContent(harness.tree())
+    assert.match(text, new RegExp(contextLabel, "u"))
+    assert.match(text, new RegExp(outputLabel, "u"))
+    assert.doesNotMatch(text, /272,000 tokens/u)
+    assert.doesNotMatch(text, /128,000 tokens/u)
+    assert.doesNotMatch(text, /推理档位|reasoning effort|not-a-catalog-field/iu)
+    assert.deepEqual(
+      findElements(harness.tree(), (element) => element.props.className === "dshCodexModelId")
+        .map((element) => textContent(element)),
+      ["gpt-codex", "gpt-without-metadata"],
+    )
+    assert.equal(findElements(harness.tree(), (element) => element.props.className === "dshCodexModelBadge").length, 2)
+    harness.unmount()
+  }
 })
 
 test("an explicit empty plugin model list remains empty instead of looking unset", async () => {
@@ -1810,9 +2255,18 @@ test("package manifest exports the real classic bundle with required client inje
     inject: [
       "@deepseek-ai/dsh-client-connection",
       "@deepseek-ai/dsh-client-runtime",
+      "@deepseek-ai/dsh-client-ui-conversation",
+      "@deepseek-ai/dsh-client-ui-model-selection",
       "@deepseek-ai/dsh-client-ui-settings",
       "@deepseek-ai/dsh-client-locale",
     ],
     platform: "web",
   })
+  for (const dependency of [
+    "@deepseek-ai/dsh-client-ui-conversation",
+    "@deepseek-ai/dsh-client-ui-model-selection",
+  ]) {
+    assert.equal(manifest.peerDependencies[dependency], "0.1.1-rc.2")
+    assert.deepEqual(manifest.peerDependenciesMeta[dependency], { optional: true })
+  }
 })

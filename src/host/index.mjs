@@ -12,6 +12,7 @@ import { createQuotaObserver } from "../internal/quota-observer.mjs"
 import { createReadImageUrlMiddleware } from "../internal/remote-image-input.mjs"
 import { createCodexSessionResourceManager } from "../internal/codex-session-resources.mjs"
 import { registerCodexSessionCommand } from "../internal/session-preference-command.mjs"
+import { registerSessionPreferenceRpc } from "../internal/session-preference-bridge.mjs"
 import { createSessionPreferences } from "../internal/session-preferences.mjs"
 import { stabilizeCodexStream } from "../internal/stream-resilience.mjs"
 
@@ -72,9 +73,11 @@ export function apply(ctx, config = {}) {
 
   ctx.inject(["connection"], (connectionCtx) => {
     installAuthorizationRpc(connectionCtx, {
+      accountUsageReader: runtime.accountUsageReader,
       commitTracker: authorizationCommitTracker,
       quotaObserver,
     })
+    registerSessionPreferenceRpc(connectionCtx, sessionPreferences)
   })
   ctx.inject(["commands"], (commandCtx) => {
     registerCodexSessionCommand(commandCtx, sessionPreferences, {

@@ -47,6 +47,25 @@ export interface AuthorizationStatus {
       }
 }
 
+export interface CodexUsageWindow {
+  usedPercent: number
+  windowDurationMins: number
+  resetsAt: number
+}
+
+export interface CodexUsageRateLimit {
+  limitId: string
+  limitName?: string
+  primary?: CodexUsageWindow
+  secondary?: CodexUsageWindow
+}
+
+export interface CodexAccountUsage {
+  observedAt: number
+  planType?: string
+  rateLimits: readonly CodexUsageRateLimit[]
+}
+
 export interface AuthorizationClient {
   describe(signal?: AbortSignal): Promise<AuthorizationStatus>
   watch(attemptId: string, after: number, signal?: AbortSignal): Promise<{
@@ -63,11 +82,41 @@ export interface AuthorizationClient {
     reason?: "commit-in-progress"
   }>
   logout(): Promise<{ signedOut: boolean }>
+  usage(signal?: AbortSignal): Promise<CodexAccountUsage>
 }
+
+export interface CodexSessionPreference {
+  fast: boolean
+}
+
+export interface SessionPreferenceClient {
+  get(signal?: AbortSignal): Promise<CodexSessionPreference>
+  setFast(fast: boolean, signal?: AbortSignal): Promise<CodexSessionPreference>
+}
+
+export interface SessionPreferenceClientFactory {
+  forSession(sessionId: string): SessionPreferenceClient
+}
+
+export interface CodexCurrentModel {
+  provider: string
+  model: string
+  reasoningEffort?: string
+}
+
+export interface CodexModelDirectoryState {
+  current?: CodexCurrentModel | null
+}
+
+export type UseCodexModelDirectory = <Selected>(
+  selector: (state: CodexModelDirectoryState) => Selected,
+) => Selected
 
 export interface CodexModelCatalogEntry {
   id: string
   name?: string
+  contextWindow?: number
+  maxTokens?: number
 }
 
 export interface CodexModelEnablementSnapshot {
@@ -131,6 +180,9 @@ export interface RpcConnection {
 }
 
 export declare function createAuthorizationClient(connection: RpcConnection): AuthorizationClient
+export declare function createSessionPreferenceClient(
+  connection: RpcConnection,
+): SessionPreferenceClientFactory
 export declare function createModelEnablementClient(
   connection: unknown,
   settingsFace?: SettingsDescribeFace,
@@ -146,6 +198,13 @@ export declare function safeQuotaSnapshot(value: unknown, now?: number):
     }
 export declare function AuthorizationSettings(props: {
   client: AuthorizationClient
+  t(key: string): string
+}): unknown
+export declare function CodexFastToggle(props: {
+  session?: { removed?: boolean }
+  useModelDirectory: UseCodexModelDirectory
+  preferenceClient: SessionPreferenceClient
+  selectModel?(selection: CodexCurrentModel): Promise<void> | void
   t(key: string): string
 }): unknown
 export declare function ModelEnablementSettings(props: {

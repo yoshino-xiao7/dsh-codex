@@ -1,0 +1,160 @@
+{
+  "schemaVersion": 3,
+  "version": "0.0.2",
+  "releaseStatus": "draft",
+  "testedCommit": "TBD",
+  "approvedBy": "TBD",
+  "approvedAt": "TBD",
+  "approvalEvidenceUrl": "TBD",
+  "platforms": {
+    "linux": {
+      "status": "pending",
+      "testedAt": "TBD",
+      "runner": "TBD",
+      "nodeVersion": "TBD",
+      "dshVersion": "0.1.1-rc.2",
+      "profileSmoke": "pending",
+      "evidenceUrl": "TBD"
+    },
+    "macos": {
+      "status": "pending",
+      "testedAt": "TBD",
+      "runner": "TBD",
+      "nodeVersion": "TBD",
+      "dshVersion": "0.1.1-rc.2",
+      "profileSmoke": "pending",
+      "evidenceUrl": "TBD"
+    },
+    "windows": {
+      "status": "pending",
+      "testedAt": "TBD",
+      "runner": "TBD",
+      "nodeVersion": "TBD",
+      "dshVersion": "0.1.1-rc.2",
+      "profileSmoke": "pending",
+      "evidenceUrl": "TBD"
+    }
+  },
+  "liveAcceptance": {
+    "oauthWebSignIn": {
+      "status": "pending",
+      "testedAt": "TBD",
+      "evidenceUrl": "TBD",
+      "assertions": {
+        "flowStartedFromSettings": false,
+        "credentialConfigured": false,
+        "postSignInRequestSucceeded": false
+      }
+    },
+    "modelCatalog": {
+      "status": "pending",
+      "testedAt": "TBD",
+      "evidenceUrl": "TBD",
+      "assertions": {
+        "settingsCatalogVisible": false,
+        "conversationModelSelectable": false
+      }
+    },
+    "textStream": {
+      "status": "pending",
+      "testedAt": "TBD",
+      "evidenceUrl": "TBD",
+      "assertions": {
+        "nonEmptyTextDelta": false,
+        "terminalStopObserved": false
+      }
+    },
+    "reasoningStream": {
+      "status": "pending",
+      "testedAt": "TBD",
+      "evidenceUrl": "TBD",
+      "assertions": {
+        "reasoningBlockObserved": false,
+        "terminalStopObserved": false
+      }
+    },
+    "terminalUsage": {
+      "status": "pending",
+      "testedAt": "TBD",
+      "evidenceUrl": "TBD",
+      "assertions": {
+        "inputTokensObserved": false,
+        "outputTokensObserved": false
+      }
+    },
+    "toolRoundTrip": {
+      "status": "pending",
+      "testedAt": "TBD",
+      "evidenceUrl": "TBD",
+      "assertions": {
+        "toolCallObserved": false,
+        "toolExecuted": false,
+        "toolResultReturned": false,
+        "followUpSucceeded": false
+      }
+    },
+    "replayContinuity": {
+      "status": "pending",
+      "testedAt": "TBD",
+      "evidenceUrl": "TBD",
+      "assertions": {
+        "firstTurnSucceeded": false,
+        "secondTurnUsedPriorContext": false,
+        "secondTurnSucceeded": false
+      }
+    },
+    "imageMaxPixels": {
+      "status": "pending",
+      "testedAt": "TBD",
+      "evidenceUrl": "TBD",
+      "assertions": {
+        "nativeImageAccepted": false,
+        "maxPixels4194304Projected": false,
+        "requestSucceeded": false
+      }
+    },
+    "transportAuto": {
+      "status": "pending",
+      "testedAt": "TBD",
+      "evidenceUrl": "TBD",
+      "assertions": {
+        "requestSucceeded": false
+      }
+    },
+    "transportSse": {
+      "status": "pending",
+      "testedAt": "TBD",
+      "evidenceUrl": "TBD",
+      "assertions": {
+        "requestSucceeded": false
+      }
+    },
+    "transportWebsocket": {
+      "status": "pending",
+      "testedAt": "TBD",
+      "evidenceUrl": "TBD",
+      "assertions": {
+        "requestSucceeded": false
+      }
+    },
+    "transportWebsocketCached": {
+      "status": "pending",
+      "testedAt": "TBD",
+      "evidenceUrl": "TBD",
+      "assertions": {
+        "firstTurnSucceeded": false,
+        "secondTurnSucceeded": false
+      }
+    },
+    "fastPriority": {
+      "status": "pending",
+      "testedAt": "TBD",
+      "evidenceUrl": "TBD",
+      "assertions": {
+        "priorityRequested": false,
+        "requestSucceeded": false,
+        "noAutomaticDowngrade": false
+      }
+    }
+  }
+}

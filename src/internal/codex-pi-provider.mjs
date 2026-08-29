@@ -6,7 +6,13 @@ import { buildBaseOptions } from "@earendil-works/pi-ai/api/simple-options"
 import { stream as streamCodexResponses } from "@earendil-works/pi-ai/api/openai-codex-responses"
 import { openaiCodexProvider } from "@earendil-works/pi-ai/providers/openai-codex"
 
+import {
+  piThinkingLevelMap,
+  supportsCodexFast,
+} from "./codex-model-capabilities.mjs"
 import { codexTransportSessionId } from "./codex-session-resources.mjs"
+
+export { supportsCodexFast } from "./codex-model-capabilities.mjs"
 
 const FACTORY_OPTION_KEYS = new Set([
   "resolveSessionPreferences",
@@ -72,7 +78,24 @@ function resolveSessionPreferenceOptions(resolver, sessionId) {
 function reasoningOptions(model, reasoning) {
   if (reasoning === undefined) return {}
   const effort = clampThinkingLevel(model, reasoning)
-  return effort === "off" ? {} : { reasoningEffort: effort }
+  return { reasoningEffort: effort === "off" ? "none" : effort }
+}
+
+function truthfulCodexModel(model) {
+  const thinkingLevelMap = piThinkingLevelMap(model.id)
+  if (thinkingLevelMap === undefined) {
+    return Object.freeze({
+      ...model,
+      // A newly published model stays usable with the provider default, but
+      // gains no selector controls until its catalog capabilities are verified.
+      reasoning: false,
+      thinkingLevelMap: undefined,
+    })
+  }
+  return Object.freeze({
+    ...model,
+    thinkingLevelMap,
+  })
 }
 
 /**
@@ -84,6 +107,7 @@ function reasoningOptions(model, reasoning) {
 export function createCodexPiProvider(options = {}) {
   validateFactoryOptions(options)
   const source = openaiCodexProvider()
+  const models = source.getModels().map(truthfulCodexModel)
   const resolveSessionPreferences = options.resolveSessionPreferences
   const resolveTransportSessionId = options.resolveTransportSessionId
     ?? codexTransportSessionId
@@ -94,7 +118,7 @@ export function createCodexPiProvider(options = {}) {
     baseUrl: source.baseUrl,
     headers: source.headers,
     auth: source.auth,
-    models: source.getModels(),
+    models,
     ...(source.filterModels === undefined
       ? {}
       : {
@@ -109,11 +133,14 @@ export function createCodexPiProvider(options = {}) {
               resolveSessionPreferences,
               streamOptions.sessionId,
             )
-        const serviceTier = sessionPreferences === undefined
+        const requestedServiceTier = sessionPreferences === undefined
           ? options.serviceTier
           : sessionPreferences.fast
             ? "priority"
             : undefined
+        const serviceTier = requestedServiceTier !== undefined && supportsCodexFast(model.id)
+          ? requestedServiceTier
+          : undefined
         const transportSessionId = resolveTransportSessionId(streamOptions.sessionId)
         if (
           transportSessionId !== undefined

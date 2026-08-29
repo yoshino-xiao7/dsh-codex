@@ -52,10 +52,32 @@ models:
 
 Model IDs and capabilities follow the pinned runtime catalog. Check the catalog discovered by the settings page before editing; do not infer that an example ID is always available.
 
+## Model capabilities and reasoning levels
+
+The settings page gets model names, context windows, and maximum outputs from the currently installed provider catalog; it is not a dynamic account model directory. The conversation model selector uses model-specific reasoning levels and defaults verified against the first-party Codex model catalog instead of inferring them from pi-ai's generic effort vocabulary:
+
+| Model | Selectable reasoning efforts | Default |
+| --- | --- | --- |
+| GPT-5.3 Codex Spark | Low, Medium, High, Xhigh | High |
+| GPT-5.4, GPT-5.4 mini, GPT-5.5 | Low, Medium, High, Xhigh | Medium |
+| GPT-5.6 Luna | Low, Medium, High, Xhigh, Max | Medium |
+| GPT-5.6 Sol | Low, Medium, High, Xhigh, Max | Low |
+| GPT-5.6 Terra | Low, Medium, High, Xhigh, Max | Medium |
+
+The selector no longer shows generic `Default`, `Off`, or `Minimal` entries that are not subscription-Codex catalog efforts. `Ultra` in the Codex product catalog also enables proactive task delegation; it is not a plain reasoning effort that a model Provider can implement by sending one wire value. This plugin does not yet own Harness Agent orchestration, so it does not disguise `Ultra` as `Max` or another wire value. A future unverified model remains usable with its server default but receives no inferred effort controls.
+
+If an older conversation still stores `Off` or `Minimal`, a **Repair old reasoning level** action appears beside the composer. Merely opening the conversation never rewrites the selection. Clicking the action switches to that model's current default. It uses the same persistence semantics as the Harness model selector, so the model also becomes the default for future conversations.
+
+## Per-session Fast preference
+
+The lightning button to the left of the conversation model selector and `/codex set fast on|off` update the same current-session preference. On GPT-5.4, GPT-5.5, GPT-5.6 Luna, Sol, and Terra, enabling it uses the official Fast priority service tier starting with the next request; disabling it restores standard speed starting with the next request. Fast targets 1.5× speed and consumes more usage. GPT-5.3 Codex Spark and GPT-5.4 mini never receive the Fast service tier.
+
+Fast state belongs only to the current session in the current process and returns to off after a process restart. Transport preferences are likewise not persisted. An in-flight request is not changed by a toggle, and a failed Fast request is not automatically replayed on a lower tier.
+
 ## Validation and activation
 
 - An omitted or `null` Boolean, enum, timeout, or image limit receives its default. `models: null` does not select the default catalog; omit `models` instead.
 - Type mismatches, unknown enum values, ordinary numbers outside the allowed ranges, fractional image limits, and unknown or duplicate model IDs are rejected during plugin load or settings save. A rejected update does not replace the last valid configuration.
 - Use only the finite JSON/YAML numbers listed above. `NaN`, infinity, and undocumented fields are outside the supported configuration interface.
 - A configuration update takes effect on the next adapter operation. An operation already in progress continues with the immutable configuration snapshot it captured at start.
-- `/codex` Fast and transport preferences are temporary state for the current session in the current process, not bundle configuration keys.
+- Fast and transport preferences are temporary state for the current session in the current process, not bundle configuration keys. `/codex` can change them, and the lightning button to the left of the model selector can also toggle Fast.
