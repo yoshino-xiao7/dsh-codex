@@ -31,6 +31,8 @@ pnpm run release:candidate -- 0.0.1
 
 该命令可在本地开发机或独立 CI 中运行，不发布 npm 包或 GitHub Release，也不读取 npm token、OIDC、OAuth 或其他凭据。它精确执行根目录和冻结 DSH 夹具的 frozen install、完整 `check`、仅一次会生成候选 tarball 的 `npm pack`、本地 tarball publish dry-run、确定性 SBOM、精确候选的 DSH profile smoke、隔离安装与 Host 导入，以及生产依赖 audit，并把候选包、摘要和全部证据写入 `release/`。为避免把旧文件误当成当前证据，只要发现已有候选输出就会在任何写入前失败；清理或移走已确认不再需要的旧输出后才能重试。
 
+普通 CI 的独立只读 `candidate-replay` job 在 Ubuntu/Node 24 的干净 checkout 中安装固定 pnpm `10.34.5` 与 npm `11.16.0`，动态读取 `package.json` 版本后只调用一次该统一命令。它把完整 `release/` 上传为 `dsh-codex-community-${{ github.sha }}-ci-replay` artifact，并保留 14 天。
+
 这只是可重复的本地/CI 预检。权威发布候选仍必须由 `main` 上的 `release.yml` workflow 生成并上传；macOS 或 Windows 上的本地复演不能替代该 workflow 的 Linux x64 发布证据，也不能替代三平台 CI/profile smoke、真实账号验收或维护者审批。
 
 ## 两级门禁

@@ -18,6 +18,10 @@ pnpm run verify:release
 
 夹具禁用生命周期脚本，因此这一级只验证 DSH Web/profile 与插件集成，不代表已验证 DSH 依赖中需要安装脚本的原生终端或本机构建能力。
 
+### 普通 CI 候选复演
+
+普通 CI 另设只读的 `candidate-replay` Ubuntu/Node 24 job。它从干净 checkout 安装固定 pnpm `10.34.5` 和 npm `11.16.0`，动态读取 `package.json` 版本，随后仅调用一次 `pnpm run release:candidate -- <version>`；完整 `release/` 以 `dsh-codex-community-${{ github.sha }}-ci-replay` artifact 上传并保留 14 天。该 job 不发布、不读取凭据，也不是 `main` 上 `release.yml` 生成的权威发布候选；它不能替代三平台 CI/profile smoke、真实账号验收或维护者审批。
+
 ## 故障回归
 
 - `failure-normalizer.test.mjs`：精确的 `AccountQuotaExceeded`、DSH canonical `QUOTA`、五小时 reset、request ID、普通/不确定 429、窄化 transport 与敏感字段不回显；嵌套 request metadata 和其他独立 JSON envelope 不得冒充或向命中的 provider `error` envelope 注入配额事实，canonical `QUOTA` 仍可从一个自身匹配的 envelope 保留合法 reset/request ID；

@@ -101,12 +101,43 @@ test("CI boots the exact DSH CLI from the final tarball on the full OS and Node 
     /pnpm --dir test\/fixtures\/dsh-runtime install --frozen-lockfile --ignore-scripts/u,
   )
   assert.match(source, /DSH_CLI_ROOT: \$\{\{ github\.workspace \}\}\/test\/fixtures\/dsh-runtime/u)
-  assert.match(source, /DSH_SMOKE_ARTIFACT_DIR: \$\{\{ runner\.temp \}\}\/npm-package/u)
   assert.equal((source.match(/pnpm run smoke:dsh-profile/gu) ?? []).length, 1)
+  assert.doesNotMatch(source, /DSH_SMOKE_ARTIFACT_DIR/u)
+  assert.doesNotMatch(source, /name: npm-package/u)
+})
+
+test("CI replays the complete release candidate in an isolated read-only job", async () => {
+  const source = await workflow("ci.yml")
+  const replay = workflowJob(source, "candidate-replay")
+  const toolchain = workflowStep(replay, "Install and verify the candidate packaging npm toolchain")
+  const build = workflowStep(replay, "Replay the complete candidate without publishing")
+  const upload = workflowStep(replay, "Upload the CI replay candidate and evidence")
+
+  assert.match(replay, /^    name: Release candidate replay \/ Node 24$/mu)
+  assert.match(replay, /^    runs-on: ubuntu-latest$/mu)
+  assert.match(replay, /^    timeout-minutes: 30$/mu)
+  assert.match(replay, /^    permissions:\n      contents: read$/mu)
+  assert.match(replay, /node-version: 24/u)
+  assert.match(replay, /package-manager-cache: false/u)
+  assert.match(replay, /version: 10\.34\.5/u)
   assert.match(
-    source,
-    /path: \$\{\{ runner\.temp \}\}\/npm-package\/dsh-codex-community-\*\.tgz/u,
+    toolchain,
+    /npm install --global --ignore-scripts --no-audit --no-fund npm@11\.16\.0/u,
   )
+  assert.match(toolchain, /test "\$\(npm --version\)" = "11\.16\.0"/u)
+  assert.match(build, /RELEASE_SOURCE_COMMIT: \$\{\{ github\.sha \}\}/u)
+  assert.match(build, /PACKAGE_VERSION="\$\(node -p "require\('\.\/package\.json'\)\.version"\)"/u)
+  assert.match(build, /pnpm run release:candidate -- "\$PACKAGE_VERSION"/u)
+  assert.equal((replay.match(/pnpm run release:candidate --/gu) ?? []).length, 1)
+  assert.ok(replay.indexOf(toolchain) < replay.indexOf(build))
+  assert.ok(replay.indexOf(build) < replay.indexOf(upload))
+  assert.match(upload, /name: dsh-codex-community-\$\{\{ github\.sha \}\}-ci-replay/u)
+  assert.match(upload, /^          path: release\/$/mu)
+  assert.match(upload, /^          if-no-files-found: error$/mu)
+  assert.match(upload, /^          overwrite: true$/mu)
+  assert.match(upload, /^          retention-days: 14$/mu)
+  assert.doesNotMatch(replay, /contents: write|id-token: write/u)
+  assert.doesNotMatch(replay, /npm publish[^\n]*--access|gh release|git tag/u)
 })
 
 test("direct CI full-suite jobs install the frozen DSH fixture before collecting tests", async () => {
