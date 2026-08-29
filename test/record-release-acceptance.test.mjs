@@ -29,6 +29,7 @@ const VERSION = "0.0.2"
 const ACCEPTANCE_PATH = `docs/releases/v${VERSION}.acceptance.json`
 const TESTED_COMMIT = "a".repeat(40)
 const OTHER_COMMIT = "b".repeat(40)
+const THIRD_COMMIT = "c".repeat(40)
 const PASS_TIME = "2026-08-29T10:00:00+08:00"
 const COMPLETE_EVIDENCE_TIME = "2026-08-29T02:00:00Z"
 const APPROVED_AT = "2026-08-29T03:00:00Z"
@@ -77,6 +78,206 @@ test("status is read-only and reports progress without exposing evidence values"
     assert.equal(result.output.includes(value), false, `status output must redact ${value}`)
   }
   assert.deepEqual(await snapshotTree(repositoryRoot), before)
+})
+
+test("reset-candidate replaces a populated draft with fresh evidence bound to the new commit", async (t) => {
+  const initialAcceptance = completeDraftAcceptance()
+  initialAcceptance.approvedBy = "superseded-reviewer"
+  initialAcceptance.approvedAt = APPROVED_AT
+  initialAcceptance.approvalEvidenceUrl = "https://evidence.example.test/approval/superseded"
+  assert.doesNotThrow(() => assertAcceptanceRecord(initialAcceptance, { version: VERSION }))
+  const repositoryRoot = await createRepository(t, { acceptance: initialAcceptance })
+  await ageRepositoryFiles(repositoryRoot)
+  const before = await snapshotTree(repositoryRoot)
+  const arguments_ = resetCandidateArguments()
+
+  const result = await runReleaseAcceptance({ repositoryRoot, arguments: arguments_ })
+
+  assert.deepEqual(result, {
+    changedPaths: [ACCEPTANCE_PATH],
+    output: "Reset release acceptance for the new candidate.",
+    status: "changed",
+  })
+  assertSensitiveValuesRedacted(result.output, [TESTED_COMMIT, OTHER_COMMIT])
+  const expected = createDraftAcceptanceRecord(VERSION)
+  expected.testedCommit = OTHER_COMMIT
+  const acceptance = await readAcceptance(repositoryRoot)
+  assert.deepEqual(acceptance, expected)
+  assert.doesNotThrow(() => assertAcceptanceRecord(acceptance, { version: VERSION }))
+  assertOnlyAcceptanceChanged(before, await snapshotTree(repositoryRoot))
+
+  await ageRepositoryFiles(repositoryRoot)
+  const beforeReplay = await snapshotTree(repositoryRoot)
+  const replay = await runReleaseAcceptance({ repositoryRoot, arguments: arguments_ })
+  assert.deepEqual(replay, {
+    changedPaths: [],
+    output: "Release acceptance is already a fresh draft for this candidate.",
+    status: "unchanged",
+  })
+  assert.deepEqual(await snapshotTree(repositoryRoot), beforeReplay)
+})
+
+test("reset-candidate rejects invalid arguments, commit conflicts, and non-fresh replays without writes", async (t) => {
+  const mismatchedCommit = freshCandidateAcceptance(THIRD_COMMIT)
+
+  const platformReplay = freshCandidateAcceptance(OTHER_COMMIT)
+  platformReplay.platforms.linux = structuredClone(completeDraftAcceptance().platforms.linux)
+
+  const liveReplay = freshCandidateAcceptance(OTHER_COMMIT)
+  liveReplay.liveAcceptance.textStream = structuredClone(
+    completeDraftAcceptance().liveAcceptance.textStream,
+  )
+
+  const approvalReplay = freshCandidateAcceptance(OTHER_COMMIT)
+  approvalReplay.approvedBy = "stale-reviewer"
+  approvalReplay.approvedAt = APPROVED_AT
+  approvalReplay.approvalEvidenceUrl = "https://evidence.example.test/approval/stale"
+
+  for (const acceptance of [platformReplay, liveReplay, approvalReplay]) {
+    assert.doesNotThrow(() => assertAcceptanceRecord(acceptance, { version: VERSION }))
+  }
+
+  const cases = [
+    {
+      label: "missing from commit",
+      arguments: resetCandidateArguments({ fromCommit: null }),
+      pattern: /--from-commit is required/iu,
+    },
+    {
+      label: "missing to commit",
+      arguments: resetCandidateArguments({ toCommit: null }),
+      pattern: /--to-commit is required/iu,
+    },
+    {
+      label: "duplicate from commit",
+      arguments: [...resetCandidateArguments(), `--from-commit=${TESTED_COMMIT}`],
+      pattern: /--from-commit may be provided only once/iu,
+    },
+    {
+      label: "duplicate to commit",
+      arguments: [...resetCandidateArguments(), `--to-commit=${OTHER_COMMIT}`],
+      pattern: /--to-commit may be provided only once/iu,
+    },
+    {
+      label: "unknown option",
+      arguments: [...resetCandidateArguments(), "--force=true"],
+      pattern: /Unknown option --force/iu,
+    },
+    {
+      label: "non-equals option spelling",
+      arguments: [
+        "reset-candidate",
+        "--from-commit",
+        TESTED_COMMIT,
+        `--to-commit=${OTHER_COMMIT}`,
+      ],
+      pattern: /--name=value form/iu,
+    },
+    {
+      label: "short from commit",
+      arguments: resetCandidateArguments({ fromCommit: "a".repeat(39) }),
+      pattern: /full lowercase Git commit/iu,
+    },
+    {
+      label: "uppercase from commit",
+      arguments: resetCandidateArguments({ fromCommit: "A".repeat(40) }),
+      pattern: /full lowercase Git commit/iu,
+    },
+    {
+      label: "short to commit",
+      arguments: resetCandidateArguments({ toCommit: "b".repeat(39) }),
+      pattern: /full lowercase Git commit/iu,
+    },
+    {
+      label: "uppercase to commit",
+      arguments: resetCandidateArguments({ toCommit: "B".repeat(40) }),
+      pattern: /full lowercase Git commit/iu,
+    },
+    {
+      label: "identical commits",
+      arguments: resetCandidateArguments({ toCommit: TESTED_COMMIT }),
+      pattern: /fromCommit and toCommit must (?:differ|be different|identify different commits)/iu,
+    },
+    {
+      label: "current commit does not match from commit",
+      acceptance: mismatchedCommit,
+      arguments: resetCandidateArguments(),
+      pattern: /fromCommit does not match|from commit.*does not match|testedCommit does not match/iu,
+    },
+    {
+      label: "approved record",
+      acceptance: approvedAcceptance(),
+      arguments: resetCandidateArguments(),
+      pattern: /approved acceptance record is immutable|only draft/iu,
+    },
+    {
+      label: "target commit replay retains platform evidence",
+      acceptance: platformReplay,
+      arguments: resetCandidateArguments(),
+      pattern: /fresh candidate state|not fresh|non-fresh|fromCommit does not match/iu,
+    },
+    {
+      label: "target commit replay retains live evidence",
+      acceptance: liveReplay,
+      arguments: resetCandidateArguments(),
+      pattern: /fresh candidate state|not fresh|non-fresh|fromCommit does not match/iu,
+    },
+    {
+      label: "target commit replay retains approval evidence",
+      acceptance: approvalReplay,
+      arguments: resetCandidateArguments(),
+      pattern: /fresh candidate state|not fresh|non-fresh|fromCommit does not match/iu,
+    },
+  ]
+
+  for (const fixture of cases) {
+    const repositoryRoot = await createRepository(t, {
+      acceptance: fixture.acceptance ?? completeDraftAcceptance(),
+    })
+    await assertRejectsWithoutWrites(
+      repositoryRoot,
+      () => runReleaseAcceptance({ repositoryRoot, arguments: fixture.arguments }),
+      fixture.pattern,
+      fixture.label,
+    )
+  }
+})
+
+test("concurrent identical candidate resets write once and leave no lock or temporary file", async (t) => {
+  const repositoryRoot = await createRepository(t, { acceptance: completeDraftAcceptance() })
+  const outcomes = await Promise.allSettled([
+    runReleaseAcceptance({ repositoryRoot, arguments: resetCandidateArguments() }),
+    runReleaseAcceptance({ repositoryRoot, arguments: resetCandidateArguments() }),
+  ])
+  const changed = outcomes.filter(({ status, value }) => (
+    status === "fulfilled" && value.status === "changed"
+  ))
+  const unchanged = outcomes.filter(({ status, value }) => (
+    status === "fulfilled" && value.status === "unchanged"
+  ))
+  const rejected = outcomes.filter(({ status }) => status === "rejected")
+
+  assert.equal(changed.length, 1, "only one concurrent reset may report writing the fresh state")
+  assert.equal(unchanged.length + rejected.length, 1)
+  for (const outcome of rejected) {
+    assert.match(
+      outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason),
+      /already being updated|changed after release-acceptance began/iu,
+    )
+  }
+
+  const expected = createDraftAcceptanceRecord(VERSION)
+  expected.testedCommit = OTHER_COMMIT
+  assert.deepEqual(await readAcceptance(repositoryRoot), expected)
+  const remainingPaths = Object.keys(await snapshotTree(repositoryRoot))
+  assert.equal(
+    remainingPaths.some((path) => (
+      path.endsWith(".release-update.lock")
+        || /\.release-acceptance-[^/]+$/u.test(path)
+    )),
+    false,
+    "concurrent reset completion must clean lock and temporary files",
+  )
 })
 
 test("pass-platform first binds the candidate commit and changes only the selected platform", async (t) => {
@@ -1090,6 +1291,16 @@ test("the package command and its local dependency closure stay offline and cred
   }
 })
 
+function resetCandidateArguments({
+  fromCommit = TESTED_COMMIT,
+  toCommit = OTHER_COMMIT,
+} = {}) {
+  const arguments_ = ["reset-candidate"]
+  if (fromCommit !== null) arguments_.push(`--from-commit=${fromCommit}`)
+  if (toCommit !== null) arguments_.push(`--to-commit=${toCommit}`)
+  return arguments_
+}
+
 function platformPassArguments({
   dshVersion = DSH_VERSION,
   evidenceUrl,
@@ -1204,6 +1415,13 @@ function completeDraftAcceptance() {
       result.assertions[assertionName] = true
     }
   }
+  assert.doesNotThrow(() => assertAcceptanceRecord(acceptance, { version: VERSION }))
+  return acceptance
+}
+
+function freshCandidateAcceptance(testedCommit) {
+  const acceptance = createDraftAcceptanceRecord(VERSION)
+  acceptance.testedCommit = testedCommit
   assert.doesNotThrow(() => assertAcceptanceRecord(acceptance, { version: VERSION }))
   return acceptance
 }

@@ -68,4 +68,14 @@ pnpm run release:acceptance -- pass-platform <linux|macos|windows> \
 
 All seven options are required exactly once in `--name=value` form. The runner must be trimmed, non-placeholder, no more than 128 characters, and a single line without control characters. Node must be a stable three-part 22 release (at least `22.19.0`) or 24, optionally prefixed with `v`. Evidence must be an absolute HTTPS URL without userinfo, query data, or a fragment.
 
+If source or other accepted content changes after a candidate has been bound, reset the draft record before accepting the new commit:
+
+```sh
+pnpm run release:acceptance -- reset-candidate \
+  --from-commit=<old-full-40-character-lowercase-SHA> \
+  --to-commit=<new-full-40-character-lowercase-SHA>
+```
+
+`--from-commit` must match the current `testedCommit`, and the two full lowercase SHAs must differ. The command clears all old platform/live evidence and approval fields, then binds the new SHA; an approved record cannot be reset. It runs offline without checking commit existence and writes safely through managed-path checks, a concurrent-write lock, and atomic replacement. Replaying the same `old → new` command returns `unchanged` when the record is already a fresh draft with only the new SHA bound; any residual evidence conflicts and produces no write. After resetting, run CI/profile smoke against the new SHA first, then record the new platform evidence with `pass-platform`.
+
 Real OAuth, quota, and network smoke must not require contributors to place secrets in CI, and secrets must never be exposed to external pull requests. `release:acceptance` is only an offline evidence recorder: `pass-platform` records only CI/profile-smoke evidence already verified by a maintainer and does not run tests, access the network, or check that the commit exists; `pass` neither reads credentials nor infers or automatically passes assertions; neither replaces human approval. `status` shows only counts and check names, never evidence values. The first `pass-platform` or `pass` binds the full candidate SHA, and all later platform/live records plus `approve` must use that same SHA. A passed item permits only an identical idempotent replay; differing evidence cannot overwrite it. The strict publish gate still verifies commit existence and ancestry.

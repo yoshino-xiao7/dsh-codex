@@ -56,7 +56,7 @@ Do not bypass the gate with fabricated environment variables. Keep the release i
 3. Run the profile smoke on all three operating systems with exact DSH `0.1.1-rc.2` and a tested Node 22 release (at least `22.19.0`) or Node 24. After a maintainer verifies the evidence, use `pass-platform` to record `testedAt`, environment details, and HTTPS evidence links without sensitive parameters.
 4. Manually complete every live check below with a test account in a controlled local environment. This consumes account quota. Mark a check `passed` only after every fixed assertion has sanitized evidence; a free-form scope statement is not a substitute.
 5. After every item passes, a maintainer records approval and changes `releaseStatus` to `approved`.
-6. From that point, only `docs/releases/v<version>.md`, its acceptance JSON, `README.md`, `README.en.md`, `CHANGELOG.md`, `docs/compatibility.md`, and `docs/compatibility.en.md` may change to record dates, evidence, and publication state. Any source, configuration, dependency, lockfile, or workflow change requires acceptance against a new commit.
+6. From that point, only `docs/releases/v<version>.md`, its acceptance JSON, `README.md`, `README.en.md`, `CHANGELOG.md`, `docs/compatibility.md`, and `docs/compatibility.en.md` may change to record dates, evidence, and publication state. After acceptance has bound a candidate, any source, configuration, dependency, lockfile, or workflow change requires resetting the draft record to the new commit before CI, profile smoke, and live-network acceptance are repeated; an approved record cannot be reset.
 
 | Check | Required proof | Copyable exact `--assert` arguments |
 | --- | --- | --- |
@@ -140,6 +140,20 @@ pnpm run release:acceptance -- approve \
 ```
 
 The command checks only the SHA format and its consistency with the acceptance record, and records a human approval that has already been made; it does not approve on a maintainer's behalf. The strict publish gate still verifies that the commit exists and that the candidate is an ancestor of the release commit. Tokens, OAuth codes, cookies, account identifiers, and complete private content must never appear in arguments, evidence URLs, acceptance records, or terminal logs.
+
+### Resetting the candidate commit
+
+When source or other accepted content changes after a draft candidate has been bound, replace the old candidate with the new commit first:
+
+```sh
+pnpm run release:acceptance -- reset-candidate \
+  --from-commit=<old-full-40-character-lowercase-SHA> \
+  --to-commit=<new-full-40-character-lowercase-SHA>
+```
+
+Both SHAs must be full, lowercase, and different; a normal reset requires the current `testedCommit` to match `--from-commit`. `reset-candidate` accepts only a draft record. It clears every old platform result, live-network result, and approval field, restores all platform/live state to `pending`/`TBD`/`false`, and binds `testedCommit` to `--to-commit`. An approved record cannot be reset.
+
+The command runs offline, accesses neither the network nor Git, and does not check whether either commit exists. Managed-path boundary checks, a concurrent-write lock, and atomic replacement protect the acceptance file. Replaying the same `old → new` command returns `unchanged` when the record is already a fresh draft with only the new SHA bound; any residual platform, live, or approval evidence instead conflicts and produces no write. After the reset, run cross-platform CI/profile smoke against the new SHA first, then record the new evidence with `pass-platform`; every later platform, live, and approval command must continue to use that new SHA.
 
 Before publication, fill in the Release date and accepted commit from `testedCommit`, then remove every placeholder. The workflow records the exact release commit used to build the artifact in the isolated-import evidence and uploads it as an asset.
 

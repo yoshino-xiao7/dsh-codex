@@ -56,7 +56,7 @@ pnpm run verify:release:publish
 3. 在三个系统分别使用精确 DSH `0.1.1-rc.2` 和已测试的 Node 22（至少 `22.19.0`）或 24 运行 profile smoke，由维护者核验证据后通过 `pass-platform` 记录 `testedAt`、环境信息和不含敏感参数的 HTTPS 证据链接；
 4. 在受控本地环境中使用测试账号人工完成下表的真实验收；该过程会消耗账号额度，每项只能在对应断言均有脱敏证据后改为 `passed`，不能用自由文本概括代替；
 5. 所有项目通过后由维护者填写审批信息，并把 `releaseStatus` 改为 `approved`；
-6. 此后只允许修改 `docs/releases/v<version>.md`、对应验收 JSON、`README.md`、`README.en.md`、`CHANGELOG.md`、`docs/compatibility.md` 和 `docs/compatibility.en.md`，用于填写日期、证据和发布状态。源码、配置、依赖、锁文件或工作流有任何变化，都必须基于新提交重新验收。
+6. 此后只允许修改 `docs/releases/v<version>.md`、对应验收 JSON、`README.md`、`README.en.md`、`CHANGELOG.md`、`docs/compatibility.md` 和 `docs/compatibility.en.md`，用于填写日期、证据和发布状态。验收已绑定候选后，源码、配置、依赖、锁文件或工作流有任何变化，都必须先把 draft 记录重置到新提交，再重新运行 CI、profile smoke 和真实网络验收；approved 记录不可重置。
 
 | 验收项 | 必须证明 | 可复制的精确 `--assert` 参数 |
 | --- | --- | --- |
@@ -140,6 +140,20 @@ pnpm run release:acceptance -- approve \
 ```
 
 命令只校验 SHA 的格式及其与验收记录的一致性，并记录已经作出的人工审批；它不会代表维护者作出审批。提交是否存在以及候选与发布提交的祖先关系仍由严格 publish gate 验证。参数、证据 URL、验收记录和终端日志中都不得出现 token、OAuth code、Cookie、账号标识或完整私人内容。
+
+### 重置候选提交
+
+已绑定的 draft 候选在源码或其他受验收内容变化后，先用新提交替换旧候选：
+
+```sh
+pnpm run release:acceptance -- reset-candidate \
+  --from-commit=<旧完整40位小写SHA> \
+  --to-commit=<新完整40位小写SHA>
+```
+
+两个 SHA 都必须完整、小写且互不相同；正常重置要求当前 `testedCommit` 与 `--from-commit` 一致。`reset-candidate` 只接受 draft 记录，并会清空全部旧平台证据、真实网络证据和审批字段，把所有平台/live 状态恢复为 `pending`/`TBD`/`false`，再把 `testedCommit` 绑定到 `--to-commit`。approved 记录不可重置。
+
+命令离线运行，不访问网络或 Git，也不检查两个提交是否存在。受管路径边界检查、并发写锁和原子替换保护验收文件。相同的 `old → new` 命令在记录已经是仅绑定新 SHA 的 fresh draft 时返回 `unchanged`；只要仍残留任何平台、live 或审批证据，就会冲突且不写入。重置后先对新 SHA 运行跨平台 CI/profile smoke，再用 `pass-platform` 记录新证据；随后所有平台、live 和审批命令都必须继续使用该新 SHA。
 
 发布前填写 Release 日期和 `testedCommit` 对应的验收提交，并清除全部占位词。工作流实际构建所用的 release commit 会写入隔离导入证据并作为附件上传。
 

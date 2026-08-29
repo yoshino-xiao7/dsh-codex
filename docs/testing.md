@@ -68,4 +68,14 @@ pnpm run release:acceptance -- pass-platform <linux|macos|windows> \
 
 七个选项都必须且只能用 `--name=value` 提供一次。runner 必须去除首尾空格、不是占位词、最长 128 字符且不含控制字符；Node 必须是可带 `v` 前缀的稳定三段 22（至少 `22.19.0`）或 24；证据必须是没有 userinfo、查询参数或片段的绝对 HTTPS URL。
 
+已绑定候选后若源码或其他受验收内容变化，必须先重置 draft 记录，再验收新提交：
+
+```sh
+pnpm run release:acceptance -- reset-candidate \
+  --from-commit=<旧完整40位小写SHA> \
+  --to-commit=<新完整40位小写SHA>
+```
+
+`--from-commit` 必须匹配当前 `testedCommit`，两个完整小写 SHA 必须不同。命令会清空全部旧平台/live 证据和审批字段并绑定新 SHA；approved 记录不能重置。它离线运行且不检查提交存在性，并通过受管路径检查、并发写锁和原子替换安全写入。同一条 `old → new` 命令在记录已是只绑定新 SHA 的 fresh draft 时返回 `unchanged`；任何残留证据都会冲突且不写入。重置后先在新 SHA 上运行 CI/profile smoke，再通过 `pass-platform` 记录新平台证据。
+
 真实 OAuth、配额或网络 smoke 不应要求贡献者在 CI 提交秘密，也不能使用外部 PR 可访问的 secret。`release:acceptance` 只是离线证据记录器：`pass-platform` 只记录维护者已核验的 CI/profile smoke，既不运行测试、不联网，也不检查提交是否存在；`pass` 不读取凭据、不推断或自动通过断言；两者都不替代人工审批。`status` 只显示计数和检查项名称，不显示证据值。第一次 `pass-platform` 或 `pass` 绑定完整候选 SHA，后续所有平台/live 记录和 `approve` 必须使用同一 SHA。已通过项目只允许完全相同的幂等重放，任何不同证据都不能覆盖；严格 publish gate 仍负责验证提交存在性和祖先关系。

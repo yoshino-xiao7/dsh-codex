@@ -24,6 +24,7 @@ This project follows the Keep a Changelog structure; `0.0.x` is a technical prev
 - 中英文文档、社区治理、Issue/PR、跨平台 CI，以及最小权限、SHA 固定、离线确定性 SBOM 和可恢复重跑的发布流程。
 - 幂等且离线的 `release:prepare` 命令，用于生成下一版本的双语 CHANGELOG/Release 草稿和全新 schema v3 验收记录；它会保护人工内容、在冲突发生时写入前失败，并拒绝受管文件或父目录符号链接。
 - 不联网、不读取凭据的 `release:acceptance` 离线证据记录器；新增 `pass-platform <linux|macos|windows>`，只记录维护者已核验的 CI/profile smoke，不检查提交是否存在；平台与真实网络证据必须绑定同一候选 SHA，已通过项只允许相同证据的幂等重放，不能覆盖不同证据；真实检查只有明确列齐固定断言才记录通过，`status` 不显示证据值，提交存在性/祖先关系仍由严格门禁验证，审批仍由维护者人工作出。
+- draft 专用的离线 `pnpm run release:acceptance -- reset-candidate --from-commit=<旧SHA> --to-commit=<新SHA>`：源码变化后清空全部旧平台/live 证据与审批并绑定新候选，再运行新 CI/profile smoke 并用 `pass-platform` 记录；它不检查提交存在性，通过受管路径检查、写锁和原子替换安全写入，拒绝重置 approved 记录，并把 fresh 状态下同一命令的重放保持为 `unchanged`。
 
 #### 修复
 
@@ -60,6 +61,7 @@ This project follows the Keep a Changelog structure; `0.0.x` is a technical prev
 - Chinese and English documentation, governance, issue/PR templates, cross-platform CI, and a least-privilege release flow with pinned Actions, an offline deterministic SBOM, and recoverable reruns.
 - An idempotent offline `release:prepare` command that creates the next bilingual CHANGELOG/Release drafts and a fresh schema-v3 acceptance record, preserves human-authored content, fails before writing on conflicts, and rejects managed-file or parent-directory symlinks.
 - An offline `release:acceptance` evidence recorder that neither accesses the network nor reads credentials, now with `pass-platform <linux|macos|windows>` to record only maintainer-verified CI/profile smoke without checking that the commit exists. Platform and live-network evidence must bind to one candidate SHA; a passed item permits only an idempotent replay of identical evidence and cannot be overwritten with different evidence. Live checks pass only when every fixed assertion is explicitly listed, `status` hides evidence values, the strict gate still checks commit existence/ancestry, and approval remains a maintainer decision.
+- A draft-only offline `pnpm run release:acceptance -- reset-candidate --from-commit=<old-SHA> --to-commit=<new-SHA>` command that clears all old platform/live evidence and approval fields after source changes, binds the new candidate, and precedes new CI/profile smoke recorded with `pass-platform`. It does not check commit existence, writes safely through managed-path checks, a write lock, and atomic replacement, rejects approved records, and keeps a replay of the same command against fresh state `unchanged`.
 
 #### Fixed
 

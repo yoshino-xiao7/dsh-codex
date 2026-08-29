@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url"
 
 import {
   assertAcceptanceRecord,
+  createDraftAcceptanceRecord,
   LIVE_ACCEPTANCE_ASSERTIONS,
 } from "./release-acceptance.mjs"
 import {
@@ -32,6 +33,37 @@ export async function acceptanceStatus({ repositoryRoot }) {
     releaseStatus: context.acceptance.releaseStatus,
     version: context.version,
   }
+}
+
+export async function resetAcceptanceCandidate({
+  fromCommit,
+  repositoryRoot,
+  toCommit,
+}) {
+  assertTestedCommit(fromCommit, "fromCommit")
+  assertTestedCommit(toCommit, "toCommit")
+  assert(fromCommit !== toCommit, "fromCommit and toCommit must identify different commits")
+
+  const context = await readAcceptanceContext(repositoryRoot)
+  const nextAcceptance = createDraftAcceptanceRecord(context.version)
+  nextAcceptance.testedCommit = toCommit
+  validateAcceptance(nextAcceptance, context.version, context.acceptancePath)
+
+  if (sameJson(context.acceptance, nextAcceptance)) {
+    return { path: context.acceptancePath, status: "unchanged" }
+  }
+
+  assert(
+    context.acceptance.releaseStatus === "draft",
+    "An approved acceptance record is immutable and cannot be reset",
+  )
+  assert(
+    context.acceptance.testedCommit === fromCommit,
+    "fromCommit does not match the release candidate currently bound to this record",
+  )
+
+  await writeAcceptance(context, nextAcceptance)
+  return { path: context.acceptancePath, status: "changed" }
 }
 
 export async function recordPlatformAcceptance({
@@ -203,10 +235,10 @@ function assertPublicMaintainerIdentity(value) {
   assert(!PLACEHOLDER_PATTERN.test(value), "approvedBy must identify the approving maintainer")
 }
 
-function assertTestedCommit(value) {
+function assertTestedCommit(value, label = "testedCommit") {
   assert(
     typeof value === "string" && /^[0-9a-f]{40}$/u.test(value),
-    "testedCommit must be a full lowercase Git commit",
+    `${label} must be a full lowercase Git commit`,
   )
 }
 
@@ -346,6 +378,24 @@ export async function runReleaseAcceptance({ arguments: rawArguments, repository
     }
   }
 
+  if (command === "reset-candidate") {
+    const options = parseOptions(arguments_.slice(1), {
+      allowed: new Set(["from-commit", "to-commit"]),
+    })
+    const result = await resetAcceptanceCandidate({
+      fromCommit: requireOption(options, "from-commit"),
+      repositoryRoot,
+      toCommit: requireOption(options, "to-commit"),
+    })
+    return {
+      changedPaths: result.status === "changed" ? [result.path] : [],
+      output: result.status === "changed"
+        ? "Reset release acceptance for the new candidate."
+        : "Release acceptance is already a fresh draft for this candidate.",
+      status: result.status,
+    }
+  }
+
   if (command === "pass") {
     assert(
       typeof arguments_[1] === "string" && !arguments_[1].startsWith("-"),
@@ -393,7 +443,7 @@ export async function runReleaseAcceptance({ arguments: rawArguments, repository
   }
 
   throw new ReleaseFileError(
-    "Usage: pnpm run release:acceptance -- <status|pass-platform|pass|approve>",
+    "Usage: pnpm run release:acceptance -- <status|reset-candidate|pass-platform|pass|approve>",
   )
 }
 
