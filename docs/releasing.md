@@ -253,7 +253,7 @@ npm 只允许给**已经存在**的包配置 Trusted Publisher，因此新包第
    ```
 
 4. 审批 `npm-release` environment。工作流只在实际需要写入不存在的 `0.0.1` 时把该 secret 注入 `npm publish`，并在 GitHub 托管 runner 上生成 provenance；
-5. npm 包出现后，在包的 **Settings → Trusted Publisher** 中填写：Provider `GitHub Actions`、owner `yoshino-xiao7`、repository `dsh-codex`、workflow filename `release.yml`、environment `npm-release`、allowed action `npm publish`；
+5. npm 包出现后，在包的 **Settings → Trusted Publisher** 中填写：Provider `GitHub Actions`、Organization or user `yoshino-xiao7`、Repository `dsh-codex`、Workflow filename `release.yml`、Environment name `npm-release`，并在 Allowed actions 中只选择 `npm publish`；
 6. 撤销 npm token，并删除 GitHub environment secret：
 
    ```sh

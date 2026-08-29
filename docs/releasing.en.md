@@ -253,7 +253,7 @@ npm allows Trusted Publisher configuration only for a package that **already exi
    ```
 
 4. approve the `npm-release` environment. The workflow injects this secret into `npm publish` only when it must create the absent `0.0.1`, and generates provenance on a GitHub-hosted runner;
-5. once the package exists, open its **Settings → Trusted Publisher** and enter: provider `GitHub Actions`, owner `yoshino-xiao7`, repository `dsh-codex`, workflow filename `release.yml`, environment `npm-release`, and allowed action `npm publish`;
+5. once the package exists, open its **Settings → Trusted Publisher** and enter: Provider `GitHub Actions`, Organization or user `yoshino-xiao7`, Repository `dsh-codex`, Workflow filename `release.yml`, Environment name `npm-release`, and select only `npm publish` under Allowed actions;
 6. revoke the npm token and delete the GitHub environment secret:
 
    ```sh

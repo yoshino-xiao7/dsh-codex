@@ -95,15 +95,9 @@ function prepareChangelog(changelog, version) {
 }
 
 function renderReleaseNotes({ packageName, version }) {
-  const [major, minor] = version.split("-", 1)[0].split(".").map(Number)
-  const title = major === 0 && minor === 0
-    ? `# v${version} 技术预览 / Technical Preview`
-    : `# v${version} 发布说明 / Release Notes`
   const acceptanceFile = `v${version}.acceptance.json`
 
-  return `${title}
-
-> 发布日期 / Release date：TBD
+  return `> 发布日期 / Release date：TBD
 > 验收提交 / Accepted commit：TBD
 > npm：\`${packageName}@${version}\`
 
@@ -148,11 +142,10 @@ function renderReleaseNotes({ packageName, version }) {
 }
 
 function assertReleaseNotes(notes, { packageName, path, version }) {
-  const escapedVersion = escapeRegExp(version)
   const identity = `${packageName}@${version}`
   assert(
-    new RegExp(`^#\\s+v${escapedVersion}(?:\\s|$)`, "mu").test(notes),
-    `${path} does not name v${version} in its title`,
+    !/^#\s+/mu.test(notes),
+    `${path} must not duplicate the GitHub Release title`,
   )
   assert(
     new RegExp(`^>\\s*npm\\s*[：:]\\s*\`${escapeRegExp(identity)}\`\\s*$`, "mu").test(notes),

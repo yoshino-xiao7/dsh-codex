@@ -513,7 +513,7 @@ test("publication verifies registry signatures and source-bound provenance from 
   )
 })
 
-test("every release carries the complete evidence set under a version-neutral bilingual title", async () => {
+test("every release carries the complete evidence set under one package-and-version title", async () => {
   const source = await workflow("release.yml")
   const releaseStep = source.slice(source.indexOf("- name: Create, verify, and publish the bilingual GitHub Release"))
   const assetsBlock = source.match(/assets=\(\n([\s\S]*?)\n\s+\)/u)?.[1]
@@ -533,14 +533,14 @@ test("every release carries the complete evidence set under a version-neutral bi
     assert.ok(expectedBlock.includes(`"${name}"`), `readback list is missing ${name}`)
   }
   assert.equal(
-    (source.match(/--title "v\$REQUESTED_VERSION 社区版本 \/ Community Release"/gu) ?? []).length,
+    (source.match(/--title "dsh-codex-community v\$REQUESTED_VERSION"/gu) ?? []).length,
     2,
   )
   assert.match(
     source,
-    /const expectedTitle = `v\$\{process\.env\.EXPECTED_VERSION\} 社区版本 \/ Community Release`/u,
+    /const expectedTitle = `dsh-codex-community v\$\{process\.env\.EXPECTED_VERSION\}`/u,
   )
-  assert.doesNotMatch(releaseStep, /0\.0\.1|首个公开预览|Initial Public Preview/u)
+  assert.doesNotMatch(releaseStep, /社区版本|Community Release|0\.0\.1|首个公开预览|Initial Public Preview/u)
 })
 
 test("publication is safely repeatable and verifies every GitHub Release asset before going public", async () => {
@@ -596,9 +596,41 @@ test("draft recovery verifies its target and any existing tag before publication
   assert.match(beforePublication, /release\.targetCommitish !== process\.env\.GITHUB_SHA/u)
   assert.match(
     beforePublication,
-    /existing_tag_commit="\$\(gh api "repos\/\$GITHUB_REPOSITORY\/commits\/\$tag" --jq \.sha/u,
+    /existing_tag_commit="\$\(gh api "repos\/\$GITHUB_REPOSITORY\/commits\/tags\/\$tag" --jq \.sha/u,
   )
   assert.match(beforePublication, /test "\$existing_tag_commit" = "\$GITHUB_SHA"/u)
+})
+
+test("the accepted release tag exists before draft assets are read back by tag", async () => {
+  const source = await workflow("release.yml")
+  const releaseStep = source.slice(source.indexOf("- name: Create, verify, and publish the bilingual GitHub Release"))
+  const createTagCommand = 'gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs"'
+  const createTagOffset = releaseStep.indexOf(createTagCommand)
+  const uploadOffset = releaseStep.indexOf('gh release upload "$tag"')
+  const downloadOffset = releaseStep.indexOf('gh release download "$tag"')
+
+  assert.notEqual(createTagOffset, -1, "release recovery must be able to create the accepted tag")
+  assert.notEqual(uploadOffset, -1, "draft asset upload command is missing")
+  assert.notEqual(downloadOffset, -1, "draft asset readback command is missing")
+  assert.ok(createTagOffset < uploadOffset, "the accepted tag must exist before draft asset upload")
+  assert.ok(createTagOffset < downloadOffset, "the accepted tag must exist before tag-based readback")
+
+  const beforeCreate = releaseStep.slice(0, createTagOffset)
+  assert.match(
+    beforeCreate,
+    /gh api "repos\/\$GITHUB_REPOSITORY\/git\/ref\/tags\/\$tag" > release\/tag-ref\.json 2> release\/tag-error\.log/u,
+  )
+  assert.match(
+    beforeCreate,
+    /existing_tag_commit="\$\(gh api "repos\/\$GITHUB_REPOSITORY\/commits\/tags\/\$tag" --jq \.sha/u,
+  )
+  assert.match(beforeCreate, /test "\$existing_tag_commit" = "\$GITHUB_SHA"/u)
+  assert.equal(
+    (releaseStep.match(/repos\/\$GITHUB_REPOSITORY\/commits\/tags\/\$tag/gu) ?? []).length,
+    4,
+    "every tag commit check must use an explicit tags namespace",
+  )
+  assert.doesNotMatch(releaseStep, /repos\/\$GITHUB_REPOSITORY\/commits\/\$tag/u)
 })
 
 test("release notes disclose platform and post-release live-validation progress", async () => {

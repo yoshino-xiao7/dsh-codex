@@ -71,6 +71,7 @@ test("a fresh next version creates exactly the four managed release files", asyn
   ]) {
     assert.ok(notes.includes(marker), `release notes must contain ${marker}`)
   }
+  assert.doesNotMatch(notes, /^#\s+/mu, "the GitHub Release body must not duplicate its title")
 })
 
 test("a fresh acceptance record is schema v3 with every platform and live check pending", async (t) => {
@@ -420,9 +421,7 @@ function validReleaseNotes(version, marker, {
   acceptedCommit = "TBD",
   releaseDate = "TBD",
 } = {}) {
-  return `# v${version} 技术预览 / Technical Preview
-
-> 发布日期 / Release date：${releaseDate}
+  return `> 发布日期 / Release date：${releaseDate}
 > 验收提交 / Accepted commit：${acceptedCommit}
 > npm：\`dsh-codex-community@${version}\`
 

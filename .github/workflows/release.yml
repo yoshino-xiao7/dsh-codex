@@ -439,20 +439,38 @@ jobs:
             exit "$release_status"
           fi
 
+          set +e
+          gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" > release/tag-ref.json 2> release/tag-error.log
+          tag_status=$?
+          set -e
+          if [ "$tag_status" -eq 0 ]; then
+            existing_tag_commit="$(gh api "repos/$GITHUB_REPOSITORY/commits/tags/$tag" --jq .sha)"
+            test "$existing_tag_commit" = "$GITHUB_SHA"
+          elif [ "$release_state" != "published" ] && grep -Eqi 'HTTP 404|Not Found' release/tag-error.log; then
+            created_tag_commit="$(gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+              -f "ref=refs/tags/$tag" \
+              -f "sha=$GITHUB_SHA" \
+              --jq .object.sha)"
+            test "$created_tag_commit" = "$GITHUB_SHA"
+          else
+            cat release/tag-error.log >&2
+            exit "$tag_status"
+          fi
+
           if [ "$release_state" = "published" ]; then
-            published_commit="$(gh api "repos/$GITHUB_REPOSITORY/commits/$tag" --jq .sha)"
+            published_commit="$(gh api "repos/$GITHUB_REPOSITORY/commits/tags/$tag" --jq .sha)"
             test "$published_commit" = "$GITHUB_SHA"
           elif [ "$release_state" = "draft" ]; then
             gh release edit "$tag" \
               --draft \
               --target "$GITHUB_SHA" \
-              --title "v$REQUESTED_VERSION 社区版本 / Community Release" \
+              --title "dsh-codex-community v$REQUESTED_VERSION" \
               --notes-file "docs/releases/v$REQUESTED_VERSION.md"
           else
             gh release create "$tag" \
               --draft \
               --target "$GITHUB_SHA" \
-              --title "v$REQUESTED_VERSION 社区版本 / Community Release" \
+              --title "dsh-codex-community v$REQUESTED_VERSION" \
               --notes-file "docs/releases/v$REQUESTED_VERSION.md"
           fi
 
@@ -485,7 +503,7 @@ jobs:
               import fs from "node:fs"
               const release = JSON.parse(fs.readFileSync(process.env.RELEASE_METADATA_PATH, "utf8"))
               const base = `dsh-codex-community-${process.env.EXPECTED_VERSION}.tgz`
-              const expectedTitle = `v${process.env.EXPECTED_VERSION} 社区版本 / Community Release`
+              const expectedTitle = `dsh-codex-community v${process.env.EXPECTED_VERSION}`
               const notes = fs.readFileSync(`docs/releases/v${process.env.EXPECTED_VERSION}.md`, "utf8")
               const normalize = (value) => value.replaceAll("\r\n", "\n").trimEnd()
               const expected = [
@@ -536,20 +554,10 @@ jobs:
                 || release.targetCommitish !== process.env.GITHUB_SHA
               ) process.exit(1)
             '
-            set +e
-            existing_tag_commit="$(gh api "repos/$GITHUB_REPOSITORY/commits/$tag" --jq .sha 2> release/prepublish-tag-error.log)"
-            tag_status=$?
-            set -e
-            if [ "$tag_status" -eq 0 ]; then
-              test "$existing_tag_commit" = "$GITHUB_SHA"
-            elif grep -Eqi 'HTTP 404|Not Found' release/prepublish-tag-error.log; then
-              :
-            else
-              cat release/prepublish-tag-error.log >&2
-              exit "$tag_status"
-            fi
+            prepublish_tag_commit="$(gh api "repos/$GITHUB_REPOSITORY/commits/tags/$tag" --jq .sha)"
+            test "$prepublish_tag_commit" = "$GITHUB_SHA"
             gh release edit "$tag" --draft=false
             verify_release false release/published-release.json "$RUNNER_TEMP/published-github-release-assets"
           fi
-          published_commit="$(gh api "repos/$GITHUB_REPOSITORY/commits/$tag" --jq .sha)"
+          published_commit="$(gh api "repos/$GITHUB_REPOSITORY/commits/tags/$tag" --jq .sha)"
           test "$published_commit" = "$GITHUB_SHA"
