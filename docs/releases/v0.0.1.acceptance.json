@@ -2,37 +2,37 @@
   "schemaVersion": 3,
   "version": "0.0.1",
   "releaseStatus": "draft",
-  "testedCommit": "3667ed30c7989c7c382fd0d39149edf0bcfa2fb8",
+  "testedCommit": "0b757b879ade52a46b8e97a5bb2a3c4d5fbc4501",
   "approvedBy": "TBD",
   "approvedAt": "TBD",
   "approvalEvidenceUrl": "TBD",
   "platforms": {
     "linux": {
       "status": "passed",
-      "testedAt": "2026-08-29T01:14:13Z",
+      "testedAt": "2026-08-29T01:35:57Z",
       "runner": "github-hosted ubuntu-latest x64",
       "nodeVersion": "24.19.0",
       "dshVersion": "0.1.1-rc.2",
       "profileSmoke": "passed",
-      "evidenceUrl": "https://github.com/yoshino-xiao7/dsh-codex/actions/runs/33225833441/job/99029300313"
+      "evidenceUrl": "https://github.com/yoshino-xiao7/dsh-codex/actions/runs/33226811144/job/99032034464"
     },
     "macos": {
       "status": "passed",
-      "testedAt": "2026-08-29T01:14:31Z",
+      "testedAt": "2026-08-29T01:36:06Z",
       "runner": "github-hosted macos-latest arm64",
       "nodeVersion": "24.18.0",
       "dshVersion": "0.1.1-rc.2",
       "profileSmoke": "passed",
-      "evidenceUrl": "https://github.com/yoshino-xiao7/dsh-codex/actions/runs/33225833441/job/99029300418"
+      "evidenceUrl": "https://github.com/yoshino-xiao7/dsh-codex/actions/runs/33226811144/job/99032034499"
     },
     "windows": {
       "status": "passed",
-      "testedAt": "2026-08-29T01:15:38Z",
+      "testedAt": "2026-08-29T01:37:44Z",
       "runner": "github-hosted windows-latest x64",
       "nodeVersion": "24.19.0",
       "dshVersion": "0.1.1-rc.2",
       "profileSmoke": "passed",
-      "evidenceUrl": "https://github.com/yoshino-xiao7/dsh-codex/actions/runs/33225833441/job/99029300360"
+      "evidenceUrl": "https://github.com/yoshino-xiao7/dsh-codex/actions/runs/33226811144/job/99032034362"
     }
   },
   "liveAcceptance": {
