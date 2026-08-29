@@ -79,8 +79,8 @@ See [Troubleshooting](docs/troubleshooting.en.md) for diagnostic steps.
 ## Support boundaries
 
 - The `0.0.x` line does not promise a stable API; pin the exact version.
-- The Linux, macOS, and Windows candidate-run evidence for `0.0.2` is currently `TBD / pending`. Formal publication still requires all three platform gates, complete supply-chain verification, and maintainer approval.
-- Live OAuth, conversation, image, transport, and Fast network acceptance is currently `0/13 pending`. These unverified capabilities remain clearly disclosed and will be completed individually after publication; `0.0.2` does not overwrite the published `0.0.1`.
+- Linux, macOS, and Windows CI/profile smoke for `0.0.2` reached `3/3`; the accepted commit and platform evidence are in the [acceptance record](docs/releases/v0.0.2.acceptance.json).
+- Live OAuth, conversation, image, transport, and Fast network acceptance is `0/13 pending`. These unverified capabilities remain clearly disclosed and will be completed individually after publication.
 - The settings page reads usage through the Web-backend compatibility endpoint used by the official Codex client. If that endpoint is unavailable or malformed, the page retains the latest safe reading and falls back to request observation or an unknown state instead of presenting the error as zero remaining usage.
 - Model names, context windows, and maximum outputs come from the installed provider catalog. The reasoning picker exposes only subscription-Codex levels through Max that the Provider can fully implement, plus each model's verified default. Generic `Default`, `Off`, and `Minimal` entries are hidden, and agent-level `Ultra` is not disguised as a plain reasoning effort.
 - Fast is limited to GPT-5.4, GPT-5.5, GPT-5.6 Luna, Sol, and Terra and consumes more usage. Other models never receive the Fast service tier.

@@ -79,8 +79,8 @@ dsh web
 ## 支持边界
 
 - `0.0.x` 不承诺稳定 API，请固定版本；
-- `0.0.2` 的 Linux、macOS 和 Windows 候选运行证据当前为 `TBD / pending`，正式发布仍须通过三平台门禁、完整供应链校验与维护者批准；
-- 真实 OAuth、对话、图片、transport 和 Fast 网络验收当前为 `0/13 pending`；这些未验证能力会继续如实展示并在发布后逐项补齐，`0.0.2` 不覆盖已经发布的 `0.0.1`；
+- `0.0.2` 的 Linux、macOS 和 Windows CI/profile smoke 已达到 `3/3`，候选提交与平台证据见[验收记录](docs/releases/v0.0.2.acceptance.json)；
+- 真实 OAuth、对话、图片、transport 和 Fast 网络验收为 `0/13 pending`；这些未验证能力继续如实展示，并在发布后逐项补齐；
 - 设置页额度通过官方 Codex 客户端使用的 Web 后端兼容接口读取；接口不可用或返回异常时保留最近的安全读数，并降级为请求观测或未知状态，不把错误伪装成零余额；
 - 模型名称、上下文和最大输出来自当前安装的 provider catalog；推理选择器只展示已按订阅 Codex 目录核验且 Provider 能完整实现的 Low 至 Max 与模型默认值，不展示通用的 `Default`、`Off`、`Minimal`，也不把需要主动任务委派的 `Ultra` 伪装成普通推理档位；
 - Fast 仅用于 GPT-5.4、GPT-5.5、GPT-5.6 Luna、Sol 和 Terra，并会提高额度消耗；其他模型不会发送 Fast service tier；
