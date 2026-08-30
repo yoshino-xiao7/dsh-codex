@@ -441,7 +441,7 @@ test("classic web bundle registers the package id and Codex settings section", a
     assert.equal(specifier, "react")
     return { createElement: () => undefined }
   })
-  assert.deepEqual([...clientModule.inject], ["slots", "locale", "connection", "settingsScope", "sessions", "modelDirectories"])
+  assert.deepEqual([...clientModule.inject], ["slots", "locale", "connection", "settingsScope"])
   assert.equal(clientModule.CHANNEL, "/dsh-codex")
   assert.equal(clientModule.NS, "settings.codex")
 
@@ -524,10 +524,9 @@ test("classic web bundle registers the package id and Codex settings section", a
     Object.keys(dictionaries[0].value.zh).sort(),
     Object.keys(dictionaries[0].value.en).sort(),
   )
-  assert.deepEqual(injectedSlots, ["settings.section", "sidebar.footer.action", "conversation.input.right"])
-  assert.equal(sections.length, 3)
+  assert.deepEqual(injectedSlots, ["settings.section", "conversation.input.right"])
+  assert.equal(sections.length, 2)
   const settingsSection = sections.find(({ spec }) => spec.name === "settings.section")
-  const sidebarQuota = sections.find(({ spec }) => spec.name === "sidebar.footer.action")
   const fastEntry = sections.find(({ spec }) => spec.name === "conversation.input.right")
   assert.ok(settingsSection)
   assert.equal(settingsSection.spec.id, "codex")
@@ -535,10 +534,6 @@ test("classic web bundle registers the package id and Codex settings section", a
   assert.equal(settingsSection.spec.label(), "nav")
   assert.equal(typeof settingsSection.component, "function")
   assert.equal(settingsSection.spec.inject().modelClient.available, false)
-  assert.ok(sidebarQuota)
-  assert.equal(sidebarQuota.spec.id, "codex-account-quota")
-  assert.equal(sidebarQuota.spec.order, 35)
-  assert.equal(typeof sidebarQuota.component, "function")
   assert.ok(fastEntry)
   assert.equal(fastEntry.spec.id, "dsh-codex-fast")
   assert.equal(fastEntry.spec.order, 100)
@@ -600,17 +595,14 @@ test("settings section selection reaches the public settings API and live route 
     },
     slots: {
       inject(name, callback) {
+        assert.equal(name, "settings.section")
         callback()
       },
       register(spec, component) {
-        if (spec.name === "settings.section") section = { spec, component }
+        section = { spec, component }
         return () => undefined
       },
     },
-    sessions: {
-      list: { getSnapshot: () => ({ current: undefined }), subscribe: () => () => undefined },
-    },
-    modelDirectories: { directoryFor: () => { throw new Error("no active session") } },
   }
   clientModule.apply(context)
   assert.ok(section)
@@ -2618,7 +2610,6 @@ test("package manifest exports the real classic bundle with required client inje
       "@deepseek-ai/dsh-client-runtime",
       "@deepseek-ai/dsh-client-ui-conversation",
       "@deepseek-ai/dsh-client-ui-model-selection",
-      "@deepseek-ai/dsh-client-ui-sidebar",
       "@deepseek-ai/dsh-client-ui-settings",
       "@deepseek-ai/dsh-client-locale",
     ],
@@ -2627,7 +2618,6 @@ test("package manifest exports the real classic bundle with required client inje
   for (const dependency of [
     "@deepseek-ai/dsh-client-ui-conversation",
     "@deepseek-ai/dsh-client-ui-model-selection",
-    "@deepseek-ai/dsh-client-ui-sidebar",
   ]) {
     assert.equal(manifest.peerDependencies[dependency], "0.1.1-rc.2")
     assert.deepEqual(manifest.peerDependenciesMeta[dependency], { optional: true })
