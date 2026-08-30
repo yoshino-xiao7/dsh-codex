@@ -4,7 +4,7 @@
 
 面向 DeepSeek Harness 的 Codex 插件，提供 ChatGPT OAuth 登录、Codex 模型、图片输入和可靠的流式回复。
 
-> 当前正式版：`0.0.3` 技术预览，使用 npm `latest` 与正式 GitHub Release 发布。`0.0.4` 正在开发，尚未发布。npm 包名：`dsh-codex-community`。
+> 当前版本：`0.0.4` 技术预览，使用 npm `latest` 与正式 GitHub Release 发布。npm 包名：`dsh-codex-community`。
 
 ## 功能
 
@@ -18,11 +18,7 @@
 - 每次进入设置页或手动刷新时读取真实的 5 小时与每周额度；读取失败时安全降级，不向 Web 页面暴露 OAuth 凭据；
 - 使用紧凑的额度卡展示剩余比例：5 小时额度显示精确重置时间，每周额度在不足 24 小时时显示精确时间，其余时间显示相对天数；
 - 在设置页优先展示已选择模型，默认收起未选择模型；上下文和最大输出使用来自当前 provider catalog 的紧凑 `K` 标签；
-- 使用模型选择器左侧的闪电按钮为当前会话切换官方 Fast（1.5 倍速），并通过 `/codex` 为当前会话选择自动、SSE、WebSocket 或 WebSocket 缓存传输。
-
-## 0.0.4 开发中（尚未发布）
-
-- 在闪电按钮旁提供图形化传输选择器，无需命令即可切换自动、SSE、WebSocket 或 WebSocket 缓存；
+- 使用模型选择器左侧的闪电按钮为当前会话切换官方 Fast（1.5 倍速），并通过相邻的图形按钮或 `/codex` 选择自动、SSE、WebSocket 或 WebSocket 缓存传输；
 - 从 Host 的单一能力接口读取模型目录字段、已核验推理档位与 Fast 支持，不在 Web 页面另存一份容易漂移的模型清单；
 - 在默认折叠的连接诊断中按需运行“本机检查”或“账号检查”；前者完全离线，后者只读取账号额度并在需要时刷新 OAuth，两者都不发送模型请求或消耗模型额度。
 
@@ -36,7 +32,7 @@
 请固定安装精确版本：
 
 ```sh
-dsh plugin --profile web add dsh-codex-community@0.0.3
+dsh plugin --profile web add dsh-codex-community@0.0.4
 dsh web
 ```
 
@@ -44,7 +40,7 @@ dsh web
 
 1. 打开 **设置 → OpenAI Codex**，按页面提示完成 ChatGPT OAuth；
 2. 在同一页面启用模型；
-3. 从会话模型选择器中选择 Codex 模型开始使用；需要时点击选择器左侧的闪电按钮开启 Fast，或使用 `/codex set transport ...` 切换当前会话的传输方式。图形化传输按钮将在尚未发布的 `0.0.4` 中提供。
+3. 从会话模型选择器中选择 Codex 模型开始使用；需要时点击选择器左侧的闪电按钮开启 Fast，并通过相邻的传输按钮或 `/codex set transport ...` 切换当前会话的传输方式。
 
 可用命令：
 
@@ -64,7 +60,7 @@ Fast 和传输偏好只保存在当前进程的当前会话中，不会持久化
 更新：
 
 ```sh
-dsh plugin --profile web update dsh-codex-community@0.0.3
+dsh plugin --profile web update dsh-codex-community@0.0.4
 dsh web
 ```
 
@@ -87,12 +83,12 @@ dsh web
 ## 支持边界
 
 - `0.0.x` 不承诺稳定 API，请固定版本；
-- `0.0.3` 的 Linux、macOS 和 Windows CI/profile smoke 已达到 `3/3`，候选提交与平台证据见[验收记录](docs/releases/v0.0.3.acceptance.json)；
-- `0.0.3` 的真实 OAuth、对话、图片、transport 和 Fast 网络验收从独立记录的 `0/13 pending` 开始；这些未验证能力继续如实展示，并在发布后逐项补齐；
+- `0.0.4` 的 Linux、macOS 和 Windows CI/profile smoke 已达到 `3/3`，候选提交与平台证据见[验收记录](docs/releases/v0.0.4.acceptance.json)；
+- `0.0.4` 的真实 OAuth、对话、图片、transport 和 Fast 网络验收从独立记录的 `0/13 pending` 开始；这些未验证能力继续如实展示，并在发布后逐项补齐；
 - 设置页额度通过官方 Codex 客户端使用的 Web 后端兼容接口读取；接口不可用或返回异常时保留最近的安全读数，并降级为请求观测或未知状态，不把错误伪装成零余额；
 - 模型名称、上下文和最大输出来自当前安装的 provider catalog；推理选择器只展示已按订阅 Codex 目录核验且 Provider 能完整实现的 Low 至 Max 与模型默认值，不展示通用的 `Default`、`Off`、`Minimal`，也不把需要主动任务委派的 `Ultra` 伪装成普通推理档位；
 - Fast 仅用于 GPT-5.4、GPT-5.5、GPT-5.6 Luna、Sol 和 Terra，并会提高额度消耗；其他模型不会发送 Fast service tier；
-- `0.0.4` 的连接诊断不会执行主动模型请求：本机检查不联网，账号检查只经过现有额度读取边界；它不能替代真实对话、图片、工具或各传输方式的网络验收；
+- 连接诊断不会执行主动模型请求：本机检查不联网，账号检查只经过现有额度读取边界；它不能替代真实对话、图片、工具或各传输方式的网络验收；
 - 不提供图片生成或编辑；
 - Windows、Linux、真实 OAuth 与真实 Codex 网络验收状态见[兼容性文档](docs/compatibility.md)。
 

@@ -1,38 +1,38 @@
 {
   "schemaVersion": 3,
   "version": "0.0.4",
-  "releaseStatus": "draft",
-  "testedCommit": "TBD",
-  "approvedBy": "TBD",
-  "approvedAt": "TBD",
-  "approvalEvidenceUrl": "TBD",
+  "releaseStatus": "approved",
+  "testedCommit": "5599b853f3325fbf78450fa4ae34cfb4bc8a3a71",
+  "approvedBy": "yoshino-xiao7",
+  "approvedAt": "2026-08-30T05:37:22Z",
+  "approvalEvidenceUrl": "https://github.com/yoshino-xiao7/dsh-codex/actions/runs/33294967533",
   "platforms": {
     "linux": {
-      "status": "pending",
-      "testedAt": "TBD",
-      "runner": "TBD",
-      "nodeVersion": "TBD",
+      "status": "passed",
+      "testedAt": "2026-08-30T05:30:52Z",
+      "runner": "GitHub Actions ubuntu-24.04 20260823.283.1",
+      "nodeVersion": "24.19.0",
       "dshVersion": "0.1.1-rc.2",
-      "profileSmoke": "pending",
-      "evidenceUrl": "TBD"
+      "profileSmoke": "passed",
+      "evidenceUrl": "https://github.com/yoshino-xiao7/dsh-codex/actions/runs/33294833279/job/99212598720"
     },
     "macos": {
-      "status": "pending",
-      "testedAt": "TBD",
-      "runner": "TBD",
-      "nodeVersion": "TBD",
+      "status": "passed",
+      "testedAt": "2026-08-30T05:30:59Z",
+      "runner": "GitHub Actions macos-26-arm64 20260728.0273.1",
+      "nodeVersion": "24.18.0",
       "dshVersion": "0.1.1-rc.2",
-      "profileSmoke": "pending",
-      "evidenceUrl": "TBD"
+      "profileSmoke": "passed",
+      "evidenceUrl": "https://github.com/yoshino-xiao7/dsh-codex/actions/runs/33294833279/job/99212598664"
     },
     "windows": {
-      "status": "pending",
-      "testedAt": "TBD",
-      "runner": "TBD",
-      "nodeVersion": "TBD",
+      "status": "passed",
+      "testedAt": "2026-08-30T05:32:10Z",
+      "runner": "GitHub Actions windows-2025-vs2026 20260824.214.3",
+      "nodeVersion": "24.19.0",
       "dshVersion": "0.1.1-rc.2",
-      "profileSmoke": "pending",
-      "evidenceUrl": "TBD"
+      "profileSmoke": "passed",
+      "evidenceUrl": "https://github.com/yoshino-xiao7/dsh-codex/actions/runs/33294833279/job/99212598768"
     }
   },
   "liveAcceptance": {

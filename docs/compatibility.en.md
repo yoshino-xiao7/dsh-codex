@@ -4,13 +4,13 @@
 
 Last updated: 2026-08-30.
 
-`0.0.4` is currently an unpublished development version. The table below continues to record evidence for the formally published `0.0.3`; development-branch tests are neither a `0.0.4` candidate nor release acceptance. The maintainer has completed real-device use without reporting an issue, but the repository does not contain individually recorded evidence for all 13 fixed sanitized assertions, so the acceptance JSON remains truthful to its existing evidence.
+`0.0.4` is the current technical-preview release. The table below records its approved candidate evidence. The maintainer has completed real-device use without reporting an issue, but the repository does not contain individually recorded evidence for all 13 fixed sanitized assertions, so the acceptance JSON truthfully remains at `0/13 pending`.
 
-| Component or environment | `0.0.3` candidate evidence | Status |
+| Component or environment | `0.0.4` candidate evidence | Status |
 | --- | --- | --- |
 | DeepSeek Harness | `test/fixtures/dsh-runtime/pnpm-lock.yaml` locks the complete `@deepseek-ai/dsh@0.1.1-rc.2` runtime/peer graph and validates the `dsh-llm` schema and stream contract | Exact version verified |
-| pi-ai | OAuth, catalog, Codex payload, and replay contract tests against `@earendil-works/pi-ai@0.82.1` | Public contract verified; 0.0.3 live-network acceptance is `0/13 pending` |
-| Node.js | Complete local suite on `22.22.2`; the [0.0.3 three-platform candidate run](https://github.com/yoshino-xiao7/dsh-codex/actions/runs/33248224386) covers Node 22/24 | `>=22.19.0 <25`; candidate run passed |
+| pi-ai | OAuth, catalog, Codex payload, and replay contract tests against `@earendil-works/pi-ai@0.82.1` | Public contract verified; 0.0.4 live-network acceptance is `0/13 pending` |
+| Node.js | Complete local suite on `22.22.2`; the [0.0.4 three-platform candidate run](https://github.com/yoshino-xiao7/dsh-codex/actions/runs/33294833279) covers Node 22/24 | `>=22.19.0 <25`; candidate run passed |
 | macOS | `macos-latest` Node 22/24 complete checks, frozen DSH installation, and Web/profile smoke | Platform gate passed |
 | Windows x64 | `windows-latest` Node 22/24 complete checks, frozen DSH installation, and Web/profile smoke | Platform gate passed; real user environment pending |
 | Linux x64 | `ubuntu-latest` Node 22/24 complete checks, frozen DSH installation, and Web/profile smoke | Platform gate passed |
@@ -22,17 +22,17 @@ Last updated: 2026-08-30.
 | Codex image input | Attachment-seam and budget-projection automation passes | A live request with `maxPixels=4194304` is pending |
 | auto / SSE / WebSocket / cached | Transport mapping and session isolation pass in automation | One live request through each transport is pending |
 | Fast / priority tier | Verified that only an explicit per-session choice changes `service_tier` | Account entitlement and live network pending |
-| npm / GitHub Release | The strict workflow verifies the candidate, Registry readback, provenance, signatures, and Release assets; artifacts are attached to [`v0.0.3`](https://github.com/yoshino-xiao7/dsh-codex/releases/tag/v0.0.3) | Formal publication is performed by the protected workflow |
+| npm / GitHub Release | The strict workflow verifies the candidate, Registry readback, provenance, signatures, and Release assets; artifacts are attached to [`v0.0.4`](https://github.com/yoshino-xiao7/dsh-codex/releases/tag/v0.0.4) | Formal publication is performed by the protected workflow |
 
-The `0.0.4` development branch adds three locally verifiable boundaries: one Host model-capability projection shared by the Provider, route, and per-conversation Fast query; a graphical selector for all four Transport choices; and connection diagnostics with a fully offline local check plus an account check limited to reading usage. The diagnostic module has no stream seam and cannot send a model request, so these tests do not replace live account acceptance for text, reasoning, images, tools, Fast, or individual transports.
+`0.0.4` adds three locally verifiable boundaries: one Host model-capability projection shared by the Provider, route, and per-conversation Fast query; a graphical selector for all four Transport choices; and connection diagnostics with a fully offline local check plus an account check limited to reading usage. The diagnostic module has no stream seam and cannot send a model request, so these tests do not replace live account acceptance for text, reasoning, images, tools, Fast, or individual transports.
 
-The `0.0.x` line is a technical preview and declares compatibility only with the exact DSH release candidate above. Linux, macOS, and Windows CI/profile smoke for `0.0.3` reached `3/3`. The accepted commit, exact Node versions, and job links are recorded in the [acceptance record](releases/v0.0.3.acceptance.json), with maintainer approval. Live OAuth, conversation, image, transport, and Fast network acceptance starts in a fresh `0/13 pending` record and will be completed individually post-release. These incomplete checks must remain visible and must never be presented as verified capabilities. Usage-window and model-setting behavior was verified independently in the local Chinese and English settings page and is not one of these 13 checks that consume a model request or require a complete interaction round trip.
+The `0.0.x` line is a technical preview and declares compatibility only with the exact DSH release candidate above. Linux, macOS, and Windows CI/profile smoke for `0.0.4` reached `3/3`. The accepted commit, exact Node versions, and job links are recorded in the [acceptance record](releases/v0.0.4.acceptance.json), with maintainer approval. Live OAuth, conversation, image, transport, and Fast network acceptance starts in a fresh `0/13 pending` record and will be completed individually post-release. These incomplete checks must remain visible and must never be presented as verified capabilities. Usage-window and model-setting behavior was verified independently in the local Chinese and English settings page and is not one of these 13 checks that consume a model request or require a complete interaction round trip.
 
 The root `pnpm-lock.yaml` locks plugin dependencies, while `test/fixtures/dsh-runtime/pnpm-lock.yaml` independently locks the complete DSH runtime and peer graph used by compatibility smoke. CI runs `pnpm --dir test/fixtures/dsh-runtime install --frozen-lockfile --ignore-scripts` instead of handing that peer graph to direct npm resolution, avoiding nondeterministic dependency results and uncontrolled memory use. This frozen layer verifies Web/profile integration; it does not claim coverage of native terminal or native-build capabilities in DSH dependencies that require lifecycle scripts. Dependency upgrades must use a pinned-version PR, update and review both lockfiles, repeat complete CI, profile smoke, and supply-chain verification before publication, and renew controlled live validation afterward. The scheduled compatibility workflow only verifies the current locked graph and reports Registry drift; neither a broad semver range nor one scheduled run proves cross-RC compatibility.
 
 ## Profile composition
 
-The `0.0.3` bundle does not modify the general `llm-pi-ai` Cordis row. It provides:
+The `0.0.4` bundle does not modify the general `llm-pi-ai` Cordis row. It provides:
 
 - the `dsh-codex` route;
 - the `dsh-codex` settings namespace;
@@ -51,9 +51,9 @@ Fast and transport preferences set by `/codex` exist only for the current proces
 ## Credentials and capability boundaries
 
 - The Codex route accepts ChatGPT OAuth only and does not read an OpenAI Platform API key.
-- Cancel sign-in through the plugin settings page or `/codex-login cancel`: cancellation succeeds before write linearization, while an in-progress commit is reported as too late and remains observed through its final state; `logout` always deletes the credential. The current DSH public seam has no post-commit cancellation barrier, so third-party code that calls `ctx.authorization.cancel()` directly bypasses this coordination and is not a supported `0.0.3` interaction path.
+- Cancel sign-in through the plugin settings page or `/codex-login cancel`: cancellation succeeds before write linearization, while an in-progress commit is reported as too late and remains observed through its final state; `logout` always deletes the credential. The current DSH public seam has no post-commit cancellation barrier, so third-party code that calls `ctx.authorization.cancel()` directly bypasses this coordination and is not a supported `0.0.4` interaction path.
 - When a plugin or hot-reload flow owner is disposed, sign-in is cancelled before commit selection, while a selected credential commit is allowed to reach its final write before disposal completes. An unsupported or malformed stored record is shown as `invalid`, requires signing in again or signing out to clear it, and is never presented as signed in.
 - The usage card actively reads the real five-hour and weekly limits when the settings page opens and when the user refreshes it manually. The Host returns only strictly parsed windows, percentages, and reset times to the Web page, never OAuth credentials or raw responses. If the endpoint is unavailable or malformed, the latest safe reading is retained and the card falls back to request observation or an unknown state rather than presenting the failure as zero remaining usage.
 - DSH Web search uses its own provider and credentials; it does not reuse ChatGPT OAuth.
-- `0.0.3` does not provide image generation or editing.
+- `0.0.4` does not provide image generation or editing.
 - Session compaction continues to use DSH's built-in automatic compaction and `/compact`.
