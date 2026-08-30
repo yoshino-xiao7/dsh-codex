@@ -13,6 +13,7 @@ This project composes the following independently published packages. Each relea
 | `@deepseek-ai/dsh-client-runtime` | Web client plugin runtime | MIT |
 | `@deepseek-ai/dsh-client-ui-conversation` | Conversation composer slot integration | MIT |
 | `@deepseek-ai/dsh-client-ui-model-selection` | Current-session model directory integration | MIT |
+| `@deepseek-ai/dsh-client-ui-sidebar` | Sidebar footer slot integration | MIT |
 | `@deepseek-ai/dsh-client-ui-settings` | Web settings-page integration | MIT |
 | `@deepseek-ai/dsh-commands` | Harness command registration | MIT |
 | `@deepseek-ai/dsh-credentials` | Credential-store contracts | MIT |
