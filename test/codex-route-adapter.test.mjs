@@ -65,6 +65,73 @@ test("exposes the verified Codex reasoning controls and model-specific default",
   assert.equal(unknown.reasoning, undefined)
 })
 
+test("projects every outward model row through the client-safe allowlist", async () => {
+  const delegate = fakeCanonicalAdapter()
+  const unsafe = {
+    apiKey: "must-not-leak",
+    baseUrl: "https://user:secret@example.test",
+    headers: { authorization: "Bearer must-not-leak" },
+    cost: { input: 1 },
+  }
+  delegate.listModels = async (provider) => [{
+    provider,
+    id: "gpt-5.4",
+    name: "GPT-5.4",
+    inputModalities: ["text", "audio", "image"],
+    ...unsafe,
+  }]
+  delegate.resolveModel = async (provider, model) => ({
+    provider,
+    id: model,
+    name: "GPT-5.4",
+    inputModalities: ["text", "image"],
+    context: { contextWindow: 272_000, internal: "must-not-leak" },
+    defaultMaxTokens: 128_000,
+    reasoning: { efforts: [{ id: "ultra", name: "Ultra" }] },
+    ...unsafe,
+  })
+  delegate.prepareCall = async (provider, model) => ({
+    model: await delegate.resolveModel(provider, model),
+    stream: (streamOptions) => delegate.stream(streamOptions),
+  })
+  const adapter = new CodexRouteAdapter(delegate)
+
+  const [listed] = await adapter.listModels(CODEX_ROUTE_ID)
+  const resolved = await adapter.resolveModel(CODEX_ROUTE_ID, "gpt-5.4")
+  const prepared = await adapter.prepareCall(CODEX_ROUTE_ID, "gpt-5.4")
+
+  assert.deepEqual(listed, {
+    provider: CODEX_ROUTE_ID,
+    id: "gpt-5.4",
+    name: "GPT-5.4",
+    inputModalities: ["text", "image"],
+    reasoning: {
+      efforts: [
+        { id: "low", name: "Low" },
+        { id: "medium", name: "Medium" },
+        { id: "high", name: "High" },
+        { id: "xhigh", name: "Xhigh" },
+      ],
+      defaultEffort: "medium",
+    },
+  })
+  for (const outward of [listed, resolved, prepared.model]) {
+    assert.equal(JSON.stringify(outward).includes("must-not-leak"), false)
+    assert.equal("apiKey" in outward, false)
+    assert.equal("headers" in outward, false)
+    assert.deepEqual(outward.reasoning.efforts.map(({ id }) => id), [
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+    ])
+  }
+  assert.deepEqual(resolved.context, { contextWindow: 272_000 })
+  assert.equal(resolved.defaultMaxTokens, 128_000)
+  assert.deepEqual(prepared.model.context, { contextWindow: 272_000 })
+  assert.equal(prepared.model.defaultMaxTokens, 128_000)
+})
+
 test("passes verified reasoning levels and rejects hidden or agent-level modes", async () => {
   const delegate = fakeCanonicalAdapter()
   const adapter = new CodexRouteAdapter(delegate)

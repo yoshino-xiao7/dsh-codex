@@ -9,6 +9,8 @@
 ```text
 DSH Web 设置 ── loopback RPC ── AuthorizationBridge
         │                             │
+        ├── 按需诊断 ────────── ConnectionDiagnostics
+        │                             │
         │ 进入页面 / 手动刷新          │
         ▼                             ▼
 AccountUsageReader ────────── CodexCredentialStore
@@ -18,7 +20,7 @@ Codex Web usage endpoint      ChatGPT OAuth grant
 
 Harness Agent Loop
         │
-        ├── SessionPreferences ── 闪电按钮、Fast / transport
+        ├── SessionPreferences ── Fast 按钮、Transport 菜单
         │
         ▼
 StreamResilience ── CodexRouteAdapter (`dsh-codex`)
@@ -55,9 +57,15 @@ Host 端通过 DSH authorization service 启动、取消和观察登录流程，
 
 该接口是 Web 后端兼容边界，不被当作稳定的插件公共 API。请求具有超时、响应大小和数值范围限制；网络失败、鉴权失败或结构变化不会被显示成零余额，也不会清除最近一次已验证读数。若没有可保留的实时读数，页面会安全降级为最近请求产生的 `QuotaObserver` 状态或“未知”，而不是推断额度。
 
+## ConnectionDiagnostics
+
+连接诊断使用独立的 `/dsh-codex-diagnostics` loopback RPC，而不是扩展授权 RPC。设置页默认折叠且不会自动运行。`local` 只读取进程内 route、模型目录、启用数量和本机凭据元数据，不访问网络、不刷新 OAuth，也不持有 stream seam；`account` 在相同本机检查后只调用一次既有 `AccountUsageReader`，因此可能按其正常合同刷新 OAuth，但不会发起模型请求或消耗模型额度。
+
+浏览器报告固定为版本、模式、总结果、观测时间和检查数组。检查只包含固定 ID、固定状态码和受限的布尔、数字或枚举事实；token、完整 grant、account ID、原始响应、Header、任意异常消息和 Provider 对象不会跨过边界。主动模型请求诊断不在 `0.0.4` 范围内，避免把真实请求副作用或流恢复误判成诊断成功。
+
 ## SessionPreferences
 
-模型选择器左侧的闪电按钮和 `/codex` 修改同一份当前会话状态：
+模型选择器左侧的闪电按钮、相邻的 Transport 菜单和 `/codex` 修改同一份当前会话状态：
 
 - 闪电按钮或 `fast on|off` 控制是否发送 Fast priority service tier，默认关闭；
 - `transport` 可选 `auto`、`sse`、`websocket` 或 `websocket-cached`，默认 `auto`；
@@ -74,6 +82,8 @@ DSH 原始 session ID 只用于偏好查询和消息/replay provenance；传给 
 设置页至少要求选中一个模型。全选且条目没有自定义字段时移除 `models` 覆盖，使目录随 pi-ai 版本更新；部分选择、额外字段和自定义参数保留显式配置。目录筛选只影响模型发现，精确指定的隐藏模型仍可解析，因此旧会话不会仅因模型被隐藏而失效。
 
 模型名称、上下文窗口与输入能力来自当前安装的 provider catalog，不声称是账号动态目录。推理选择器由 `CodexRouteAdapter` 按已核验的订阅 Codex 模型目录重新投影：删除通用 `Default`、`Off` 与 `Minimal`，写入逐模型默认值，并只暴露可以由 Provider 请求层诚实表达的 Low 至 Max。Codex 的 `Ultra` 同时代表最高普通推理与主动任务委派，属于 Agent 编排模式；本插件不会只发送一个伪造的 `ultra` 值，也不会静默退化成 `Max`。未知模型不获得推断能力，route 边界也拒绝直接注入未核验档位。
+
+`codexModelCapabilityDescriptor` 是目录字段与已核验控件的单一 Host 投影：它只允许模型 ID、名称、上下文、最大输出、输入模态、推理档位和 Fast 支持通过，并返回不可变快照。Provider、route adapter 与会话 Fast 查询复用同一来源；Web 客户端不再维护一份按模型 ID 硬编码的 Fast 清单。未知模型保留目录可用性，但不会获得推断出的推理或 Fast 能力。
 
 ## ImagePolicy
 
@@ -112,4 +122,4 @@ DSH 原始 session ID 只用于偏好查询和消息/replay provenance；传给 
 
 - 会话压缩使用 DSH 自带的自动压缩和 `/compact`；本插件不改写压缩协议；
 - Web search 使用 DSH 的工具和对应凭据，不复用 ChatGPT OAuth；
-- 图片生成或编辑需要单独的模型、凭据与计费边界，`0.0.1` 不提供该能力。
+- 图片生成或编辑需要单独的模型、凭据与计费边界；本插件当前不提供该能力。

@@ -10,6 +10,7 @@
 - [测试策略](testing.md)
 - [发布流程](releasing.md)
 - [GitHub About 与 Topics](github-about.md)
+- [v0.0.4 Release 文案（开发草稿）](releases/v0.0.4.md)
 - [v0.0.3 Release 文案](releases/v0.0.3.md)
 - [v0.0.2 Release 文案](releases/v0.0.2.md)
 - [v0.0.1 Release 文案](releases/v0.0.1.md)

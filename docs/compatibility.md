@@ -2,7 +2,9 @@
 
 [简体中文](compatibility.md) | [English](compatibility.en.md)
 
-最近更新：2026-08-29。
+最近更新：2026-08-30。
+
+`0.0.4` 当前是未发布的开发版本；下表仍记录已正式发布的 `0.0.3` 证据，不能把开发分支测试当作 `0.0.4` 的候选或发布验收。维护者已完成实际设备使用且未报告问题，但仓库没有逐项记录固定的 13 项脱敏断言，因此验收 JSON 仍按其已有证据如实保留。
 
 | 组件或环境 | `0.0.3` 候选证据 | 状态 |
 | --- | --- | --- |
@@ -21,6 +23,8 @@
 | auto / SSE / WebSocket / cached | transport 映射与会话隔离自动化已通过 | 四种真实请求待验收 |
 | Fast / priority tier | 已验证仅在当前会话开启时改变 `service_tier` | 账号权限与真实网络待验收 |
 | npm / GitHub Release | 严格工作流校验候选、Registry 回读、provenance、签名与 Release 资产；发布制品见 [`v0.0.3`](https://github.com/yoshino-xiao7/dsh-codex/releases/tag/v0.0.3) | 正式发布由受保护工作流完成 |
+
+`0.0.4` 开发分支新增三类本地可验证边界：模型能力由 Host 单一投影供 Provider、route 与会话 Fast 查询共用；会话输入区提供四种 Transport 的图形选择器；连接诊断提供完全离线的本机检查与只读取额度的账号检查。诊断模块没有 stream seam，不会发送模型请求；因此这些测试不能替代真实文本、reasoning、图片、工具、Fast 或各 Transport 的账号网络验收。
 
 `0.0.x` 是技术预览，只对表中的精确 DSH 预发布版本声明兼容。`0.0.3` 的 Linux、macOS 和 Windows CI/profile smoke 已达到 `3/3`，候选提交、精确 Node 版本与作业链接记录在[验收记录](releases/v0.0.3.acceptance.json)中，并已获得维护者批准。真实 OAuth、对话、图片、transport 和 Fast 网络验收从独立的 `0/13 pending` 记录开始，发布后再逐项补齐；这些未完成项必须如实展示，不能冒充已验证能力。额度窗口与模型设置已独立完成本机中英文页面验证，不计入这 13 个会消耗模型请求或需要完整交互闭环的验收项。
 

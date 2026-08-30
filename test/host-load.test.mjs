@@ -3,6 +3,7 @@ import test from "node:test"
 
 import { Config, apply, inject, name } from "../src/host/index.mjs"
 import { AUTHORIZATION_RPC_CHANNEL } from "../src/internal/authorization-bridge.mjs"
+import { CODEX_DIAGNOSTICS_RPC_CHANNEL } from "../src/internal/codex-connection-diagnostics.mjs"
 import { CODEX_ROUTE_ID } from "../src/internal/codex-route-adapter.mjs"
 import { SESSION_PREFERENCE_RPC_CHANNEL } from "../src/internal/session-preference-bridge.mjs"
 
@@ -117,6 +118,7 @@ test("host entry exports a valid Cordis plugin and scoped stream listener", asyn
   assert.deepEqual([...rpcHandlers.keys()], [
     AUTHORIZATION_RPC_CHANNEL,
     SESSION_PREFERENCE_RPC_CHANNEL,
+    CODEX_DIAGNOSTICS_RPC_CHANNEL,
   ])
   const status = await rpcHandlers.get(AUTHORIZATION_RPC_CHANNEL)(
     "status",
@@ -130,7 +132,32 @@ test("host entry exports a valid Cordis plugin and scoped stream listener", asyn
     { sessionId: "host-session", fast: true },
     new AbortController().signal,
   )
-  assert.deepEqual(fast, { ok: true, value: { fast: true } })
+  assert.deepEqual(fast, {
+    ok: true,
+    value: { fast: true, transport: "auto" },
+  })
+  const transport = await rpcHandlers.get(SESSION_PREFERENCE_RPC_CHANNEL)(
+    "set-transport",
+    { sessionId: "host-session", transport: "websocket-cached" },
+    new AbortController().signal,
+  )
+  assert.deepEqual(transport, {
+    ok: true,
+    value: { fast: true, transport: "websocket-cached" },
+  })
+  const diagnostics = await rpcHandlers.get(CODEX_DIAGNOSTICS_RPC_CHANNEL)(
+    "run",
+    { mode: "local" },
+    new AbortController().signal,
+  )
+  assert.equal(diagnostics.ok, true)
+  assert.equal(diagnostics.value.version, 1)
+  assert.equal(diagnostics.value.mode, "local")
+  assert.deepEqual(diagnostics.value.checks.map(({ id }) => id), [
+    "runtime",
+    "credential",
+    "models",
+  ])
 
   const commands = []
   dynamicInjections.find(({ services }) => services[0] === "commands").callback({

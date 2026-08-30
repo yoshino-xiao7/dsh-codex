@@ -13,20 +13,21 @@
 5. 合并前让 CI 在 Linux、macOS、Windows 通过；
 6. 明确真实账号验证计划和当前进度；`0.0.1` 允许以 `0/13` 正式发布，发布后使用受控测试账号逐项补齐，不能把 token、OAuth code、Cookie 或账号凭据写入记录。
 
-可以用离线准备脚本建立下一版本的发布骨架：
+可以用离线准备脚本建立下一版本的发布骨架（将 `X.Y.Z` 替换为目标版本）：
 
 ```sh
-pnpm run release:prepare -- 0.0.2
+pnpm run release:prepare -- X.Y.Z
 ```
 
 它只创建或补齐 `package.json` 版本、双语 `CHANGELOG.md` 草稿、双语 Release 草稿和全新的 schema v3 draft 验收记录。脚本幂等，不访问 Git 或网络，也不会伪造日期、提交或通过证据；已有有效人工内容不会被覆盖，任何冲突都会在写入前失败。README、兼容性文档、lockfile、发布分支、提交和标签仍需人工处理。
 
 ### 本地或 CI 复演候选
 
-在已经提交且工作树干净的候选 checkout 中，使用 Node 24、pnpm `10.34.5` 和 npm `11.16.0` 一键复演 `0.0.1` 候选：
+在已经提交且工作树干净的候选 checkout 中，使用 Node 24、pnpm `10.34.5` 和 npm `11.16.0` 一键复演当前 `package.json` 中的候选：
 
 ```sh
-pnpm run release:candidate -- 0.0.1
+PACKAGE_VERSION="$(node -p "require('./package.json').version")"
+pnpm run release:candidate -- "$PACKAGE_VERSION"
 ```
 
 该命令可在本地开发机或独立 CI 中运行，不发布 npm 包或 GitHub Release，也不读取 npm token、OIDC、OAuth 或其他凭据。它精确执行根目录和冻结 DSH 夹具的 frozen install、完整 `check`、仅一次会生成候选 tarball 的 `npm pack`、本地 tarball publish dry-run、确定性 SBOM、精确候选的 DSH profile smoke、隔离安装与 Host 导入，以及生产依赖 audit，并把候选包、摘要和全部证据写入 `release/`。为避免把旧文件误当成当前证据，只要发现已有候选输出就会在任何写入前失败；清理或移走已确认不再需要的旧输出后才能重试。
@@ -76,7 +77,7 @@ pnpm run verify:release:publish
 4. 三平台、供应链与候选边界全部通过后，由维护者填写审批信息，并把 `releaseStatus` 改为 `approved`；这表示批准正式发布，不表示真实账号已完成 `13/13`；
 5. `0.0.1` 可以保持 live `0/13` 并使用 npm `latest` 与正式 GitHub Release 发布，Release 和兼容性文档必须如实标明未验证项；
 6. 发布后在受控本地环境中使用测试账号逐项完成下表的真实验证；该过程会消耗账号额度，每项只能在对应断言均有脱敏证据后改为 `passed`，不能用自由文本概括代替；
-7. 发布前已绑定候选后，源码、配置、依赖、锁文件或工作流有任何变化，都必须先把 draft 记录重置到新提交，再重新运行 CI、profile smoke 和供应链校验；approved 记录不可重置。正式发布后发现的产品问题修复到 `0.0.2`，不覆盖 `0.0.1`。
+7. 发布前已绑定候选后，源码、配置、依赖、锁文件或工作流有任何变化，都必须先把 draft 记录重置到新提交，再重新运行 CI、profile smoke 和供应链校验；approved 记录不可重置。正式发布后发现的产品问题进入下一个尚未发布的递增版本，不覆盖任何已存在版本。
 
 | 验收项 | 必须证明 | 可复制的精确 `--assert` 参数 |
 | --- | --- | --- |
@@ -231,12 +232,13 @@ CycloneDX SBOM 是从已提交 `pnpm-lock.yaml` 与 package manifest 离线生�
 先运行只读候选流程：
 
 ```sh
+PACKAGE_VERSION="$(node -p "require('./package.json').version")"
 gh workflow run release.yml --ref main \
-  -f version=0.0.1 \
+  -f version="$PACKAGE_VERSION" \
   -f publish=false
 ```
 
-`--ref main` 是硬门禁；从其他分支触发时 candidate 会明确失败，不会以全部 job 被跳过的方式显示成功。下载并核对候选附件，确认三平台 `3/3`、供应链证据和维护者批准后，更新允许的发布证据文件并合并到 `main`，再开始发布。live `0/13` 不阻止 `0.0.1` 正式发布，但必须如实展示。
+`--ref main` 是硬门禁；从其他分支触发时 candidate 会明确失败，不会以全部 job 被跳过的方式显示成功。下载并核对候选附件，确认三平台 `3/3`、供应链证据和维护者批准后，更新允许的发布证据文件并合并到 `main`，再开始发布。受控真实账号验收进度不阻止已满足硬门禁的正式发布，但必须如实展示。
 
 ## 首次发布 `0.0.1`
 
@@ -271,9 +273,11 @@ Trusted Publisher 配置完成后，所有版本使用：
 
 ```sh
 gh workflow run release.yml --ref main \
-  -f version=0.0.2 \
+  -f version=X.Y.Z \
   -f publish=true
 ```
+
+将 `X.Y.Z` 替换为尚未发布的目标版本号。
 
 - `publish=false` 只生成并验证候选产物；`publish=true` 才启用严格门禁、Registry 写入和双语 GitHub Release；
 - `0.0.1` 发布到 npm `latest`，并创建正式 GitHub Release；真实账号进度可为 `0/13`，但必须在文档中如实公开；
@@ -285,6 +289,6 @@ gh workflow run release.yml --ref main \
 - GitHub Release 先保持 draft；工作流用 `--clobber` 恢复上传全部附件，从 Release 回下载后逐字节比较，只有附件集合和内容全部匹配才公开；已公开版本重跑时只接受 tag commit 和全部附件与候选产物一致；
 - 不从本地开发机直接创建 tag 或发布包。
 
-正式发布后按验收表继续补齐真实账号证据。若发现产品问题，修复后发布 `0.0.2`；不修改、覆盖或重新发布已存在的 `0.0.1`。
+正式发布后按验收表继续补齐真实账号证据。若发现产品问题，修复后发布下一个尚未发布的递增版本；不修改、覆盖或重新发布任何已存在的版本。
 
 任何一步失败都停止，绝不覆盖 npm 的不可变版本。若 Registry 中的包体与候选逐字节一致，可以安全恢复后续步骤；若包体不同，修复后必须递增版本。候选 job 已成功而 publish job 失败时，只在同一 workflow run 中重跑失败的 job，不重跑已经成功的候选 job：恢复过程继续使用原始 `GITHUB_SHA` 与保留 90 天的已上传候选，即使 `main` 后来前进也不会改用新源码；新 workflow run 则从当时的 `main` 重新构建。

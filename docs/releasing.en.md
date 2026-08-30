@@ -13,20 +13,21 @@ Versioning begins at `0.0.1`. The `0.0.x` line is a technical preview, but `0.0.
 5. require green Linux, macOS, and Windows CI before merge;
 6. state the controlled-account validation plan and current progress. `0.0.1` may be formally published at `0/13`, then completed check by check with a controlled test account without recording tokens, OAuth codes, cookies, or account credentials.
 
-Use the offline preparation script to establish the next release skeleton:
+Use the offline preparation script to establish the next release skeleton (replace `X.Y.Z` with the target version):
 
 ```sh
-pnpm run release:prepare -- 0.0.2
+pnpm run release:prepare -- X.Y.Z
 ```
 
 It only creates or completes the `package.json` version, bilingual `CHANGELOG.md` draft, bilingual Release draft, and a fresh schema v3 draft acceptance record. The script is idempotent, accesses neither Git nor the network, and never fabricates dates, commits, or passing evidence. Existing valid human-authored content is preserved, and any conflict fails before writing. The README, compatibility documents, lockfiles, release branch, commit, and tag still require manual handling.
 
 ### Replaying a candidate locally or in CI
 
-From a committed candidate checkout with a clean working tree, use Node 24, pnpm `10.34.5`, and npm `11.16.0` to replay the `0.0.1` candidate in one command:
+From a committed candidate checkout with a clean working tree, use Node 24, pnpm `10.34.5`, and npm `11.16.0` to replay the candidate declared in the current `package.json`:
 
 ```sh
-pnpm run release:candidate -- 0.0.1
+PACKAGE_VERSION="$(node -p "require('./package.json').version")"
+pnpm run release:candidate -- "$PACKAGE_VERSION"
 ```
 
 The command runs on a local development machine or in separate CI. It neither publishes an npm package or GitHub Release nor reads npm tokens, OIDC, OAuth, or other credentials. It performs the root and frozen-DSH-fixture frozen installs, the complete `check`, exactly one artifact-producing `npm pack`, a local-tarball publish dry-run, the deterministic SBOM, exact-candidate DSH profile smoke, isolated installation and Host import, and the production-dependency audit. It writes the candidate package, digests, and all evidence under `release/`. To prevent stale files from being mistaken for current evidence, any existing candidate output makes the command fail before its first write; remove or move only old output that you have confirmed is no longer needed before retrying.
@@ -76,7 +77,7 @@ Do not bypass the gate with fabricated environment variables. Keep the release i
 4. After all three platforms, the supply-chain evidence, and the candidate boundary pass, a maintainer records approval and changes `releaseStatus` to `approved`. This approves formal publication; it does not claim that controlled-account validation is `13/13`.
 5. `0.0.1` may retain live validation at `0/13` and be published under npm `latest` with a full GitHub Release. The Release and compatibility documents must disclose every unverified check honestly.
 6. After publication, manually complete the live checks below with a test account in a controlled local environment. This consumes account quota. Mark a check `passed` only after every fixed assertion has sanitized evidence; a free-form scope statement is not a substitute.
-7. Before publication, any source, configuration, dependency, lockfile, or workflow change after the candidate was bound requires resetting the draft record to the new commit and repeating CI, profile smoke, and supply-chain verification; an approved record cannot be reset. Product findings after formal publication are fixed in `0.0.2`, never by overwriting `0.0.1`.
+7. Before publication, any source, configuration, dependency, lockfile, or workflow change after the candidate was bound requires resetting the draft record to the new commit and repeating CI, profile smoke, and supply-chain verification; an approved record cannot be reset. Product findings after formal publication go to the next unpublished increment; never overwrite an existing version.
 
 | Check | Required proof | Copyable exact `--assert` arguments |
 | --- | --- | --- |
@@ -231,12 +232,13 @@ The release workflow pins npm `11.16.0` and verifies and records that exact vers
 Run the read-only candidate first:
 
 ```sh
+PACKAGE_VERSION="$(node -p "require('./package.json').version")"
 gh workflow run release.yml --ref main \
-  -f version=0.0.1 \
+  -f version="$PACKAGE_VERSION" \
   -f publish=false
 ```
 
-`--ref main` is a hard gate. Dispatching another branch makes the candidate fail explicitly instead of reporting success with every job skipped. Download and review the candidate assets, confirm `3/3` platforms, complete supply-chain evidence, and maintainer approval, then update only the permitted release-evidence documents and merge them to `main` before publishing. Live progress at `0/13` does not block the formal `0.0.1` release, but it must remain honestly disclosed.
+`--ref main` is a hard gate. Dispatching another branch makes the candidate fail explicitly instead of reporting success with every job skipped. Download and review the candidate assets, confirm `3/3` platforms, complete supply-chain evidence, and maintainer approval, then update only the permitted release-evidence documents and merge them to `main` before publishing. Controlled-account acceptance progress does not block a formal release whose hard gates have passed, but it must remain honestly disclosed.
 
 ## First publication of `0.0.1`
 
@@ -271,9 +273,11 @@ After Trusted Publisher is configured, every version uses:
 
 ```sh
 gh workflow run release.yml --ref main \
-  -f version=0.0.2 \
+  -f version=X.Y.Z \
   -f publish=true
 ```
+
+Replace `X.Y.Z` with the unpublished target version.
 
 - `publish=false` only builds and verifies a candidate artifact; `publish=true` enables the strict gate, Registry write, and bilingual GitHub Release.
 - `0.0.1` publishes under npm `latest` with a full GitHub Release. Controlled-account progress may be `0/13`, but the documentation must disclose that status exactly.
@@ -285,6 +289,6 @@ gh workflow run release.yml --ref main \
 - Keep the GitHub Release as a draft while uploading or restoring every asset with `--clobber`. Download every Release asset and compare it byte-for-byte before making the Release public. A rerun of an already-public version succeeds only when the tag commit and every asset still match the candidate.
 - Do not tag or publish directly from a development machine.
 
-Continue collecting controlled-account evidence against the formal release. If validation finds a product issue, fix it and publish `0.0.2`; never modify, overwrite, or republish the existing `0.0.1`.
+Continue collecting controlled-account evidence against the formal release. If validation finds a product issue, fix it in the next unpublished incremented version; never modify, overwrite, or republish an existing version.
 
 Any failed gate stops the release, and an immutable npm version is never overwritten. A byte-identical Registry artifact permits safe recovery of later stages; a different artifact requires a fixed, incremented version. If the candidate job succeeded but the publication job failed, rerun only the failed job in the same workflow run, leaving the successful candidate job untouched. Recovery keeps the original `GITHUB_SHA` and the uploaded candidate retained for 90 days even if `main` has advanced, while a new workflow run rebuilds the then-current `main`.

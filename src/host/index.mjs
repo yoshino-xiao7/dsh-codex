@@ -4,6 +4,7 @@ import {
   registerCodexUsageCommand,
 } from "../internal/authorization-bridge.mjs"
 import { createAuthorizationCommitTracker } from "../internal/authorization-commit-tracker.mjs"
+import { registerCodexDiagnosticsRpc } from "../internal/codex-connection-diagnostics.mjs"
 import {
   Config,
   installCodexProviderRuntime,
@@ -78,6 +79,7 @@ export function apply(ctx, config = {}) {
       quotaObserver,
     })
     registerSessionPreferenceRpc(connectionCtx, sessionPreferences)
+    registerCodexDiagnosticsRpc(connectionCtx, runtime.connectionDiagnostics)
   })
   ctx.inject(["commands"], (commandCtx) => {
     registerCodexSessionCommand(commandCtx, sessionPreferences, {

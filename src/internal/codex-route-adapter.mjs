@@ -9,7 +9,7 @@ import {
   CODEX_ROUTE_ID,
 } from "./codex-identifiers.mjs"
 import {
-  codexModelCapability,
+  codexModelCapabilityDescriptor,
   supportsCodexReasoningEffort,
 } from "./codex-model-capabilities.mjs"
 
@@ -71,8 +71,7 @@ export class CodexRouteAdapter extends LlmAdapter {
       ? catalog
       : this.filterModels(catalog)
     if (!Array.isArray(visible)) throw new TypeError("filterModels must return an array")
-    return visible
-      .map((model) => ({ ...model, provider: CODEX_ROUTE_ID }))
+    return visible.map(externalModelInfo)
   }
 
   async resolveModel(provider, model, signal) {
@@ -134,18 +133,30 @@ export class CodexRouteAdapter extends LlmAdapter {
 }
 
 function externalModelInfo(model) {
-  const capability = codexModelCapability(model.id)
-  if (capability === undefined) {
-    const { reasoning: _unverifiedReasoning, ...withoutReasoning } = model
-    return withoutReasoning
-  }
-  return {
-    ...model,
-    reasoning: {
-      efforts: capability.reasoningEfforts,
-      defaultEffort: capability.defaultReasoningEffort,
-    },
-  }
+  const descriptor = codexModelCapabilityDescriptor({
+    id: model?.id,
+    name: model?.name,
+    contextWindow: model?.context?.contextWindow ?? model?.contextWindow,
+    maxTokens: model?.defaultMaxTokens ?? model?.maxTokens,
+    inputModalities: model?.inputModalities ?? model?.input,
+  })
+  return Object.freeze({
+    provider: CODEX_ROUTE_ID,
+    id: descriptor.id,
+    name: descriptor.name ?? descriptor.id,
+    ...(descriptor.inputModalities === undefined
+      ? {}
+      : { inputModalities: descriptor.inputModalities }),
+    ...(descriptor.contextWindow === undefined
+      ? {}
+      : { context: Object.freeze({ contextWindow: descriptor.contextWindow }) }),
+    ...(descriptor.maxTokens === undefined
+      ? {}
+      : { defaultMaxTokens: descriptor.maxTokens }),
+    ...(descriptor.reasoning === undefined
+      ? {}
+      : { reasoning: descriptor.reasoning }),
+  })
 }
 
 function toCanonicalHistoryMessage(message) {

@@ -65,6 +65,11 @@ function hookHarness() {
       if (hooks[index] === undefined) hooks[index] = { kind: "ref", value: { current: initial } }
       return hooks[index].value
     },
+    useId() {
+      const index = hookIndex++
+      if (hooks[index] === undefined) hooks[index] = { kind: "id", value: `:test-${index}:` }
+      return hooks[index].value
+    },
     useCallback(callback, dependencies) {
       const index = hookIndex++
       const previous = hooks[index]
@@ -443,6 +448,7 @@ test("classic web bundle registers the package id and Codex settings section", a
   })
   assert.deepEqual([...clientModule.inject], ["slots", "locale", "connection", "settingsScope"])
   assert.equal(clientModule.CHANNEL, "/dsh-codex")
+  assert.equal(clientModule.DIAGNOSTICS_CHANNEL, "/dsh-codex-diagnostics")
   assert.equal(clientModule.NS, "settings.codex")
 
   const dictionaries = []
@@ -540,7 +546,9 @@ test("classic web bundle registers the package id and Codex settings section", a
   assert.equal(fastEntry.spec.locale, "settings.codex")
   const fastProps = fastEntry.spec.inject("session-fast-entry")
   assert.equal(typeof fastProps.preferenceClient.get, "function")
+  assert.equal(typeof fastProps.preferenceClient.getForModel, "function")
   assert.equal(typeof fastProps.preferenceClient.setFast, "function")
+  assert.equal(typeof fastProps.preferenceClient.setTransport, "function")
   assert.equal(typeof fastProps.selectModel, "function")
   assert.equal(fastProps.hooks.modelDirectory.getSnapshot().current, null)
   assert.match(dictionaries[0].value.zh.modelsDescription, /模型选择器.*provider catalog.*已有会话/u)
@@ -557,13 +565,23 @@ test("classic web bundle registers the package id and Codex settings section", a
   assert.equal(dictionaries[0].value.en.modelsShowMore, "Show {count} unselected models")
   assert.equal(dictionaries[0].value.zh.modelsSummary, "已选择 {selected}/{total} · 当前显示 {visible}/{total}")
   assert.equal(dictionaries[0].value.en.modelsSummary, "Selected {selected}/{total} · Showing {visible}/{total}")
+  assert.equal(dictionaries[0].value.zh.transportMenu, "当前会话的传输方式")
+  assert.equal(dictionaries[0].value.en.transportMenu, "Transport for this conversation")
+  assert.match(dictionaries[0].value.zh.transportResetLabel, /当前会话.*自动/u)
+  assert.match(dictionaries[0].value.en.transportResetLabel, /conversation.*Auto/iu)
+  assert.match(dictionaries[0].value.zh.diagnosticsLocalHelp, /不联网.*不刷新凭据.*不发送模型请求/u)
+  assert.match(dictionaries[0].value.zh.diagnosticsAccountHelp, /刷新 OAuth.*不发送模型请求.*不消耗额度/u)
+  assert.match(dictionaries[0].value.en.diagnosticsLocalHelp, /No network.*credential refresh.*model request/iu)
+  assert.match(dictionaries[0].value.en.diagnosticsAccountHelp, /refreshes OAuth.*never sends a model request.*consumes usage/iu)
+  assert.equal(typeof settingsSection.spec.inject().diagnosticsClient.run, "function")
 })
 
-test("settings page keeps one hero above the authorization and model cards", async () => {
+test("settings page keeps one hero above authorization, compact diagnostics, and models", async () => {
   const harness = hookHarness()
   const clientModule = await loadClientModule(harness.React)
   const page = clientModule.CodexSettings({
     client: {},
+    diagnosticsClient: {},
     modelClient: {},
     t: (key) => key,
   })
@@ -575,7 +593,144 @@ test("settings page keeps one hero above the authorization and model cards", asy
   assert.equal(findElements(hero, (element) => element.type === "h2").length, 1)
   assert.match(textContent(hero), /titledescription/u)
   assert.equal(page.children[1].type, clientModule.AuthorizationSettings)
-  assert.equal(page.children[2].type, clientModule.ModelEnablementSettings)
+  assert.equal(page.children[2].type, clientModule.ConnectionDiagnosticsSettings)
+  assert.equal(page.children[3].type, clientModule.ModelEnablementSettings)
+})
+
+test("connection diagnostics stay collapsed and idle until explicitly requested", async () => {
+  const harness = hookHarness()
+  const clientModule = await loadClientModule(harness.React)
+  const pending = []
+  const calls = []
+  const connection = {
+    rpc: {
+      call(channel, endpoint, payload, signal) {
+        const request = deferred()
+        pending.push(request)
+        calls.push({ channel, endpoint, payload, signal })
+        return request.promise
+      },
+    },
+  }
+  const translate = (key) => key === "locale" ? "en-US" : key
+  harness.mount(clientModule.ConnectionDiagnosticsSettings, {
+    client: clientModule.createConnectionDiagnosticsClient(connection),
+    t: translate,
+  })
+
+  let tree = harness.tree()
+  const toggle = findElement(tree, (element) => element.type === "button"
+    && element.props.className === "dshCodexDiagnosticsToggle")
+  assert.equal(toggle.props["aria-expanded"], "false")
+  assert.equal(calls.length, 0, "opening settings must not run diagnostics")
+  assert.equal(findElement(tree, (element) => textContent(element) === "diagnosticsLocal"), undefined)
+
+  toggle.props.onClick()
+  tree = harness.flush()
+  assert.equal(findElement(tree, (element) => element.type === "button"
+    && element.props.className === "dshCodexDiagnosticsToggle").props["aria-expanded"], "true")
+  assert.match(textContent(tree), /diagnosticsLocalHelp/u)
+  assert.match(textContent(tree), /diagnosticsAccountHelp/u)
+  assert.equal(calls.length, 0, "expanding diagnostics must remain side-effect free")
+
+  const localButton = findElement(tree, (element) => element.type === "button"
+    && textContent(element) === "diagnosticsLocal")
+  localButton.props.onClick()
+  tree = harness.flush()
+  assert.equal(calls.length, 1)
+  assert.deepEqual({ ...calls[0].payload }, { mode: "local" })
+  assert.equal(textContent(findElement(tree, (element) => element.type === "button"
+    && element.props["aria-busy"] === "true")), "diagnosticsLocalRunning")
+  assert.equal(findElements(tree, (element) => element.type === "button"
+    && element.props.disabled === true).length, 2)
+
+  const secret = "raw-host-diagnostic-secret"
+  pending[0].resolve({
+    ok: true,
+    value: {
+      version: 1,
+      mode: "local",
+      outcome: "warning",
+      observedAt: 1,
+      rawError: secret,
+      checks: [
+        {
+          id: "runtime",
+          status: "pass",
+          code: "runtime-ready",
+          facts: { route: "dsh-codex", registered: true },
+          message: secret,
+        },
+        {
+          id: "credential",
+          status: "warning",
+          code: "credential-signed-out",
+          facts: { configured: false, state: "signed-out", writable: true },
+        },
+        {
+          id: "models",
+          status: "pass",
+          code: "models-ready",
+          facts: { catalogCount: 7, enabledCount: 7, selection: "all", allEnabled: true },
+        },
+      ],
+    },
+  })
+  await settle()
+  tree = harness.flush()
+  const rendered = textContent(tree)
+  assert.match(rendered, /diagnosticsOutcomeWarning/u)
+  assert.match(rendered, /runtime-ready/u)
+  assert.match(rendered, /route=dsh-codex/u)
+  assert.match(rendered, /credential-signed-out/u)
+  assert.equal(rendered.includes(secret), false)
+  assert.equal(rendered.includes("message="), false)
+
+  harness.unmount()
+})
+
+test("connection diagnostics can be cancelled and abort safely on unmount", async () => {
+  const harness = hookHarness()
+  const clientModule = await loadClientModule(harness.React)
+  const pending = []
+  const calls = []
+  const client = clientModule.createConnectionDiagnosticsClient({
+    rpc: {
+      call(_channel, _endpoint, payload, signal) {
+        const request = deferred()
+        pending.push(request)
+        calls.push({ payload, signal })
+        return request.promise
+      },
+    },
+  })
+  harness.mount(clientModule.ConnectionDiagnosticsSettings, {
+    client,
+    t: (key) => key === "locale" ? "en-US" : key,
+  })
+  let tree = harness.tree()
+  findElement(tree, (element) => element.props?.className === "dshCodexDiagnosticsToggle").props.onClick()
+  tree = harness.flush()
+  findElement(tree, (element) => element.type === "button"
+    && textContent(element) === "diagnosticsAccount").props.onClick()
+  tree = harness.flush()
+  assert.equal(calls[0].signal.aborted, false)
+  findElement(tree, (element) => element.type === "button"
+    && textContent(element) === "diagnosticsCancel").props.onClick()
+  tree = harness.flush()
+  assert.equal(calls[0].signal.aborted, true)
+  assert.match(textContent(tree), /diagnosticsOutcomeCancelled/u)
+
+  findElement(tree, (element) => element.type === "button"
+    && textContent(element) === "diagnosticsLocal").props.onClick()
+  harness.flush()
+  assert.equal(calls.length, 2)
+  harness.unmount()
+  assert.equal(calls[1].signal.aborted, true)
+  pending[0].resolve({ ok: false, error: { code: "cancelled", message: "ignored" } })
+  pending[1].resolve({ ok: false, error: { code: "cancelled", message: "ignored" } })
+  await settle()
+  assert.equal(harness.updatesAfterUnmount(), 0)
 })
 
 test("settings section selection reaches the public settings API and live route directory", async () => {
@@ -694,30 +849,220 @@ test("browser client calls only the loopback authorization RPC contract", async 
   assert.equal(Object.keys(calls.at(-1).payload).length, 0)
 })
 
-test("browser Fast client uses the dedicated session-scoped loopback contract", async () => {
+test("connection diagnostics client uses a strict, sanitized loopback contract", async () => {
+  const clientModule = await loadClientModule({ createElement: () => undefined })
+  const calls = []
+  const secret = "raw secret must not cross the client boundary"
+  const checksFor = (mode) => [
+    {
+      id: "runtime",
+      status: "pass",
+      code: "runtime-ready",
+      facts: { route: "dsh-codex", registered: true },
+      message: secret,
+    },
+    {
+      id: "credential",
+      status: "pass",
+      code: "credential-ready",
+      facts: { configured: true, state: "signed-in", writable: true },
+    },
+    {
+      id: "models",
+      status: "pass",
+      code: "models-ready",
+      facts: { catalogCount: 7, enabledCount: 7, selection: "all", allEnabled: true },
+    },
+    ...(mode === "account" ? [{
+      id: "account-usage",
+      status: "pass",
+      code: "account-usage-ready",
+      facts: { rateLimitCount: 1, primaryWindows: 1, secondaryWindows: 1 },
+    }] : []),
+  ]
+  const connection = {
+    rpc: {
+      async call(channel, endpoint, payload, signal) {
+        calls.push({ channel, endpoint, payload, signal })
+        return {
+          ok: true,
+          value: {
+            version: 1,
+            mode: payload.mode,
+            outcome: "pass",
+            observedAt: 0,
+            rawError: secret,
+            checks: checksFor(payload.mode),
+          },
+        }
+      },
+    },
+  }
+  const client = clientModule.createConnectionDiagnosticsClient(connection)
+  const signal = new AbortController().signal
+
+  const local = plain(await client.run("local", signal))
+  const account = plain(await client.run("account", signal))
+
+  assert.deepEqual(local, {
+    version: 1,
+    mode: "local",
+    outcome: "pass",
+    observedAt: 0,
+    checks: [{
+      id: "runtime",
+      status: "pass",
+      code: "runtime-ready",
+      facts: { route: "dsh-codex", registered: true },
+    }, {
+      id: "credential",
+      status: "pass",
+      code: "credential-ready",
+      facts: { configured: true, state: "signed-in", writable: true },
+    }, {
+      id: "models",
+      status: "pass",
+      code: "models-ready",
+      facts: { catalogCount: 7, enabledCount: 7, selection: "all", allEnabled: true },
+    }],
+  })
+  assert.equal(JSON.stringify(local).includes(secret), false)
+  assert.equal(account.mode, "account")
+  assert.deepEqual(calls.map(({ channel }) => channel), [
+    "/dsh-codex-diagnostics",
+    "/dsh-codex-diagnostics",
+  ])
+  assert.deepEqual(calls.map(({ endpoint }) => endpoint), ["run", "run"])
+  assert.deepEqual(calls.map(({ payload }) => ({ ...payload })), [
+    { mode: "local" },
+    { mode: "account" },
+  ])
+  assert.equal(calls[0].signal, signal)
+  await assert.rejects(
+    () => client.run("active"),
+    (error) => error.name === "TypeError" && error.message === "Unsupported diagnostics mode.",
+  )
+  assert.equal(calls.length, 2, "an unsupported mode must not reach RPC")
+
+  const invalidReports = [
+    { label: "empty", checks: [] },
+    { label: "duplicate", checks: [checksFor("local")[0], checksFor("local")[0], checksFor("local")[2]] },
+    { label: "unknown", checks: [checksFor("local")[0], checksFor("local")[1], { ...checksFor("local")[2], id: "network" }] },
+    { label: "out of order", checks: [checksFor("local")[1], checksFor("local")[0], checksFor("local")[2]] },
+    {
+      label: "unknown code",
+      checks: [{ ...checksFor("local")[0], code: "runtime-mystery" }, ...checksFor("local").slice(1)],
+    },
+    {
+      label: "code and status conflict",
+      outcome: "warning",
+      checks: [{ ...checksFor("local")[0], status: "warning" }, ...checksFor("local").slice(1)],
+    },
+    { label: "outcome mismatch", outcome: "warning", checks: checksFor("local") },
+    {
+      label: "missing required facts",
+      checks: [{ ...checksFor("local")[0], facts: undefined }, ...checksFor("local").slice(1)],
+    },
+    {
+      label: "extra fact",
+      checks: [{ ...checksFor("local")[0], facts: { route: "dsh-codex", registered: true, message: secret } }, ...checksFor("local").slice(1)],
+    },
+    {
+      label: "facts forbidden for code",
+      outcome: "fail",
+      checks: [{
+        ...checksFor("local")[0],
+        status: "fail",
+        code: "runtime-unavailable",
+        facts: { route: "dsh-codex", registered: true },
+      }, ...checksFor("local").slice(1)],
+    },
+    {
+      label: "facts forbidden when cancelled",
+      outcome: "cancelled",
+      checks: [
+        { id: "runtime", status: "skipped", code: "cancelled", facts: { route: "dsh-codex", registered: true } },
+        { id: "credential", status: "skipped", code: "cancelled" },
+        { id: "models", status: "skipped", code: "cancelled" },
+      ],
+    },
+  ]
+  for (const invalidReport of invalidReports) {
+    const invalid = clientModule.createConnectionDiagnosticsClient({
+      rpc: {
+        call: async () => ({
+          ok: true,
+          value: {
+            version: 1,
+            mode: "local",
+            outcome: invalidReport.outcome ?? "pass",
+            observedAt: 1,
+            checks: invalidReport.checks,
+          },
+        }),
+      },
+    })
+    await assert.rejects(
+      () => invalid.run("local"),
+      (error) => error.code === "INVALID_DIAGNOSTICS_RESPONSE"
+        && !error.message.includes(secret),
+      invalidReport.label,
+    )
+  }
+
+  const failed = clientModule.createConnectionDiagnosticsClient({
+    rpc: { call: async () => ({ ok: false, error: { code: "account-http-error", message: secret } }) },
+  })
+  await assert.rejects(
+    () => failed.run("account"),
+    (error) => error.code === "account-http-error" && !error.message.includes(secret),
+  )
+})
+
+test("browser session preference client uses the dedicated loopback contract", async () => {
   const clientModule = await loadClientModule({ createElement: () => undefined })
   const calls = []
   const connection = {
     rpc: {
       async call(channel, endpoint, payload, signal) {
         calls.push({ channel, endpoint, payload, signal })
-        return { ok: true, value: { fast: endpoint === "set-fast" ? payload.fast : false } }
+        return {
+          ok: true,
+          value: {
+            fast: endpoint === "set-fast" ? payload.fast : false,
+            transport: endpoint === "set-transport" ? payload.transport : "auto",
+            ...(payload.modelId === undefined ? {} : { fastSupported: true }),
+          },
+        }
       },
     },
   }
   const client = clientModule.createSessionPreferenceClient(connection).forSession("session-a")
   const signal = new AbortController().signal
 
-  assert.deepEqual({ ...(await client.get(signal)) }, { fast: false })
-  assert.deepEqual({ ...(await client.setFast(true, signal)) }, { fast: true })
+  assert.deepEqual({ ...(await client.get(signal)) }, { fast: false, transport: "auto" })
+  assert.deepEqual({ ...(await client.getForModel("gpt-5.6-sol", signal)) }, {
+    fast: false,
+    transport: "auto",
+    fastSupported: true,
+  })
+  assert.deepEqual({ ...(await client.setFast(true, signal)) }, { fast: true, transport: "auto" })
+  assert.deepEqual({ ...(await client.setTransport("websocket", signal)) }, {
+    fast: false,
+    transport: "websocket",
+  })
   assert.deepEqual(calls.map(({ channel }) => channel), [
     "/dsh-codex-session",
     "/dsh-codex-session",
+    "/dsh-codex-session",
+    "/dsh-codex-session",
   ])
-  assert.deepEqual(calls.map(({ endpoint }) => endpoint), ["get", "set-fast"])
+  assert.deepEqual(calls.map(({ endpoint }) => endpoint), ["get", "get", "set-fast", "set-transport"])
   assert.deepEqual(calls.map(({ payload }) => ({ ...payload })), [
     { sessionId: "session-a" },
+    { sessionId: "session-a", modelId: "gpt-5.6-sol" },
     { sessionId: "session-a", fast: true },
+    { sessionId: "session-a", transport: "websocket" },
   ])
 })
 
@@ -726,9 +1071,9 @@ test("Fast lightning appears immediately for supported Codex models and toggles 
   const clientModule = await loadClientModule(harness.React)
   const calls = []
   const preferenceClient = {
-    async get() {
+    async getForModel() {
       calls.push(["get"])
-      return { fast: false }
+      return { fast: false, transport: "auto", fastSupported: true }
     },
     async setFast(fast) {
       calls.push(["set-fast", fast])
@@ -782,14 +1127,227 @@ test("Fast lightning appears immediately for supported Codex models and toggles 
   harness.unmount()
 })
 
+test("transport selector changes and resets the current session with keyboard and ARIA semantics", async () => {
+  const harness = hookHarness()
+  const clientModule = await loadClientModule(harness.React)
+  const calls = []
+  const preferenceClient = {
+    async getForModel() {
+      calls.push(["get"])
+      return { fast: false, transport: "auto", fastSupported: true }
+    },
+    async setFast(fast) {
+      return { fast, transport: "auto" }
+    },
+    async setTransport(transport) {
+      calls.push(["set-transport", transport])
+      return { fast: false, transport }
+    },
+  }
+  const translations = {
+    transportLabel: "传输方式：{transport}",
+    transportMenu: "当前会话的传输方式",
+    transportAuto: "自动",
+    transportAutoHelp: "自动选择",
+    transportSse: "SSE",
+    transportSseHelp: "SSE 响应",
+    transportWebsocket: "WebSocket",
+    transportWebsocketHelp: "实时连接",
+    transportWebsocketCached: "WebSocket 缓存",
+    transportWebsocketCachedHelp: "复用缓存",
+    transportSessionOnly: "仅应用于当前会话",
+    transportReset: "恢复自动",
+    transportResetLabel: "将当前会话的传输方式恢复为自动",
+  }
+  const t = (key) => translations[key] ?? key
+  const useModelDirectory = (select) => select({
+    current: { provider: "dsh-codex", model: "gpt-5.6-sol" },
+  })
+
+  harness.mount(clientModule.CodexFastToggle, {
+    session: { removed: false },
+    useModelDirectory,
+    preferenceClient,
+    t,
+  })
+  await settle()
+  harness.flush()
+
+  let toggle = findElement(
+    harness.tree(),
+    (element) => element.type === "button"
+      && element.props.className?.includes("dshCodexTransportToggle"),
+  )
+  assert.ok(toggle)
+  assert.equal(toggle.props["data-transport"], "auto")
+  assert.equal(toggle.props["aria-label"], "传输方式：自动")
+  assert.equal(toggle.props["aria-haspopup"], "menu")
+  assert.equal(toggle.props["aria-expanded"], "false")
+
+  let prevented = false
+  toggle.props.onKeyDown({
+    key: "ArrowDown",
+    preventDefault() { prevented = true },
+  })
+  harness.flush()
+  assert.equal(prevented, true)
+
+  let menu = findElement(harness.tree(), (element) => element.props?.role === "menu")
+  assert.ok(menu)
+  assert.match(menu.props.id, /^dsh-codex-transport-menu-test-/u)
+  toggle = findElement(
+    harness.tree(),
+    (element) => element.type === "button"
+      && element.props.className?.includes("dshCodexTransportToggle"),
+  )
+  assert.equal(toggle.props["aria-controls"], menu.props.id)
+  assert.equal(menu.props["aria-label"], "当前会话的传输方式")
+  let options = findElements(menu, (element) => element.props?.role === "menuitemradio")
+  assert.equal(options.length, 4)
+  assert.equal(options[0].props["aria-checked"], true)
+  assert.equal(options[0].props.tabIndex, 0)
+  let focusCalls = 0
+  toggle.props.ref.current = { focus: () => { focusCalls += 1 } }
+
+  menu.props.onKeyDown({ key: "ArrowDown", preventDefault() {} })
+  harness.flush()
+  menu = findElement(harness.tree(), (element) => element.props?.role === "menu")
+  options = findElements(menu, (element) => element.props?.role === "menuitemradio")
+  assert.equal(options[1].props.tabIndex, 0)
+  options[1].props.onClick()
+  await settle()
+  harness.flush()
+
+  toggle = findElement(
+    harness.tree(),
+    (element) => element.type === "button"
+      && element.props.className?.includes("dshCodexTransportToggle"),
+  )
+  assert.equal(toggle.props["data-transport"], "sse")
+  assert.equal(toggle.props["aria-label"], "传输方式：SSE")
+  assert.equal(focusCalls, 1, "choosing a transport must return focus to its trigger")
+  assert.deepEqual(calls, [["get"], ["set-transport", "sse"]])
+
+  toggle.props.onClick()
+  harness.flush()
+  menu = findElement(harness.tree(), (element) => element.props?.role === "menu")
+  const reset = findElement(
+    menu,
+    (element) => element.type === "button"
+      && element.props.className?.includes("dshCodexTransportReset"),
+  )
+  assert.ok(reset)
+  assert.equal(reset.props.disabled, false)
+  assert.match(textContent(reset), /恢复自动/u)
+  reset.props.onClick()
+  await settle()
+  harness.flush()
+  assert.deepEqual(calls.at(-1), ["set-transport", "auto"])
+
+  toggle = findElement(
+    harness.tree(),
+    (element) => element.type === "button"
+      && element.props.className?.includes("dshCodexTransportToggle"),
+  )
+  toggle.props.onClick()
+  harness.flush()
+  menu = findElement(harness.tree(), (element) => element.props?.role === "menu")
+  prevented = false
+  menu.props.onKeyDown({
+    key: "Escape",
+    preventDefault() { prevented = true },
+  })
+  harness.flush()
+  assert.equal(prevented, true)
+  assert.equal(findElement(harness.tree(), (element) => element.props?.role === "menu"), undefined)
+  harness.unmount()
+})
+
+test("Fast and transport controls retry a failed read and transport dismisses outside", async () => {
+  const harness = hookHarness()
+  let pointerdown
+  const document = {
+    addEventListener(type, listener) {
+      if (type === "pointerdown") pointerdown = listener
+    },
+    removeEventListener(type, listener) {
+      if (type === "pointerdown" && pointerdown === listener) pointerdown = undefined
+    },
+  }
+  const clientModule = await loadClientModule(harness.React, {}, { document })
+  let reads = 0
+  const preferenceClient = {
+    async getForModel() {
+      reads += 1
+      if (reads === 1) throw new Error("temporary read failure")
+      return { fast: false, transport: "auto", fastSupported: true }
+    },
+    async setFast(fast) {
+      return { fast, transport: "auto" }
+    },
+    async setTransport(transport) {
+      return { fast: false, transport }
+    },
+  }
+  harness.mount(clientModule.CodexFastToggle, {
+    session: { removed: false },
+    useModelDirectory: (select) => select({
+      current: { provider: "dsh-codex", model: "gpt-5.6-sol" },
+    }),
+    preferenceClient,
+    t: (key) => key,
+  })
+  await settle()
+  harness.flush()
+
+  let fastButton = findElement(
+    harness.tree(),
+    (element) => element.type === "button"
+      && element.props.className?.includes("dshCodexFastToggle"),
+  )
+  assert.equal(fastButton.props["aria-label"], "fastUnavailable")
+  assert.equal(fastButton.props.disabled, false)
+  fastButton.props.onClick()
+  await settle()
+  harness.flush()
+  assert.equal(reads, 2, "Fast must retry when the first capability read failed")
+
+  let toggle = findElement(
+    harness.tree(),
+    (element) => element.type === "button"
+      && element.props.className?.includes("dshCodexTransportToggle"),
+  )
+  assert.equal(toggle.props["aria-label"], "transportLabel")
+  assert.equal(toggle.props.disabled, false)
+  toggle.props.onClick()
+  harness.flush()
+  assert.equal(typeof pointerdown, "function")
+  assert.ok(findElement(harness.tree(), (element) => element.props?.role === "menu"))
+  pointerdown({ target: {} })
+  harness.flush()
+  assert.equal(findElement(harness.tree(), (element) => element.props?.role === "menu"), undefined)
+  harness.unmount()
+})
+
 test("Fast lightning is hidden outside Codex and disabled for unsupported Codex models", async () => {
   const harness = hookHarness()
   const clientModule = await loadClientModule(harness.React)
+  const queriedModels = []
   const props = {
     sessionId: "session-fast",
     session: { removed: false },
     input: { phase: "idle" },
-    preferenceClient: { get: async () => ({ fast: false }), setFast: async () => ({ fast: true }) },
+    preferenceClient: {
+      async getForModel(modelId) {
+        queriedModels.push(modelId)
+        return {
+          fast: false,
+          transport: "auto",
+          fastSupported: modelId !== "gpt-5.3-codex-spark",
+        }
+      },
+      setFast: async () => ({ fast: true, transport: "auto" }),
+    },
     t: (key) => key,
   }
 
@@ -801,7 +1359,8 @@ test("Fast lightning is hidden outside Codex and disabled for unsupported Codex 
   harness.unmount()
 
   const unsupportedHarness = hookHarness()
-  unsupportedHarness.mount(clientModule.CodexFastToggle, {
+  const unsupportedModule = await loadClientModule(unsupportedHarness.React)
+  unsupportedHarness.mount(unsupportedModule.CodexFastToggle, {
     ...props,
     useModelDirectory: (select) => select({
       current: { provider: "dsh-codex", model: "gpt-5.3-codex-spark" },
@@ -809,6 +1368,9 @@ test("Fast lightning is hidden outside Codex and disabled for unsupported Codex 
   })
   await settle()
   unsupportedHarness.flush()
+  await settle()
+  unsupportedHarness.flush()
+  assert.deepEqual(queriedModels, ["gpt-5.3-codex-spark"])
   const button = findElement(unsupportedHarness.tree(), (element) => element.type === "button")
   assert.ok(button)
   assert.equal(button.props.disabled, true)
@@ -846,8 +1408,8 @@ test("legacy Off or Minimal selections require an explicit, disclosed repair act
       session: { removed: false },
       useModelDirectory: (project) => project({ current }),
       preferenceClient: {
-        get: async () => ({ fast: false }),
-        setFast: async () => ({ fast: false }),
+        getForModel: async () => ({ fast: false, transport: "auto", fastSupported: true }),
+        setFast: async () => ({ fast: false, transport: "auto" }),
       },
       selectModel: select,
       t,
@@ -1556,13 +2118,24 @@ test("client styles bound narrow-screen provider text and actions", async () => 
   assert.match(css, /\.dshCodexHero h2\{font-size:16px;font-weight:500;line-height:24px\}/u)
   assert.match(css, /\.dshCodexCard\{[^}]*var\(--dsw-alias-bg-module-platform/u)
   assert.match(css, /\.dshCodexModelList\{[^}]*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/u)
-  assert.match(css, /@media\(max-width:760px\)\{\.dshCodexQuotaWindows,\.dshCodexModelList\{grid-template-columns:1fr\}/u)
+  assert.match(css, /@media\(max-width:760px\)\{\.dshCodexQuotaWindows,\.dshCodexModelList,\.dshCodexDiagnosticsModes,\.dshCodexDiagnosticsChecks\{grid-template-columns:1fr\}/u)
   assert.match(css, /\.dshCodexButton:focus-visible,[^{]+input:focus-visible/u)
   assert.match(css, /\.dshCodexModelId\{[^}]*font-family:inherit/u)
   assert.match(css, /\.dshCodexModelCapabilities\{[^}]*flex-wrap:wrap/u)
   assert.match(css, /\.dshCodexModelBadge\{[^}]*border-radius:999px[^}]*font-family:inherit/u)
   assert.match(css, /\.dshCodexFastToggle\{[^}]*width:28px[^}]*font:inherit/u)
   assert.match(css, /\.dshCodexFastToggle\[data-fast=true\]/u)
+  assert.match(css, /\.dshCodexTransportControl\{[^}]*position:relative/u)
+  assert.match(css, /\.dshCodexTransportToggle\{[^}]*width:28px[^}]*font:inherit/u)
+  assert.match(css, /\.dshCodexTransportMenu\{[^}]*bottom:calc\(100% \+ 8px\)[^}]*max-width:calc\(100vw - 32px\)/u)
+  assert.match(css, /\.dshCodexTransportOption:focus-visible/u)
+  assert.match(css, /\.dshCodexDiagnostics\{[^}]*border-radius:12px/u)
+  assert.match(css, /\.dshCodexDiagnosticsToggle\{[^}]*font:inherit/u)
+  assert.match(css, /\.dshCodexDiagnosticsChecks code,[^{]+\{[^}]*font:inherit/u)
+  assert.match(css, /@media\(max-width:480px\)\{/u)
+  assert.match(css, /\.dshCodexDiagnosticsMode\{flex-direction:column\}/u)
+  assert.match(css, /\.dshCodexDiagnosticsMode \.dshCodexButton\{width:100%;min-width:0\}/u)
+  assert.match(css, /\.dshCodexDiagnosticsMode>span\{max-width:100%;overflow-wrap:anywhere\}/u)
   assert.match(css, /\.dshCodexQuotaWindow progress\{[^}]*width:100%[^}]*height:8px/u)
   assert.match(css, /\.dshCodexQuotaWindows\{[^}]*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/u)
   assert.match(css, /\.dshCodexQuota \.dshCodexQuotaUpdated\{[^}]*font-size:12px[^}]*line-height:18px/u)
