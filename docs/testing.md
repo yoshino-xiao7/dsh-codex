@@ -29,26 +29,27 @@ pnpm run verify:release
 - `stream-resilience.test.mjs`：半段纯文本保存、pre-output quota、瞬时/不确定 429、直接抛出的 quota/usage-limit/`STREAM_CLOSED`、未完成工具调用、纯工具流失败关闭与非 Codex route；`onRecovery` 观察者自身抛错时也不能破坏已恢复的文本、恢复提示或正常终态；
 - `provider-reliability-public-api.test.mjs`：公开 pi-ai → PiAiAdapter → route → resilience 的成功文本/reasoning/usage、工具调用与两轮 replay、原生图片预算、text-only 图片拒绝、429、`STREAM_CLOSED` 与 WebSocket failure 链路；
 - `llm-runtime-integration.test.mjs`：真实冻结 DSH `LlmRuntime + AgentLoop + Retry` 编排证明瞬时 `RATE_LIMIT` 发生一次重试，而归一化后的 `QUOTA` 与 `QUOTA_OR_RATE_LIMIT` 都只调用 provider 一次；同时验证 waterfall 在恢复策略读取结果前发布非重试 `QUOTA`；
-- `codex-session-resources.test.mjs`：命名空间 session、reset/agent/runtime 清理，以及同进程外部 pi-ai session 隔离；
+- `codex-session-resources.test.mjs`：命名空间 session、reset/agent/runtime 清理、脱敏传输健康计数，以及同进程外部 pi-ai session 隔离；
 - `sdk-contract.test.mjs`：真实 pi-ai OAuth/模型目录、DSH profile schema，以及 PNG 穿过真实 attachment seam；
 - `bundle-contract.test.mjs`：bundle 保留通用 `llm-pi-ai` 配置、插入 `dsh-codex`，且图片预算完整；
 - `codex-route-adapter.test.mjs`：外部 `dsh-codex` route 与内部 canonical provider 的映射、replay 和 tool-call ID；
 - `codex-provider-runtime.test.mjs`：专用 route、设置热更新、模型筛选与同 profile 共存；
 - `codex-model-capabilities.test.mjs`：目录字段白名单投影、不可变能力快照、逐模型推理/Fast 控件与未知模型不推断；
-- `codex-connection-diagnostics.test.mjs`：本机模式零账号读取、账号模式恰好一次额度读取、取消、固定报告、loopback-only RPC 与 token/account ID/原始错误不泄漏；模块没有 stream seam；
+- `codex-model-capability-bridge.test.mjs`：独立 loopback-only 只读 RPC、只接受空对象的 `get`、取消、内部错误脱敏、能力白名单与未知模型不推断；
+- `codex-connection-diagnostics.test.mjs`：本机模式零账号读取、账号模式恰好一次额度读取、401/403、429、5xx 与其他 HTTP 固定分类、取消、固定报告、loopback-only RPC 与 token/account ID/原始错误不泄漏；模块没有 stream seam；
 - `authorization-commit-tracker.test.mjs`、`authorization-commit-integration.test.mjs`、`codex-credential-store.test.mjs` 与 `codex-authorization.test.mjs`：专用 OAuth 范围、串行 refresh、非法记录失败关闭、登录事件脱敏、generation 隔离和取消线性化点；真实 Cordis `AuthorizationService + Bridge` 回归还验证 flow owner 卸载在提交选择前取消、提交选择后等待最终写入、提交失败后释放、退出最终删除，以及一个进程取消时不会删除另一进程已排队的新登录；
 - `oauth-refresh-logout-race.test.mjs`：使用公开 PiAiAdapter 请求链验证 refresh/delete 锁顺序，保证退出登录后凭据不会复活；
-- `codex-pi-provider.test.mjs`：默认 payload、当前会话 Fast、transport 和不自动降级；
-- `session-preferences.test.mjs`、`session-preference-command.test.mjs` 与 `session-preference-bridge.test.mjs`：当前会话隔离、容量限制、重置、Fast 支持查询、四种 Transport 读写和命令/RPC 错误边界；
-- `authorization-bridge.test.mjs`：登录交互限额、凭据不出 RPC、退出登录和命令输出；不支持类型或结构损坏的已存记录必须返回独立的 `invalid` 状态，不能显示为已登录，也不能跨 RPC 暴露 secret；
+- `codex-pi-provider.test.mjs`：默认 payload、当前会话 Fast、transport、回复详略、推理摘要和不自动降级；
+- `session-preferences.test.mjs`、`session-preference-command.test.mjs` 与 `session-preference-bridge.test.mjs`：当前会话隔离、容量限制、重置、Fast 支持查询、四种 Transport、回复详略、推理摘要、脱敏传输健康和命令/RPC 错误边界；
+- `authorization-bridge.test.mjs`：登录交互限额、凭据不出 RPC、退出登录、`/codex-usage status|refresh` 与命令输出；不支持类型或结构损坏的已存记录必须返回独立的 `invalid` 状态，不能显示为已登录，也不能跨 RPC 暴露 secret；
 - `quota-observer.test.mjs`：三态、reset/stale 到期、乱序观测、严格输入与冻结脱敏快照；
-- `client-bundle.test.mjs`：Web 登录页、额度展示、模型启用写入、Transport 图形菜单、折叠连接诊断、登录操作互斥、组件卸载安全、样式节点多实例/热重载生命周期、窄屏布局与 loopback RPC 调用边界；模型设置回归从真实 section 组件发出公开 settings mutation，并把返回配置交给真实 provider runtime 验证 route 模型目录；
+- `client-bundle.test.mjs`：Web 登录页与显式 OAuth 链接/验证码复制、套餐及额度展示、可见性/重置节点主动刷新与 24 小时本地显示切换、通用发现加独立能力 RPC、未知能力不推断、模型启用写入、Fast/Transport/回复详略/推理摘要菜单、脱敏传输健康、折叠连接诊断与安全报告复制、登录操作互斥、组件卸载安全、样式节点多实例/热重载生命周期、窄屏布局与 loopback RPC 调用边界；
 - `remote-image-input.test.mjs`：URL、DNS、重定向、响应大小、MIME、超时、2 个活动任务、32 个排队任务、队列满拒绝、排队取消、插件卸载时的队列封口/活动任务收敛、保存阶段取消边界，以及真实 ToolRuntime 和正式 `read_image` renderer 的端到端执行；模型能力预检位于同一限流器内，阻塞或忽略 abort 的 resolver 也不能绕过活动与排队上限；
 - `generate-sbom.test.mjs`、`release-evidence.test.mjs` 与 `release-workflow.test.mjs`：离线确定性参考依赖图、产物/两套锁文件哈希绑定、DSH smoke 运行环境、实际安装树和生产依赖审计取证、精确 SRI、签名/attestation 审计、Action SHA 固定、最小权限、draft/tag 目标预检和可恢复发布；
 - `release-maintainability.test.mjs`：直接运行依赖声明覆盖、Apache-2.0 贡献许可、双语隐私模板、根/夹具 DSH 版本一致性与协调 Dependabot 配置；
 - `dsh-runtime-fixture.test.mjs`：夹具为 private、精确固定 DSH `0.1.1-rc.2` 且提交完整 pnpm lock；CI、兼容性和发布工作流只能用 `--frozen-lockfile --ignore-scripts` 安装该图，并禁止直接交给 npm 重新解算无界 DSH peer 图；
 - `types-consumer.ts`：从 npm package exports 消费公开 `.d.ts`，并以严格 TypeScript 配置编译；
-- `host-load.test.mjs`：Host export、Config、waterfall 与动态服务注册；配额纵向回归把真实 stream listener 的结构化/模糊 429 观测贯通到脱敏状态 RPC 和 `/codex-usage` 命令，并验证成功请求恢复近期成功状态。
+- `host-load.test.mjs`：Host export、Config、waterfall、独立模型能力 RPC 与动态服务注册；配额纵向回归把真实 stream listener 的结构化/模糊 429 观测贯通到脱敏状态 RPC 和 `/codex-usage` 命令，并验证成功请求恢复近期成功状态。
 
 ## 验收层级
 

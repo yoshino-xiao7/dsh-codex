@@ -13,19 +13,19 @@ import {
 } from "../src/internal/codex-model-capabilities.mjs"
 
 const EXPECTED = Object.freeze({
-  "gpt-5.3-codex-spark": ["high", ["low", "medium", "high", "xhigh"], false],
-  "gpt-5.4": ["medium", ["low", "medium", "high", "xhigh"], true],
-  "gpt-5.4-mini": ["medium", ["low", "medium", "high", "xhigh"], false],
-  "gpt-5.5": ["medium", ["low", "medium", "high", "xhigh"], true],
-  "gpt-5.6-luna": ["medium", ["low", "medium", "high", "xhigh", "max"], true],
-  "gpt-5.6-sol": ["low", ["low", "medium", "high", "xhigh", "max"], true],
-  "gpt-5.6-terra": ["medium", ["low", "medium", "high", "xhigh", "max"], true],
+  "gpt-5.3-codex-spark": [["low", "medium", "high", "xhigh"], false],
+  "gpt-5.4": [["low", "medium", "high", "xhigh"], true],
+  "gpt-5.4-mini": [["low", "medium", "high", "xhigh"], false],
+  "gpt-5.5": [["low", "medium", "high", "xhigh"], true],
+  "gpt-5.6-luna": [["low", "medium", "high", "xhigh", "max"], true],
+  "gpt-5.6-sol": [["low", "medium", "high", "xhigh", "max"], true],
+  "gpt-5.6-terra": [["low", "medium", "high", "xhigh", "max"], true],
 })
 
-test("keeps the verified Codex reasoning order, defaults, and Fast support per model", () => {
-  for (const [modelId, [defaultEffort, effortIds, fast]] of Object.entries(EXPECTED)) {
+test("keeps the verified Codex reasoning order and Fast support per model without inventing defaults", () => {
+  for (const [modelId, [effortIds, fast]] of Object.entries(EXPECTED)) {
     const capability = codexModelCapability(modelId)
-    assert.equal(capability.defaultReasoningEffort, defaultEffort, modelId)
+    assert.equal(Object.hasOwn(capability, "defaultReasoningEffort"), false, modelId)
     assert.deepEqual(capability.reasoningEfforts.map(({ id }) => id), effortIds, modelId)
     assert.equal(supportsCodexFast(modelId), fast, modelId)
     for (const effortId of effortIds) {
@@ -76,7 +76,6 @@ test("merges the installed provider catalog with verified controls behind one im
         { id: "xhigh", name: "Xhigh" },
         { id: "max", name: "Max" },
       ],
-      defaultEffort: "low",
     },
     fast: true,
   })

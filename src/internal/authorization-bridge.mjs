@@ -26,6 +26,9 @@ const MAX_MESSAGE_CHARS = 2_048
 const MAX_PLACEHOLDER_CHARS = 512
 const MAX_CODE_CHARS = 256
 const MAX_URL_CHARS = 2_048
+const MAX_USAGE_SUMMARY_LIMITS = 16
+const MAX_USAGE_WINDOW_MINS = 525_600
+const MAX_USAGE_LABEL_CHARS = 128
 
 class RpcInputError extends Error {
   constructor(message) {
@@ -483,18 +486,40 @@ async function describeCodexCredential(credentials) {
   }
 }
 
-export function registerCodexUsageCommand(ctx, quotaObserver) {
+export function registerCodexUsageCommand(ctx, quotaObserver, options = {}) {
+  const accountUsageReader = options?.accountUsageReader
   ctx.commands.register({
     name: "codex-usage",
-    description: "查看最近观测到的 Codex 额度状态 / Show the last observed Codex quota state",
-    input: { hint: "[status]" },
+    description: "查看或刷新 Codex 额度状态 / Show or refresh Codex quota state",
+    input: { hint: "[status|refresh]" },
     recordInput: false,
-    handler: async ({ rawInput }) => {
+    handler: async ({ rawInput, signal }) => {
       const action = rawInput.trim()
-      if (action !== "" && action !== "status") {
+      if (action !== "" && action !== "status" && action !== "refresh") {
         return {
           kind: "error",
-          text: "用法：/codex-usage [status] / Usage: /codex-usage [status]",
+          text: "用法：/codex-usage [status|refresh] / Usage: /codex-usage [status|refresh]",
+        }
+      }
+
+      if (action === "refresh") {
+        if (accountUsageReader?.read === undefined || typeof accountUsageReader.read !== "function") {
+          return {
+            kind: "error",
+            text: "Codex 账户额度刷新当前不可用。 / Codex account usage refresh is currently unavailable.",
+          }
+        }
+        try {
+          const usage = await accountUsageReader.read({ signal })
+          return {
+            kind: "success",
+            text: formatAccountUsageSnapshot(usage),
+          }
+        } catch {
+          return {
+            kind: "error",
+            text: "暂时无法刷新 Codex 账户额度。 / We are temporarily unable to refresh Codex account usage.",
+          }
         }
       }
 
@@ -511,6 +536,111 @@ export function registerCodexUsageCommand(ctx, quotaObserver) {
       }
     },
   })
+}
+
+function formatAccountUsageSnapshot(snapshot) {
+  if (
+    snapshot === null
+    || typeof snapshot !== "object"
+    || Array.isArray(snapshot)
+    || !Array.isArray(snapshot.rateLimits)
+  ) {
+    throw new TypeError("account usage snapshot is invalid")
+  }
+
+  const observedAt = usageTimestamp(snapshot.observedAt, "observedAt")
+  const rateLimits = snapshot.rateLimits.slice(0, MAX_USAGE_SUMMARY_LIMITS)
+  const lines = ["Codex 账户额度 / Codex account usage"]
+
+  for (const [index, limit] of rateLimits.entries()) {
+    if (limit === null || typeof limit !== "object" || Array.isArray(limit)) {
+      throw new TypeError("account usage rate limit is invalid")
+    }
+    if (index > 0) {
+      const label = safeUsageLabel(limit.limitName)
+      const suffix = label === undefined ? "" : `（${label}） / Additional limit ${index} (${label})`
+      lines.push(label === undefined
+        ? `附加额度 ${index} / Additional limit ${index}`
+        : `附加额度 ${index}${suffix}`)
+    }
+
+    const windows = [limit.primary, limit.secondary].filter((window) => window !== undefined)
+    if (windows.length === 0) {
+      lines.push("- 暂无可显示的额度窗口。 / No displayable quota window is available.")
+      continue
+    }
+    for (const window of windows) lines.push(formatAccountUsageWindow(window))
+  }
+
+  if (rateLimits.length === 0) {
+    lines.push("暂无可显示的额度窗口。 / No displayable quota window is available.")
+  }
+  if (snapshot.rateLimits.length > rateLimits.length) {
+    const omitted = snapshot.rateLimits.length - rateLimits.length
+    lines.push(`另有 ${omitted} 项附加额度未展开。 / ${omitted} additional limit${omitted === 1 ? "" : "s"} omitted.`)
+  }
+  lines.push(`数据更新时间：${observedAt} / Updated at: ${observedAt}`)
+  return lines.join("\n")
+}
+
+function formatAccountUsageWindow(value) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new TypeError("account usage window is invalid")
+  }
+  const usedPercent = value.usedPercent
+  if (
+    typeof usedPercent !== "number"
+    || !Number.isFinite(usedPercent)
+    || usedPercent < 0
+    || usedPercent > 100
+  ) {
+    throw new TypeError("account usage percentage is invalid")
+  }
+  if (
+    !Number.isSafeInteger(value.windowDurationMins)
+    || value.windowDurationMins < 1
+    || value.windowDurationMins > MAX_USAGE_WINDOW_MINS
+  ) {
+    throw new TypeError("account usage window duration is invalid")
+  }
+  const resetsAt = usageTimestamp(value.resetsAt, "resetsAt")
+  const used = concisePercent(usedPercent)
+  const remaining = concisePercent(Math.max(0, 100 - usedPercent))
+  const label = usageWindowLabel(value.windowDurationMins)
+  return `- ${label.zh}：已使用 ${used}%，剩余 ${remaining}%；重置时间：${resetsAt} / ${label.en}: ${used}% used, ${remaining}% remaining; resets at: ${resetsAt}`
+}
+
+function usageWindowLabel(windowDurationMins) {
+  if (windowDurationMins === 300) return { zh: "5 小时额度", en: "5-hour limit" }
+  if (windowDurationMins === 10_080) return { zh: "每周额度", en: "Weekly limit" }
+  return {
+    zh: `${windowDurationMins} 分钟额度`,
+    en: `${windowDurationMins}-minute limit`,
+  }
+}
+
+function concisePercent(value) {
+  return String(Math.round(value * 10) / 10)
+}
+
+function usageTimestamp(value, name) {
+  if (!Number.isSafeInteger(value) || value < 0 || !Number.isFinite(new Date(value).getTime())) {
+    throw new TypeError(`account usage ${name} is invalid`)
+  }
+  return new Date(value).toISOString()
+}
+
+function safeUsageLabel(value) {
+  if (
+    typeof value !== "string"
+    || value.length === 0
+    || value.length > MAX_USAGE_LABEL_CHARS
+    || value.trim() !== value
+    || /[\u0000-\u001f\u007f]/u.test(value)
+  ) {
+    return undefined
+  }
+  return value
 }
 
 function formatQuotaSnapshot(snapshot) {

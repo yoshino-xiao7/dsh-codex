@@ -160,6 +160,41 @@ test("diagnostics map credential and account failures without exposing raw error
   assert.doesNotMatch(JSON.stringify(report), new RegExp(`${SECRET}|${ACCOUNT_ID}|network failed`, "u"))
 })
 
+test("diagnostics classify account usage HTTP failures without exposing response bodies", async (t) => {
+  const cases = [
+    { status: 401, code: "account-http-auth-error" },
+    { status: 403, code: "account-http-auth-error" },
+    { status: 429, code: "account-http-rate-limited" },
+    { status: 500, code: "account-http-server-error" },
+    { status: 503, code: "account-http-server-error" },
+    { status: 418, code: "account-http-error" },
+  ]
+
+  for (const entry of cases) {
+    await t.test(String(entry.status), async () => {
+      const report = await diagnostics({
+        accountUsageReader: {
+          read: async () => {
+            throw Object.assign(new Error(`HTTP ${entry.status}: ${SECRET}`), {
+              code: "HTTP_STATUS",
+              status: entry.status,
+              responseBody: SECRET,
+            })
+          },
+        },
+      }).run("account", new AbortController().signal)
+
+      assert.equal(report.outcome, "fail")
+      assert.deepEqual(report.checks.at(-1), {
+        id: "account-usage",
+        status: "fail",
+        code: entry.code,
+      })
+      assert.doesNotMatch(JSON.stringify(report), new RegExp(`${SECRET}|responseBody|HTTP ${entry.status}`, "u"))
+    })
+  }
+})
+
 test("account cancellation returns the fixed cancelled report without raw abort reasons", async () => {
   const controller = new AbortController()
   const report = await diagnostics({

@@ -4,7 +4,7 @@
 
 面向 DeepSeek Harness 的 Codex 插件，提供 ChatGPT OAuth 登录、Codex 模型、图片输入和可靠的流式回复。
 
-> 当前版本：`0.0.4` 技术预览，使用 npm `latest` 与正式 GitHub Release 发布。npm 包名：`dsh-codex-community`。
+> 当前版本：`1.0.0` 正式版（发布准备中，尚未发布）。npm 包名：`dsh-codex-community`；当前已发布版本仍为 `0.0.4`。
 
 ## 功能
 
@@ -15,12 +15,15 @@
 - 为请求图片补全有效的像素与字节预算，避免无效 `maxPixels`；
 - 将 `AccountQuotaExceeded` 识别为不可重试的账户配额错误，并显示脱敏后的重置时间；
 - 流中断时保留安全的半段纯文本；涉及未完成工具调用时停止，不自动重放请求；
-- 每次进入设置页或手动刷新时读取真实的 5 小时与每周额度；读取失败时安全降级，不向 Web 页面暴露 OAuth 凭据；
-- 使用紧凑的额度卡展示剩余比例：5 小时额度显示精确重置时间，每周额度在不足 24 小时时显示精确时间，其余时间显示相对天数；
+- 每次进入设置页、页面重新可见或额度窗口到达重置节点时主动读取真实的 5 小时与每周额度，也可通过刷新按钮或 `/codex-usage refresh` 立即刷新；每周不足 24 小时阈值只切换本地时间显示；
+- 使用紧凑的额度卡展示统一的剩余额度语义、套餐类型与安全的重置时间；5 小时额度显示精确时间，每周额度不足 24 小时时也显示精确时间；
 - 在设置页优先展示已选择模型，默认收起未选择模型；上下文和最大输出使用来自当前 provider catalog 的紧凑 `K` 标签；
 - 使用模型选择器左侧的闪电按钮为当前会话切换官方 Fast（1.5 倍速），并通过相邻的图形按钮或 `/codex` 选择自动、SSE、WebSocket 或 WebSocket 缓存传输；
-- 从 Host 的单一能力接口读取模型目录字段、已核验推理档位与 Fast 支持，不在 Web 页面另存一份容易漂移的模型清单；
-- 在默认折叠的连接诊断中按需运行“本机检查”或“账号检查”；前者完全离线，后者只读取账号额度并在需要时刷新 OAuth，两者都不发送模型请求或消耗模型额度。
+- 通过独立的本机 loopback-only 只读 RPC 从 Host 读取输入模态、当前安装 provider catalog 实际提供的可选推理档位与 Fast 支持，并与 Harness 通用模型目录合并为真实能力标签；RPC 不可用或能力未知时不推断；
+- 在当前会话中选择回复详略（低、中、高）和推理摘要（自动、简洁、详细、关闭），从下一次请求生效；
+- OAuth 授权提示支持分别复制登录链接和验证码，复制只在用户点击时发生，不记录短期凭据；
+- 在默认折叠的连接诊断中按需运行“本机检查”或“账号检查”，并复制仅含固定状态与受限事实的脱敏报告；
+- 在会话请求设置中查看本会话的请求数、连接复用、增量上下文和 SSE 回退等脱敏传输健康状态。
 
 ## 运行要求
 
@@ -29,10 +32,10 @@
 
 ## 安装
 
-请固定安装精确版本：
+`1.0.0` 尚未发布。开发完成并通过发布门禁后，请固定安装精确版本：
 
 ```sh
-dsh plugin --profile web add dsh-codex-community@0.0.4
+dsh plugin --profile web add dsh-codex-community@1.0.0
 dsh web
 ```
 
@@ -48,19 +51,22 @@ dsh web
 /codex-login status
 /codex-login cancel
 /codex-login logout
-/codex-usage
+/codex-usage status
+/codex-usage refresh
 /codex status
 /codex reset
 /codex set fast on|off
 /codex set transport auto|sse|websocket|websocket-cached
+/codex set verbosity low|medium|high
+/codex set summary auto|concise|detailed|off
 ```
 
-Fast 和传输偏好只保存在当前进程的当前会话中，不会持久化，进程重启后恢复默认。Fast 在 GPT-5.4、GPT-5.5、GPT-5.6 Luna、Sol 和 Terra 上从下一次请求起使用官方 priority service tier，目标速度为 1.5 倍并消耗更多额度；关闭后，下一次请求恢复默认速度。失败请求不会自动降级重放。
+Fast、传输、回复详略和推理摘要偏好只保存在当前进程的当前会话中，不会持久化；进程重启后分别恢复关闭、自动、低详略和自动摘要。所有切换从下一次请求生效。Fast 在 GPT-5.4、GPT-5.5、GPT-5.6 Luna、Sol 和 Terra 上使用官方 priority service tier，目标速度为 1.5 倍并消耗更多额度；失败请求不会自动降级重放。
 
 更新：
 
 ```sh
-dsh plugin --profile web update dsh-codex-community@0.0.4
+dsh plugin --profile web update dsh-codex-community@1.0.0
 dsh web
 ```
 
@@ -82,11 +88,10 @@ dsh web
 
 ## 支持边界
 
-- `0.0.x` 不承诺稳定 API，请固定版本；
-- `0.0.4` 的 Linux、macOS 和 Windows CI/profile smoke 已达到 `3/3`，候选提交与平台证据见[验收记录](docs/releases/v0.0.4.acceptance.json)；
-- `0.0.4` 的真实 OAuth、对话、图片、transport 和 Fast 网络验收从独立记录的 `0/13 pending` 开始；这些未验证能力继续如实展示，并在发布后逐项补齐；
+- `1.0.0` 仍在开发且尚未发布；Linux、macOS、Windows CI/profile smoke 与本版本真实账号验收均为待完成，状态见[验收草稿](docs/releases/v1.0.0.acceptance.json)；
+- `0.0.4` 的历史发布证据继续保留，但不会继承为 `1.0.0` 的验收结果；
 - 设置页额度通过官方 Codex 客户端使用的 Web 后端兼容接口读取；接口不可用或返回异常时保留最近的安全读数，并降级为请求观测或未知状态，不把错误伪装成零余额；
-- 模型名称、上下文和最大输出来自当前安装的 provider catalog；推理选择器只展示已按订阅 Codex 目录核验且 Provider 能完整实现的 Low 至 Max 与模型默认值，不展示通用的 `Default`、`Off`、`Minimal`，也不把需要主动任务委派的 `Ultra` 伪装成普通推理档位；
+- 模型名称、上下文、最大输出和可选的 Low 至 Max 推理档位来自当前安装 provider catalog 的实际语义；插件不会虚构或标注 catalog 未提供的默认档位，无显式 effort 时由当前 Provider 或服务端采用其默认行为。选择器不展示通用的 `Default`、`Off`、`Minimal`，也不把需要主动任务委派的 `Ultra` 伪装成普通推理档位；
 - Fast 仅用于 GPT-5.4、GPT-5.5、GPT-5.6 Luna、Sol 和 Terra，并会提高额度消耗；其他模型不会发送 Fast service tier；
 - 连接诊断不会执行主动模型请求：本机检查不联网，账号检查只经过现有额度读取边界；它不能替代真实对话、图片、工具或各传输方式的网络验收；
 - 不提供图片生成或编辑；

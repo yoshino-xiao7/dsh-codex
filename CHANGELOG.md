@@ -1,7 +1,51 @@
 # 更新日志 / Changelog
 
-本项目遵循 Keep a Changelog 的结构；`0.0.x` 为技术预览。
-This project follows the Keep a Changelog structure; `0.0.x` is a technical preview.
+本项目遵循 Keep a Changelog 的结构；`1.0.0` 起作为正式版发布，具体兼容性边界以对应发布说明为准。
+This project follows the Keep a Changelog structure. Starting with `1.0.0`, releases are stable; each release note defines its exact compatibility boundary.
+
+## [1.0.0] - Unreleased
+
+### 中文
+
+#### 新增
+
+- 当前会话新增回复详略（低、中、高），并将所选值真实传入下一次 Codex 请求。
+- 当前会话新增推理摘要（自动、简洁、详细、关闭），不把摘要形式伪装成模型推理强度。
+- 模型设置在 Harness 通用发现接口之外新增独立的本机 loopback-only 只读能力 RPC，安全投影输入模态、当前安装 provider catalog 实际提供的推理档位和 Fast 支持；RPC 不可用或目录未提供的能力不推断。
+- OAuth 授权提示新增登录链接与验证码的独立复制操作；只有用户点击时才访问剪贴板，不记录短期授权材料。
+- 额度读取新增页面重新可见和窗口重置节点驱动的主动刷新；每周窗口进入不足 24 小时时只切换本地时间显示，不额外联网。
+- 设置页展示 Host 严格解析的套餐类型，不从模型或余额推测套餐。
+- `/codex-usage refresh` 可立即读取真实账号额度，`status` 继续只读取进程内最近请求观测；两者都不发起模型请求。
+- 连接诊断支持复制脱敏报告；报告仅包含固定检查 ID、状态码、时间和受限事实，不包含凭据、账号标识、原始响应或原始错误。
+- 会话请求设置展示脱敏的传输健康状态，包括请求、连接复用、增量上下文与 SSE 回退计数，不暴露 response ID 或原始 WebSocket 错误。
+
+#### 修复
+
+- 额度窗口只使用“剩余”语义；五小时重置始终显示精确时间，每周重置不足 24 小时时切换为精确时间，并保留刷新中状态与安全降级。
+- 重新登录开始时立即清除旧账号的已验证额度，避免新账号额度读取失败时继续显示上一个账号的百分比。
+- 显式切换传输方式会清理当前精确会话的 WebSocket→SSE 回退锁存；即使当前已是自动模式，存在回退时仍可点击“恢复自动”重新建立干净的传输状态。
+- 账号诊断将 HTTP 失败固定区分为 401/403 鉴权、429 限流、5xx 服务端和其他 HTTP 错误，不再把这些情况折叠为同一不可用状态，也不暴露原始响应。
+
+### English
+
+#### Added
+
+- Current sessions now provide reply verbosity (low, medium, or high), with the selected value sent truthfully on the next Codex request.
+- Current sessions now provide reasoning-summary style (auto, concise, detailed, or off) without presenting summary form as model reasoning effort.
+- Beyond Harness's generic discovery API, model settings now use an independent local loopback-only read-only capability RPC for safely projected input modalities, reasoning efforts exposed by the installed provider catalog, and Fast support. Unavailable RPC data and catalog-absent capabilities are not inferred.
+- OAuth prompts now provide separate copy actions for the sign-in link and verification code. Clipboard access occurs only after an explicit user click and short-lived authorization material is not logged.
+- Usage reads now refresh when the page becomes visible or a window reset boundary is reached. Crossing the weekly under-24-hour threshold changes only the local time display and performs no extra network read.
+- Settings displays the Host's strictly parsed plan type without inferring a plan from models or balance.
+- `/codex-usage refresh` performs an immediate real account-usage read, while `status` continues to read only the process-local recent-request observation. Neither sends a model request.
+- Connection diagnostics can copy a sanitized report containing only fixed check IDs, statuses, timestamps, and bounded facts, never credentials, account identifiers, raw responses, or raw errors.
+- Conversation request settings expose sanitized transport health for requests, connection reuse, delta context, and SSE fallback counts without response IDs or raw WebSocket errors.
+
+#### Fixed
+
+- Usage windows now use one consistent remaining-usage meaning. Five-hour resets always show exact time, weekly resets switch to exact time inside 24 hours, and refresh state plus safe fallback remain explicit.
+- Starting re-authorization immediately clears verified usage from the previous account, so a failed read for the new account cannot leave the previous account's percentages visible.
+- Explicit transport changes clear the exact conversation's WebSocket-to-SSE fallback latch. When fallback is active, **Reset to Auto** remains available even if Auto is already selected, allowing a clean transport state to be established.
+- Account diagnostics now classify HTTP failures into fixed 401/403 authentication, 429 rate-limit, 5xx server, and other HTTP categories instead of collapsing them into one unavailable state, without exposing raw responses.
 
 ## [0.0.4] - 2026-08-30
 

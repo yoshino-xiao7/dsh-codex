@@ -24,6 +24,7 @@ import {
   DEFAULT_IMAGE_POLICY,
   resolveImagePolicy,
 } from "./image-policy.mjs"
+import { codexModelCapabilityCatalog } from "./codex-model-capabilities.mjs"
 
 export const CODEX_SETTINGS_NAMESPACE = settingsNamespace("dsh-codex")
 
@@ -271,6 +272,7 @@ export function installCodexProviderRuntime(ctx, entryConfig = {}, options = {})
   return Object.freeze({
     accountUsageReader,
     connectionDiagnostics,
+    getModelCapabilities: () => codexModelCapabilityCatalog(provider.getModels()),
     getConfig: () => source(),
   })
 }

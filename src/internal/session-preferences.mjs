@@ -2,9 +2,21 @@ const MAX_SESSION_ID_CHARS = 256
 const DEFAULT_MAX_SESSIONS = 512
 const MAX_MAX_SESSIONS = 4_096
 const TRANSPORTS = new Set(["auto", "sse", "websocket", "websocket-cached"])
-const PREFERENCE_KEYS = new Set(["fast", "transport"])
+const TEXT_VERBOSITIES = new Set(["low", "medium", "high"])
+const REASONING_SUMMARIES = new Set(["auto", "concise", "detailed", "off"])
+const PREFERENCE_KEYS = new Set([
+  "fast",
+  "transport",
+  "textVerbosity",
+  "reasoningSummary",
+])
 
-const SAFE_DEFAULTS = Object.freeze({ fast: false, transport: "auto" })
+const SAFE_DEFAULTS = Object.freeze({
+  fast: false,
+  transport: "auto",
+  textVerbosity: "low",
+  reasoningSummary: "auto",
+})
 
 /**
  * Process-local, per-session request preferences.
@@ -16,7 +28,13 @@ const SAFE_DEFAULTS = Object.freeze({ fast: false, transport: "auto" })
  */
 export function createSessionPreferences(options = {}) {
   const input = plainObject(options, "options")
-  assertOnlyKeys(input, ["defaultFast", "defaultTransport", "maxSessions"], "option")
+  assertOnlyKeys(input, [
+    "defaultFast",
+    "defaultTransport",
+    "defaultTextVerbosity",
+    "defaultReasoningSummary",
+    "maxSessions",
+  ], "option")
   const maxSessions = input.maxSessions ?? DEFAULT_MAX_SESSIONS
   if (!Number.isSafeInteger(maxSessions) || maxSessions < 1 || maxSessions > MAX_MAX_SESSIONS) {
     throw new TypeError(`maxSessions must be an integer from 1 to ${MAX_MAX_SESSIONS}`)
@@ -24,6 +42,8 @@ export function createSessionPreferences(options = {}) {
   const defaults = snapshot({
     fast: input.defaultFast ?? SAFE_DEFAULTS.fast,
     transport: input.defaultTransport ?? SAFE_DEFAULTS.transport,
+    textVerbosity: input.defaultTextVerbosity ?? SAFE_DEFAULTS.textVerbosity,
+    reasoningSummary: input.defaultReasoningSummary ?? SAFE_DEFAULTS.reasoningSummary,
   })
   const entries = new Map()
   let disposed = false
@@ -40,7 +60,9 @@ export function createSessionPreferences(options = {}) {
       const change = plainObject(patch, "preference patch")
       const keys = Object.keys(change)
       if (keys.length === 0 || keys.some((key) => !PREFERENCE_KEYS.has(key))) {
-        throw new TypeError("preference patch must set only fast and/or transport")
+        throw new TypeError(
+          "preference patch must set only fast, transport, textVerbosity, and/or reasoningSummary",
+        )
       }
       if (!entries.has(id) && entries.size >= maxSessions) {
         throw new Error("session preference capacity reached")
@@ -68,7 +90,18 @@ function snapshot(value) {
   if (!TRANSPORTS.has(value.transport)) {
     throw new TypeError("transport must be auto, sse, websocket, or websocket-cached")
   }
-  return Object.freeze({ fast: value.fast, transport: value.transport })
+  if (!TEXT_VERBOSITIES.has(value.textVerbosity)) {
+    throw new TypeError("textVerbosity must be low, medium, or high")
+  }
+  if (!REASONING_SUMMARIES.has(value.reasoningSummary)) {
+    throw new TypeError("reasoningSummary must be auto, concise, detailed, or off")
+  }
+  return Object.freeze({
+    fast: value.fast,
+    transport: value.transport,
+    textVerbosity: value.textVerbosity,
+    reasoningSummary: value.reasoningSummary,
+  })
 }
 
 function validSessionId(value) {

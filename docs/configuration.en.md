@@ -54,27 +54,36 @@ Model IDs and capabilities follow the pinned runtime catalog. Check the catalog 
 
 ## Model capabilities and reasoning levels
 
-The settings page gets model names, context windows, and maximum outputs from the currently installed provider catalog; it is not a dynamic account model directory. The conversation model selector uses model-specific reasoning levels and defaults verified against the first-party Codex model catalog instead of inferring them from pi-ai's generic effort vocabulary:
+The settings page gets model names, context windows, and maximum outputs from the currently installed provider catalog; it is not a dynamic account model directory. Harness's generic `llm.discoverModels` provides the base catalog fields, while this plugin's independent loopback-only read-only capability RPC supplies input modalities, selectable reasoning efforts, and Fast support. If that RPC is unavailable, the base catalog remains visible and unproven capability badges are omitted. Low through Max in the conversation model selector follows the actual semantics of the currently installed provider catalog instead of being inferred from pi-ai's generic effort vocabulary:
 
-| Model | Selectable reasoning efforts | Default |
-| --- | --- | --- |
-| GPT-5.3 Codex Spark | Low, Medium, High, Xhigh | High |
-| GPT-5.4, GPT-5.4 mini, GPT-5.5 | Low, Medium, High, Xhigh | Medium |
-| GPT-5.6 Luna | Low, Medium, High, Xhigh, Max | Medium |
-| GPT-5.6 Sol | Low, Medium, High, Xhigh, Max | Low |
-| GPT-5.6 Terra | Low, Medium, High, Xhigh, Max | Medium |
+| Model | Selectable reasoning efforts |
+| --- | --- |
+| GPT-5.3 Codex Spark | Low, Medium, High, Xhigh |
+| GPT-5.4, GPT-5.4 mini, GPT-5.5 | Low, Medium, High, Xhigh |
+| GPT-5.6 Luna | Low, Medium, High, Xhigh, Max |
+| GPT-5.6 Sol | Low, Medium, High, Xhigh, Max |
+| GPT-5.6 Terra | Low, Medium, High, Xhigh, Max |
 
-The selector no longer shows generic `Default`, `Off`, or `Minimal` entries that are not subscription-Codex catalog efforts. `Ultra` in the Codex product catalog also enables proactive task delegation; it is not a plain reasoning effort that a model Provider can implement by sending one wire value. This plugin does not yet own Harness Agent orchestration, so it does not disguise `Ultra` as `Max` or another wire value. A future unverified model remains usable with its server default but receives no inferred effort controls.
+The selector no longer shows generic `Default`, `Off`, or `Minimal` entries that are not selectable efforts in the current catalog. `Ultra` in the Codex product catalog also enables proactive task delegation; it is not a plain reasoning effort that a model Provider can implement by sending one wire value. This plugin does not yet own Harness Agent orchestration, so it does not disguise `Ultra` as `Max` or another wire value. The plugin neither invents nor labels a default effort that the catalog does not provide. When a request has no explicit effort, the current Provider or service applies its default behavior. A future model without catalog-provided capability semantics remains usable through that behavior but receives no inferred effort controls.
 
-If an older conversation still stores `Off` or `Minimal`, a **Repair old reasoning level** action appears beside the composer. Merely opening the conversation never rewrites the selection. Clicking the action switches to that model's current default. It uses the same persistence semantics as the Harness model selector, so the model also becomes the default for future conversations.
+Model cards show text/image input, the selectable reasoning range, and Fast only when supplied by the safe capability projection. An unknown model never receives reasoning or Fast badges merely because its name resembles a known model. If an older conversation still stores `Off` or `Minimal`, a **Repair old reasoning level** action appears beside the composer. Merely opening the conversation never rewrites the selection. Clicking the action removes the unsupported explicit effort, after which the current Provider or service applies its default behavior. Repair neither displays, writes, nor claims a concrete default effort that the catalog does not provide. It still uses the Harness model selector's model-persistence semantics, so the current model becomes the default model for future conversations.
 
-## Per-session Fast and Transport preferences
+## Per-session request preferences
 
 The lightning button to the left of the conversation model selector and `/codex set fast on|off` update the same current-session Fast preference. On GPT-5.4, GPT-5.5, GPT-5.6 Luna, Sol, and Terra, enabling it uses the official Fast priority service tier starting with the next request; disabling it restores standard speed starting with the next request. Fast targets 1.5× speed and consumes more usage. GPT-5.3 Codex Spark and GPT-5.4 mini never receive the Fast service tier.
 
 The adjacent Transport button and `/codex set transport auto|sse|websocket|websocket-cached` share the current-conversation transport preference. The graphical menu displays the actual current value and can reset to Auto. `auto` lets the Provider select a transport; the other three choices request their named transport explicitly.
 
-Fast state belongs only to the current session in the current process and returns to off after a process restart. Transport preferences are likewise not persisted. An in-flight request is not changed by a toggle, and a failed Fast request is not automatically replayed on a lower tier.
+Every explicit transport selection clears only the current exact conversation's existing WebSocket connection, debug counters, and WebSocket-to-SSE fallback latch. The next request rebuilds transport state under the selected preference without affecting other conversations. If `auto` is already selected while health reports an active SSE fallback, **Reset to Auto** remains enabled so that latch can be cleared.
+
+The same menu provides two truthful request preferences:
+
+- reply verbosity: `/codex set verbosity low|medium|high`, default `low`;
+- reasoning summary: `/codex set summary auto|concise|detailed|off`, default `auto`.
+
+Both values are passed directly to the Provider request layer and do not rewrite model reasoning effort. `verbosity` controls final-answer detail, while `summary` selects the reasoning-summary form and `off` requests no summary. Like Fast and Transport, each change applies to the next request.
+
+Fast, Transport, reply verbosity, and reasoning summary belong only to the current session and process. Restart restores off, `auto`, `low`, and `auto`. An in-flight request is not changed by a toggle, and a failed Fast request is not replayed automatically on a lower tier. Transport health at the bottom of the menu is sanitized, process-local state for this conversation—requests, connection reuse, delta context, and SSE fallbacks—not an account-side service status. It contains neither response IDs nor raw WebSocket errors.
 
 ## Validation and activation
 
@@ -82,4 +91,4 @@ Fast state belongs only to the current session in the current process and return
 - Type mismatches, unknown enum values, ordinary numbers outside the allowed ranges, fractional image limits, and unknown or duplicate model IDs are rejected during plugin load or settings save. A rejected update does not replace the last valid configuration.
 - Use only the finite JSON/YAML numbers listed above. `NaN`, infinity, and undocumented fields are outside the supported configuration interface.
 - A configuration update takes effect on the next adapter operation. An operation already in progress continues with the immutable configuration snapshot it captured at start.
-- Fast and transport preferences are temporary state for the current session in the current process, not bundle configuration keys. `/codex` can change them, and the lightning button plus adjacent Transport menu provide the same controls graphically.
+- Fast, transport, reply-verbosity, and reasoning-summary preferences are temporary state for the current session in the current process, not bundle configuration keys. `/codex` can change them, and the lightning button plus adjacent conversation-request menu provide the same controls graphically.

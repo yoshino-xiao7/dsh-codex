@@ -9,6 +9,7 @@ window.__ModuleLoader__.load({
     const CHANNEL = "/dsh-codex"
     const SESSION_CHANNEL = "/dsh-codex-session"
     const DIAGNOSTICS_CHANNEL = "/dsh-codex-diagnostics"
+    const MODEL_CAPABILITIES_CHANNEL = "/dsh-codex-model-capabilities"
     const NS = "settings.codex"
     const CODEX_PROVIDER = "dsh-codex"
     const CODEX_SETTINGS_NS = "dsh-codex"
@@ -39,6 +40,10 @@ window.__ModuleLoader__.load({
       signingOut: "正在退出登录",
       confirmSignOut: "确认退出 Codex 登录并删除已保存的授权凭据吗？",
       openPage: "打开授权页面",
+      copyLoginLink: "复制登录链接",
+      copyVerificationCode: "复制验证码",
+      copied: "已复制",
+      copyFailed: "复制失败，请手动复制。",
       deviceCode: "验证码",
       submit: "继续",
       decline: "取消",
@@ -53,6 +58,7 @@ window.__ModuleLoader__.load({
       locale: "zh-CN",
       quotaTitle: "使用额度",
       quotaProduct: "Codex",
+      quotaPlan: "套餐",
       quotaLoading: "正在读取账户额度…",
       quotaLoadFailed: "暂时无法刷新账户额度。",
       quotaStaleHelp: "继续显示上一次验证成功的数据。",
@@ -80,6 +86,11 @@ window.__ModuleLoader__.load({
       modelsDescription: "选择在模型选择器中显示的 Codex 模型。名称、上下文和最大输出来自当前安装的 provider catalog；隐藏模型不影响已有会话。",
       modelsContextWindow: "上下文",
       modelsMaxOutput: "最大输出",
+      modelsTextInput: "文本输入",
+      modelsImageInput: "图片输入",
+      modelsFast: "Fast 1.5×",
+      modelsReasoning: "推理",
+      modelsDefaultReasoning: "默认",
       modelsLoading: "正在读取 Codex 模型目录…",
       modelsUnavailable: "当前环境没有可用的 Codex 模型管理接口。",
       modelsReadOnly: "当前设置存储为只读，无法修改启用模型。",
@@ -116,6 +127,23 @@ window.__ModuleLoader__.load({
       transportSessionOnly: "仅应用于当前会话",
       transportReset: "恢复自动",
       transportResetLabel: "将当前会话的传输方式恢复为自动",
+      requestSettings: "Codex 请求设置",
+      replyDetail: "回复详略",
+      replyDetailLow: "精简",
+      replyDetailMedium: "适中",
+      replyDetailHigh: "详细",
+      reasoningSummary: "推理摘要",
+      reasoningSummaryAuto: "自动",
+      reasoningSummaryConcise: "简洁",
+      reasoningSummaryDetailed: "详细",
+      reasoningSummaryOff: "关闭",
+      transportHealth: "本会话传输状态",
+      transportHealthIdle: "尚无传输观测",
+      transportHealthRequests: "请求",
+      transportHealthReused: "连接复用",
+      transportHealthCached: "增量上下文",
+      transportHealthFallbacks: "SSE 回退",
+      transportHealthFallbackActive: "当前已回退到 SSE",
       diagnosticsTitle: "连接诊断",
       diagnosticsCollapsedHelp: "按需检查，不会自动运行",
       diagnosticsExpandedHelp: "诊断只返回安全状态，不显示凭据或原始错误。",
@@ -140,6 +168,9 @@ window.__ModuleLoader__.load({
       diagnosticsCheckModels: "模型目录",
       diagnosticsCheckAccountUsage: "账号额度",
       diagnosticsObservedAt: "检查时间",
+      diagnosticsCopy: "复制诊断报告",
+      diagnosticsCopied: "诊断报告已复制",
+      diagnosticsCopyFailed: "无法复制诊断报告。",
       legacyReasoningRepair: "修复并设为新会话默认模型",
       legacyReasoningRepairing: "正在修复…",
       legacyReasoningRepaired: "已修复并设为新会话默认模型",
@@ -169,6 +200,10 @@ window.__ModuleLoader__.load({
       signingOut: "Signing out",
       confirmSignOut: "Sign out of Codex and delete the saved authorization credential?",
       openPage: "Open authorization page",
+      copyLoginLink: "Copy sign-in link",
+      copyVerificationCode: "Copy verification code",
+      copied: "Copied",
+      copyFailed: "Copy failed. Copy it manually.",
       deviceCode: "Verification code",
       submit: "Continue",
       decline: "Cancel",
@@ -183,6 +218,7 @@ window.__ModuleLoader__.load({
       locale: "en-US",
       quotaTitle: "Usage",
       quotaProduct: "Codex",
+      quotaPlan: "Plan",
       quotaLoading: "Reading account usage…",
       quotaLoadFailed: "Account usage could not be refreshed.",
       quotaStaleHelp: "The last successfully verified data remains visible.",
@@ -210,6 +246,11 @@ window.__ModuleLoader__.load({
       modelsDescription: "Choose which Codex models appear in the model selector. Names, context windows, and maximum output values come from the installed provider catalog; hidden models do not affect existing conversations.",
       modelsContextWindow: "Context",
       modelsMaxOutput: "Max output",
+      modelsTextInput: "Text input",
+      modelsImageInput: "Image input",
+      modelsFast: "Fast 1.5×",
+      modelsReasoning: "Reasoning",
+      modelsDefaultReasoning: "default",
       modelsLoading: "Reading the Codex model catalog…",
       modelsUnavailable: "Codex model management is unavailable in this environment.",
       modelsReadOnly: "The settings store is read-only, so enabled models cannot be changed.",
@@ -246,6 +287,23 @@ window.__ModuleLoader__.load({
       transportSessionOnly: "Applies only to this conversation",
       transportReset: "Reset to Auto",
       transportResetLabel: "Reset this conversation's transport to Auto",
+      requestSettings: "Codex request settings",
+      replyDetail: "Reply detail",
+      replyDetailLow: "Concise",
+      replyDetailMedium: "Balanced",
+      replyDetailHigh: "Detailed",
+      reasoningSummary: "Reasoning summary",
+      reasoningSummaryAuto: "Auto",
+      reasoningSummaryConcise: "Concise",
+      reasoningSummaryDetailed: "Detailed",
+      reasoningSummaryOff: "Off",
+      transportHealth: "Transport status for this conversation",
+      transportHealthIdle: "No transport activity observed yet",
+      transportHealthRequests: "Requests",
+      transportHealthReused: "Connection reuse",
+      transportHealthCached: "Delta context",
+      transportHealthFallbacks: "SSE fallbacks",
+      transportHealthFallbackActive: "Currently falling back to SSE",
       diagnosticsTitle: "Connection diagnostics",
       diagnosticsCollapsedHelp: "Runs only when requested; never starts automatically",
       diagnosticsExpandedHelp: "Diagnostics return safe status only, without credentials or raw errors.",
@@ -270,6 +328,9 @@ window.__ModuleLoader__.load({
       diagnosticsCheckModels: "Model catalog",
       diagnosticsCheckAccountUsage: "Account usage",
       diagnosticsObservedAt: "Checked",
+      diagnosticsCopy: "Copy diagnostics report",
+      diagnosticsCopied: "Diagnostics report copied",
+      diagnosticsCopyFailed: "Could not copy the diagnostics report.",
       legacyReasoningRepair: "Repair and set as future default",
       legacyReasoningRepairing: "Repairing…",
       legacyReasoningRepaired: "Repaired and set as future default",
@@ -362,6 +423,9 @@ window.__ModuleLoader__.load({
         "account-auth-unavailable": diagnosticCheckContract("fail"),
         "account-network-unavailable": diagnosticCheckContract("fail"),
         "account-timeout": diagnosticCheckContract("fail"),
+        "account-http-auth-error": diagnosticCheckContract("fail"),
+        "account-http-rate-limited": diagnosticCheckContract("fail"),
+        "account-http-server-error": diagnosticCheckContract("fail"),
         "account-http-error": diagnosticCheckContract("fail"),
         "account-response-invalid": diagnosticCheckContract("fail"),
         "account-usage-unavailable": diagnosticCheckContract("fail"),
@@ -500,6 +564,37 @@ window.__ModuleLoader__.load({
       })
     }
 
+    async function writeClipboardText(value) {
+      if (typeof value !== "string" || value.length === 0) {
+        throw new TypeError("Clipboard text must be a non-empty string.")
+      }
+      const clipboard = typeof navigator === "object" && navigator !== null
+        ? navigator.clipboard
+        : typeof window === "object" ? window.navigator?.clipboard : undefined
+      if (typeof clipboard?.writeText !== "function") {
+        throw new Error("Clipboard API is unavailable.")
+      }
+      await clipboard.writeText(value)
+    }
+
+    function diagnosticsReportText(value) {
+      if (!DIAGNOSTIC_MODES.has(value?.mode)) throw invalidDiagnosticsResponse()
+      const report = safeDiagnosticsReport(value, value.mode)
+      return JSON.stringify({
+        format: "dsh-codex-diagnostics",
+        version: report.version,
+        mode: report.mode,
+        outcome: report.outcome,
+        observedAt: report.observedAt,
+        checks: report.checks.map((check) => ({
+          id: check.id,
+          status: check.status,
+          code: check.code,
+          ...(check.facts === undefined ? {} : { facts: { ...check.facts } }),
+        })),
+      }, null, 2)
+    }
+
     function createSessionPreferenceClient(connection) {
       const call = async (endpoint, payload, signal) => {
         const result = await connection.rpc.call(SESSION_CHANNEL, endpoint, payload, signal)
@@ -520,6 +615,14 @@ window.__ModuleLoader__.load({
               sessionId,
               transport,
             }, signal),
+            setTextVerbosity: (textVerbosity, signal) => call("set-text-verbosity", {
+              sessionId,
+              textVerbosity,
+            }, signal),
+            setReasoningSummary: (reasoningSummary, signal) => call("set-reasoning-summary", {
+              sessionId,
+              reasoningSummary,
+            }, signal),
           })
         },
       })
@@ -536,12 +639,59 @@ window.__ModuleLoader__.load({
       }),
     ])
     const TRANSPORT_IDS = new Set(TRANSPORT_OPTIONS.map(({ id }) => id))
+    const TEXT_VERBOSITY_OPTIONS = Object.freeze([
+      Object.freeze({ id: "low", label: "replyDetailLow" }),
+      Object.freeze({ id: "medium", label: "replyDetailMedium" }),
+      Object.freeze({ id: "high", label: "replyDetailHigh" }),
+    ])
+    const REASONING_SUMMARY_OPTIONS = Object.freeze([
+      Object.freeze({ id: "auto", label: "reasoningSummaryAuto" }),
+      Object.freeze({ id: "concise", label: "reasoningSummaryConcise" }),
+      Object.freeze({ id: "detailed", label: "reasoningSummaryDetailed" }),
+      Object.freeze({ id: "off", label: "reasoningSummaryOff" }),
+    ])
+    const TEXT_VERBOSITY_IDS = new Set(TEXT_VERBOSITY_OPTIONS.map(({ id }) => id))
+    const REASONING_SUMMARY_IDS = new Set(REASONING_SUMMARY_OPTIONS.map(({ id }) => id))
+
+    function safeTransportHealth(value) {
+      if (value?.status === "idle") return { status: "idle" }
+      if (value?.status !== "observed" || typeof value.websocketFallbackActive !== "boolean") {
+        return undefined
+      }
+      const counts = {}
+      for (const key of [
+        "requests",
+        "connectionsCreated",
+        "connectionsReused",
+        "cachedContextRequests",
+        "fullContextRequests",
+        "deltaRequests",
+        "websocketFailures",
+        "sseFallbacks",
+      ]) {
+        if (!Number.isSafeInteger(value[key]) || value[key] < 0) return undefined
+        counts[key] = value[key]
+      }
+      return {
+        status: "observed",
+        ...counts,
+        websocketFallbackActive: value.websocketFallbackActive,
+      }
+    }
 
     function readyPreference(value, previous) {
+      const transportHealth = safeTransportHealth(value?.transportHealth)
       return {
         status: "ready",
         fast: value?.fast === true,
         transport: TRANSPORT_IDS.has(value?.transport) ? value.transport : previous.transport,
+        textVerbosity: TEXT_VERBOSITY_IDS.has(value?.textVerbosity)
+          ? value.textVerbosity
+          : previous.textVerbosity,
+        reasoningSummary: REASONING_SUMMARY_IDS.has(value?.reasoningSummary)
+          ? value.reasoningSummary
+          : previous.reasoningSummary,
+        transportHealth: transportHealth ?? previous.transportHealth,
         fastSupported: typeof value?.fastSupported === "boolean"
           ? value.fastSupported
           : previous.fastSupported,
@@ -560,6 +710,9 @@ window.__ModuleLoader__.load({
         status: "loading",
         fast: false,
         transport: "auto",
+        textVerbosity: "low",
+        reasoningSummary: "auto",
+        transportHealth: { status: "idle" },
         fastSupported: null,
       })
       const [transportMenuOpen, setTransportMenuOpen] = React.useState(false)
@@ -577,13 +730,13 @@ window.__ModuleLoader__.load({
       const isCodex = current?.provider === CODEX_PROVIDER
       const supported = isCodex && preference.fastSupported === true
 
-      const refreshPreference = React.useCallback(async () => {
+      const refreshPreference = React.useCallback(async (showLoading = true) => {
         if (!mountedRef.current || !isCodex) return
         const generation = ++generationRef.current
         controllerRef.current?.abort()
         const controller = new AbortController()
         controllerRef.current = controller
-        setPreference((value) => ({ ...value, status: "loading" }))
+        if (showLoading) setPreference((value) => ({ ...value, status: "loading" }))
         try {
           const value = await preferenceClient.getForModel(current.model, controller.signal)
           if (!mountedRef.current || generation !== generationRef.current || controller.signal.aborted) return
@@ -698,6 +851,7 @@ window.__ModuleLoader__.load({
         const selectedIndex = TRANSPORT_OPTIONS.findIndex(({ id }) => id === preference.transport)
         setActiveTransportIndex(selectedIndex < 0 ? 0 : selectedIndex)
         setTransportMenuOpen(true)
+        void refreshPreference(false)
       }
 
       const chooseTransport = async (transport) => {
@@ -708,7 +862,9 @@ window.__ModuleLoader__.load({
           || preference.status !== "ready"
         ) return
         closeTransportMenu(true)
-        if (transport === preference.transport) return
+        const clearsFallback = preference.transportHealth.status === "observed"
+          && preference.transportHealth.websocketFallbackActive
+        if (transport === preference.transport && !clearsFallback) return
         const generation = ++generationRef.current
         controllerRef.current?.abort()
         const controller = new AbortController()
@@ -716,6 +872,56 @@ window.__ModuleLoader__.load({
         setPreference((value) => ({ ...value, status: "saving" }))
         try {
           const value = await preferenceClient.setTransport(transport, controller.signal)
+          if (!mountedRef.current || generation !== generationRef.current || controller.signal.aborted) return
+          setPreference((previous) => readyPreference(value, previous))
+        } catch {
+          if (!mountedRef.current || generation !== generationRef.current || controller.signal.aborted) return
+          setPreference((value) => ({ ...value, status: "error" }))
+        } finally {
+          if (controllerRef.current === controller) controllerRef.current = null
+        }
+      }
+
+      const chooseTextVerbosity = async (textVerbosity) => {
+        if (
+          !mountedRef.current
+          || !TEXT_VERBOSITY_IDS.has(textVerbosity)
+          || session?.removed === true
+          || preference.status !== "ready"
+          || textVerbosity === preference.textVerbosity
+        ) return
+        const generation = ++generationRef.current
+        controllerRef.current?.abort()
+        const controller = new AbortController()
+        controllerRef.current = controller
+        setPreference((value) => ({ ...value, status: "saving" }))
+        try {
+          const value = await preferenceClient.setTextVerbosity(textVerbosity, controller.signal)
+          if (!mountedRef.current || generation !== generationRef.current || controller.signal.aborted) return
+          setPreference((previous) => readyPreference(value, previous))
+        } catch {
+          if (!mountedRef.current || generation !== generationRef.current || controller.signal.aborted) return
+          setPreference((value) => ({ ...value, status: "error" }))
+        } finally {
+          if (controllerRef.current === controller) controllerRef.current = null
+        }
+      }
+
+      const chooseReasoningSummary = async (reasoningSummary) => {
+        if (
+          !mountedRef.current
+          || !REASONING_SUMMARY_IDS.has(reasoningSummary)
+          || session?.removed === true
+          || preference.status !== "ready"
+          || reasoningSummary === preference.reasoningSummary
+        ) return
+        const generation = ++generationRef.current
+        controllerRef.current?.abort()
+        const controller = new AbortController()
+        controllerRef.current = controller
+        setPreference((value) => ({ ...value, status: "saving" }))
+        try {
+          const value = await preferenceClient.setReasoningSummary(reasoningSummary, controller.signal)
           if (!mountedRef.current || generation !== generationRef.current || controller.signal.aborted) return
           setPreference((previous) => readyPreference(value, previous))
         } catch {
@@ -738,6 +944,7 @@ window.__ModuleLoader__.load({
           closeTransportMenu(true)
           return
         }
+        if (event.target?.tagName === "SELECT") return
         let nextIndex
         if (event.key === "ArrowDown") {
           nextIndex = (activeTransportIndex + 1) % TRANSPORT_OPTIONS.length
@@ -807,7 +1014,7 @@ window.__ModuleLoader__.load({
         className: "dshCodexTransportToggle",
         "data-transport": preference.transport,
         "aria-label": transportLabel,
-        "aria-haspopup": "menu",
+        "aria-haspopup": "dialog",
         "aria-expanded": transportMenuOpen ? "true" : "false",
         "aria-controls": transportMenuOpen ? transportMenuId : undefined,
         "aria-busy": preference.status === "loading" || preference.status === "saving" ? "true" : undefined,
@@ -828,49 +1035,93 @@ window.__ModuleLoader__.load({
       },
       h("path", { d: "M7 7h11m0 0-3-3m3 3-3 3M17 17H6m0 0 3 3m-3-3 3-3" })))
 
+      const health = preference.transportHealth
+      const healthSummary = health.status === "observed"
+        ? [
+            `${t("transportHealthRequests")} ${health.requests}`,
+            `${t("transportHealthReused")} ${health.connectionsReused}`,
+            `${t("transportHealthCached")} ${health.deltaRequests}`,
+            `${t("transportHealthFallbacks")} ${health.sseFallbacks}`,
+          ].join(" · ")
+        : t("transportHealthIdle")
+
       const transportMenu = !transportMenuOpen ? null : h("div", {
         id: transportMenuId,
         className: "dshCodexTransportMenu",
-        role: "menu",
-        "aria-label": t("transportMenu"),
-        "aria-orientation": "vertical",
+        role: "dialog",
+        "aria-label": t("requestSettings"),
         onKeyDown: handleTransportMenuKeyDown,
       },
-      ...TRANSPORT_OPTIONS.map((option, index) => h("button", {
-        key: option.id,
-        type: "button",
-        ref: (element) => { transportOptionRefs.current[index] = element },
-        className: "dshCodexTransportOption",
-        role: "menuitemradio",
-        "aria-checked": preference.transport === option.id,
-        "data-selected": preference.transport === option.id ? "true" : undefined,
-        tabIndex: activeTransportIndex === index ? 0 : -1,
-        onMouseEnter: () => setActiveTransportIndex(index),
-        onClick: () => void chooseTransport(option.id),
+      h("div", {
+        className: "dshCodexTransportOptions",
+        role: "radiogroup",
+        "aria-label": t("transportMenu"),
+      }, ...TRANSPORT_OPTIONS.map((option, index) => h("button", {
+          key: option.id,
+          type: "button",
+          ref: (element) => { transportOptionRefs.current[index] = element },
+          className: "dshCodexTransportOption",
+          role: "radio",
+          "aria-checked": preference.transport === option.id,
+          "data-selected": preference.transport === option.id ? "true" : undefined,
+          tabIndex: activeTransportIndex === index ? 0 : -1,
+          onMouseEnter: () => setActiveTransportIndex(index),
+          onClick: () => void chooseTransport(option.id),
+        },
+        h("span", { className: "dshCodexTransportOptionCopy" },
+          h("strong", null, t(option.label)),
+          h("span", null, t(option.help))),
+        preference.transport === option.id
+          ? h("svg", {
+              viewBox: "0 0 24 24",
+              width: 16,
+              height: 16,
+              fill: "none",
+              stroke: "currentColor",
+              strokeWidth: 2.2,
+              strokeLinecap: "round",
+              strokeLinejoin: "round",
+              "aria-hidden": "true",
+            }, h("path", { d: "m5 12 4 4L19 6" }))
+          : null))),
+      h("div", { className: "dshCodexRequestSetting" },
+        h("label", null,
+          h("strong", null, t("replyDetail")),
+          h("select", {
+            value: preference.textVerbosity,
+            disabled: preference.status !== "ready",
+            onChange: (event) => void chooseTextVerbosity(event.currentTarget.value),
+          }, ...TEXT_VERBOSITY_OPTIONS.map((option) => h("option", {
+            key: option.id,
+            value: option.id,
+          }, t(option.label))))),
+        h("label", null,
+          h("strong", null, t("reasoningSummary")),
+          h("select", {
+            value: preference.reasoningSummary,
+            disabled: preference.status !== "ready",
+            onChange: (event) => void chooseReasoningSummary(event.currentTarget.value),
+          }, ...REASONING_SUMMARY_OPTIONS.map((option) => h("option", {
+            key: option.id,
+            value: option.id,
+          }, t(option.label)))))),
+      h("div", {
+        className: "dshCodexTransportHealth",
+        "data-status": health.status,
+        role: "status",
       },
-      h("span", { className: "dshCodexTransportOptionCopy" },
-        h("strong", null, t(option.label)),
-        h("span", null, t(option.help))),
-      preference.transport === option.id
-        ? h("svg", {
-            viewBox: "0 0 24 24",
-            width: 16,
-            height: 16,
-            fill: "none",
-            stroke: "currentColor",
-            strokeWidth: 2.2,
-            strokeLinecap: "round",
-            strokeLinejoin: "round",
-            "aria-hidden": "true",
-          }, h("path", { d: "m5 12 4 4L19 6" }))
-        : null)),
-      h("div", { className: "dshCodexTransportMenuFooter", role: "none" },
+        h("strong", null, t("transportHealth")),
+        h("span", null, healthSummary),
+        health.status === "observed" && health.websocketFallbackActive
+          ? h("span", { className: "dshCodexTransportFallback" }, t("transportHealthFallbackActive"))
+          : null),
+      h("div", { className: "dshCodexTransportMenuFooter" },
         h("span", null, t("transportSessionOnly")),
         h("button", {
           type: "button",
           className: "dshCodexTransportReset",
-          role: "menuitem",
-          disabled: preference.transport === "auto",
+          disabled: preference.transport === "auto"
+            && !(health.status === "observed" && health.websocketFallbackActive),
           "aria-label": t("transportResetLabel"),
           onClick: () => void chooseTransport("auto"),
         }, t("transportReset"))))
@@ -958,7 +1209,15 @@ window.__ModuleLoader__.load({
         })
       }
       if (rateLimits.length === 0) return undefined
-      return { observedAt: value.observedAt, rateLimits }
+      const planType = typeof value.planType === "string"
+        && /^[a-zA-Z0-9][a-zA-Z0-9 _-]{0,63}$/u.test(value.planType)
+        ? value.planType
+        : undefined
+      return {
+        observedAt: value.observedAt,
+        ...(planType === undefined ? {} : { planType }),
+        rateLimits,
+      }
     }
 
     function safeUsageWindow(value) {
@@ -1063,9 +1322,31 @@ window.__ModuleLoader__.load({
         h("p", { className: "dshCodexMuted" }, t("quotaUnknownHelp")))
     }
 
-    function renderAccountUsage(usage, t) {
-      const now = Date.now()
+    function nextAccountUsageTransition(usage, now = Date.now()) {
+      if (!Number.isSafeInteger(now) || now < 0) return undefined
+      let next
+      for (const limit of usage?.rateLimits ?? []) {
+        for (const window of [limit?.primary, limit?.secondary]) {
+          if (window === undefined) continue
+          const candidates = [{ at: window.resetsAt, refresh: true }]
+          if (window.windowDurationMins === 10_080) {
+            candidates.push({ at: window.resetsAt - 24 * 60 * 60_000, refresh: false })
+          }
+          for (const candidate of candidates) {
+            if (!Number.isSafeInteger(candidate.at) || candidate.at <= now) continue
+            if (next === undefined || candidate.at < next.at) next = candidate
+            else if (candidate.at === next.at && candidate.refresh) next = candidate
+          }
+        }
+      }
+      return next
+    }
+
+    function renderAccountUsage(usage, t, now = Date.now()) {
       return h(React.Fragment, null,
+        usage.planType === undefined
+          ? null
+          : h("p", { className: "dshCodexQuotaPlan" }, `${t("quotaPlan")}${t("locale").toLowerCase().startsWith("zh") ? "：" : ": "}${usage.planType}`),
         ...usage.rateLimits.map((limit) => {
           const windows = [limit.primary, limit.secondary].filter((window) => window !== undefined)
           const limitLabel = limit.limitId === "codex"
@@ -1113,13 +1394,17 @@ window.__ModuleLoader__.load({
       return value.filter((row) => typeof row === "object" && row !== null && !Array.isArray(row) && typeof row.id === "string" && row.id.length > 0)
     }
 
-    function discoveredModels(value) {
+    function discoveredModels(value, includeCapabilities = false) {
       if (!Array.isArray(value)) return []
       const seen = new Set()
       const rows = []
       for (const candidate of value) {
         if (typeof candidate !== "object" || candidate === null || typeof candidate.id !== "string" || candidate.id.length === 0 || seen.has(candidate.id)) continue
         seen.add(candidate.id)
+        const inputModalities = includeCapabilities
+          ? safeModelInputModalities(candidate.inputModalities)
+          : undefined
+        const reasoning = includeCapabilities ? safeModelReasoning(candidate.reasoning) : undefined
         rows.push({
           id: candidate.id,
           ...(typeof candidate.name === "string" && candidate.name.length > 0 ? { name: candidate.name } : {}),
@@ -1129,9 +1414,54 @@ window.__ModuleLoader__.load({
           ...(Number.isSafeInteger(candidate.maxTokens) && candidate.maxTokens > 0
             ? { maxTokens: candidate.maxTokens }
             : {}),
+          ...(inputModalities === undefined ? {} : { inputModalities }),
+          ...(reasoning === undefined ? {} : { reasoning }),
+          ...(includeCapabilities && typeof candidate.fast === "boolean"
+            ? { fast: candidate.fast }
+            : {}),
         })
       }
       return rows
+    }
+
+    function safeModelInputModalities(value) {
+      if (!Array.isArray(value) || value.length > 8) return undefined
+      const modalities = [...new Set(value.filter((item) => item === "text" || item === "image"))]
+      return modalities.length === 0 ? undefined : modalities
+    }
+
+    function safeModelReasoning(value) {
+      if (typeof value !== "object" || value === null || Array.isArray(value)
+        || !Array.isArray(value.efforts)
+        || value.efforts.length < 1
+        || value.efforts.length > 8) return undefined
+      const efforts = []
+      const seen = new Set()
+      for (const effort of value.efforts) {
+        if (typeof effort !== "object" || effort === null || Array.isArray(effort)
+          || typeof effort.id !== "string"
+          || !/^[a-z][a-z0-9-]{0,31}$/u.test(effort.id)
+          || typeof effort.name !== "string"
+          || effort.name.length < 1
+          || effort.name.length > 32
+          || seen.has(effort.id)) return undefined
+        seen.add(effort.id)
+        efforts.push({ id: effort.id, name: effort.name })
+      }
+      if (value.defaultEffort !== undefined && !seen.has(value.defaultEffort)) return undefined
+      return {
+        efforts,
+        ...(value.defaultEffort === undefined ? {} : { defaultEffort: value.defaultEffort }),
+      }
+    }
+
+    function modelReasoningLabel(reasoning, t) {
+      const names = reasoning.efforts.map(({ name }) => name)
+      const range = names.length < 2 ? names[0] : `${names[0]}–${names.at(-1)}`
+      if (reasoning.defaultEffort === undefined) return `${t("modelsReasoning")} ${range}`
+      const defaultName = reasoning.efforts.find(({ id }) => id === reasoning.defaultEffort)?.name
+        ?? reasoning.defaultEffort
+      return `${t("modelsReasoning")} ${range} · ${t("modelsDefaultReasoning")} ${defaultName}`
     }
 
     function formatModelTokenCount(value, locale) {
@@ -1179,11 +1509,42 @@ window.__ModuleLoader__.load({
       const load = async (signal) => {
         if (!available) return { kind: "unavailable" }
 
-        const [catalogResponse] = await Promise.all([
-          api.llm.discoverModels({ settingsNs: CODEX_SETTINGS_NS, provider: CODEX_PROVIDER }, signal),
-          settingsFace.ensure(),
+        const catalogRequest = api.llm.discoverModels(
+          { settingsNs: CODEX_SETTINGS_NS, provider: CODEX_PROVIDER },
+          signal,
+        )
+        const settingsRequest = settingsFace.ensure()
+        const capabilityRequest = typeof connection?.rpc?.call === "function"
+          ? Promise.resolve()
+            .then(() => connection.rpc.call(
+              MODEL_CAPABILITIES_CHANNEL,
+              "get",
+              {},
+              signal,
+            ))
+            .catch(() => undefined)
+          : Promise.resolve(undefined)
+        const [catalogResponse, , capabilityResponse] = await Promise.all([
+          catalogRequest,
+          settingsRequest,
+          capabilityRequest,
         ])
-        const discovered = discoveredModels(resultValue(catalogResponse).models)
+        const capabilityModels = capabilityResponse?.ok === true
+          ? discoveredModels(capabilityResponse.value?.models, true)
+          : []
+        const capabilitiesById = new Map(capabilityModels.map((model) => [model.id, model]))
+        const discovered = discoveredModels(resultValue(catalogResponse).models).map((model) => {
+          const capability = capabilitiesById.get(model.id)
+          if (capability === undefined) return model
+          return {
+            ...model,
+            ...(capability.inputModalities === undefined
+              ? {}
+              : { inputModalities: capability.inputModalities }),
+            ...(capability.reasoning === undefined ? {} : { reasoning: capability.reasoning }),
+            ...(typeof capability.fast === "boolean" ? { fast: capability.fast } : {}),
+          }
+        })
         const mirror = settingsFace.getSnapshot()
         if (mirror?.status !== "ready" || mirror.view === undefined) return { kind: "unavailable" }
         const settings = mirror.view
@@ -1264,6 +1625,7 @@ window.__ModuleLoader__.load({
     function AuthorizationSettings({ client, t }) {
       const [snapshot, setSnapshot] = React.useState({ status: "loading" })
       const [usageSnapshot, setUsageSnapshot] = React.useState({ status: "idle" })
+      const [usageNow, setUsageNow] = React.useState(() => Date.now())
       const [attempt, setAttempt] = React.useState(null)
       const [notices, setNotices] = React.useState([])
       const [prompt, setPrompt] = React.useState(null)
@@ -1273,6 +1635,7 @@ window.__ModuleLoader__.load({
       const [responding, setResponding] = React.useState(false)
       const [cancelling, setCancelling] = React.useState(false)
       const [loggingOut, setLoggingOut] = React.useState(false)
+      const [copyState, setCopyState] = React.useState({ key: null, status: "idle" })
       const attemptRef = React.useRef(null)
       const pendingStartRef = React.useRef(null)
       const mountedRef = React.useRef(false)
@@ -1307,6 +1670,7 @@ window.__ModuleLoader__.load({
             const usage = safeAccountUsage(await client.usage(controller.signal))
             if (usage === undefined) throw new Error("invalid account usage")
             if (!mountedRef.current || generation !== refreshGenerationRef.current || controller.signal.aborted) return
+            setUsageNow(Date.now())
             setUsageSnapshot({ status: "ready", value: usage })
           } catch {
             if (!mountedRef.current || generation !== refreshGenerationRef.current || controller.signal.aborted) return
@@ -1342,6 +1706,31 @@ window.__ModuleLoader__.load({
           if (current !== null && !current.done) void client.cancel(current.id).catch(() => undefined)
         }
       }, [client])
+
+      React.useEffect(() => {
+        const transition = nextAccountUsageTransition(usageSnapshot.value, usageNow)
+        if (transition === undefined
+          || typeof window?.setTimeout !== "function"
+          || typeof window?.clearTimeout !== "function") return undefined
+        const delay = Math.min(2_147_483_647, Math.max(1, transition.at - usageNow))
+        const timer = window.setTimeout(() => {
+          if (!mountedRef.current) return
+          if (transition.refresh && transition.at - Date.now() <= 1_000) void refresh()
+          else setUsageNow(Date.now())
+        }, delay)
+        return () => window.clearTimeout(timer)
+      }, [refresh, usageNow, usageSnapshot.value])
+
+      React.useEffect(() => {
+        if (typeof document === "undefined" || typeof document.addEventListener !== "function") {
+          return undefined
+        }
+        const refreshWhenVisible = () => {
+          if (document.visibilityState === "visible" && mountedRef.current) void refresh()
+        }
+        document.addEventListener("visibilitychange", refreshWhenVisible)
+        return () => document.removeEventListener?.("visibilitychange", refreshWhenVisible)
+      }, [refresh])
 
       const consume = async (current) => {
         const isCurrent = () => mountedRef.current
@@ -1409,6 +1798,10 @@ window.__ModuleLoader__.load({
         const pending = { generation }
         pendingStartRef.current = pending
         setAttempt("starting")
+        // A new authorization attempt may replace the account. Never carry a
+        // verified percentage from the previous account across that boundary.
+        setUsageSnapshot({ status: "idle" })
+        setUsageNow(Date.now())
         setNotices([])
         setPrompt(null)
         setOutcome(null)
@@ -1485,6 +1878,8 @@ window.__ModuleLoader__.load({
         try {
           await client.logout()
           if (!mountedRef.current) return
+          setUsageSnapshot({ status: "idle" })
+          setUsageNow(Date.now())
           setNotices([])
           setPrompt(null)
           setAnswer("")
@@ -1520,6 +1915,16 @@ window.__ModuleLoader__.load({
             && attemptRef.current === current) setFailure("RESPONSE_FAILED")
         } finally {
           if (isCurrentResponse()) setResponding(false)
+        }
+      }
+
+      const copyAuthorizationValue = async (key, value) => {
+        if (!mountedRef.current || typeof value !== "string" || value.length === 0) return
+        try {
+          await writeClipboardText(value)
+          if (mountedRef.current) setCopyState({ key, status: "copied" })
+        } catch {
+          if (mountedRef.current) setCopyState({ key, status: "error" })
         }
       }
 
@@ -1593,7 +1998,7 @@ window.__ModuleLoader__.load({
       let quotaBody
       if (liveUsage !== undefined) {
         quotaBody = h(React.Fragment, null,
-          renderAccountUsage(liveUsage, t),
+          renderAccountUsage(liveUsage, t, usageNow),
           usageSnapshot.status === "error"
             ? h("p", { role: "status", className: "dshCodexError" }, `${t("quotaLoadFailed")} ${t("quotaStaleHelp")}`)
             : null)
@@ -1634,13 +2039,37 @@ window.__ModuleLoader__.load({
           ? h("ol", { className: "dshCodexNotices", "aria-live": "polite" },
               ...notices.map((notice, index) => h("li", { key: `${index}-${notice.message}` },
                 h("p", null, notice.message),
-                notice.url === undefined ? null : h("a", {
-                  href: notice.url,
-                  target: "_blank",
-                  rel: "noopener noreferrer",
-                }, t("openPage")),
+                notice.url === undefined ? null : h("div", { className: "dshCodexNoticeActions" },
+                  h("a", {
+                    href: notice.url,
+                    target: "_blank",
+                    rel: "noopener noreferrer",
+                  }, t("openPage")),
+                  h("button", {
+                    type: "button",
+                    className: "dshCodexInlineCopy",
+                    onClick: () => void copyAuthorizationValue(`url-${index}`, notice.url),
+                  }, t("copyLoginLink")),
+                  copyState.key !== `url-${index}`
+                    ? null
+                    : h("span", {
+                        className: copyState.status === "error" ? "dshCodexError" : "dshCodexSuccess",
+                        role: "status",
+                      }, t(copyState.status === "error" ? "copyFailed" : "copied"))),
                 notice.code === undefined ? null : h("div", { className: "dshCodexCode" },
-                  h("span", null, t("deviceCode")), h("code", null, notice.code)))))
+                  h("span", null, t("deviceCode")),
+                  h("code", null, notice.code),
+                  h("button", {
+                    type: "button",
+                    className: "dshCodexInlineCopy",
+                    onClick: () => void copyAuthorizationValue(`code-${index}`, notice.code),
+                  }, t("copyVerificationCode")),
+                  copyState.key !== `code-${index}`
+                    ? null
+                    : h("span", {
+                        className: copyState.status === "error" ? "dshCodexError" : "dshCodexSuccess",
+                        role: "status",
+                      }, t(copyState.status === "error" ? "copyFailed" : "copied"))))))
           : null,
         prompt === null ? null : h("form", {
           className: "dshCodexPrompt",
@@ -1746,6 +2175,7 @@ window.__ModuleLoader__.load({
     function ConnectionDiagnosticsSettings({ client, t }) {
       const [expanded, setExpanded] = React.useState(false)
       const [state, setState] = React.useState({ kind: "idle" })
+      const [copyStatus, setCopyStatus] = React.useState("idle")
       const instanceId = React.useId().replace(/[^a-zA-Z0-9_-]/gu, "")
       const contentId = `dsh-codex-diagnostics-${instanceId}`
       const mountedRef = React.useRef(false)
@@ -1768,6 +2198,7 @@ window.__ModuleLoader__.load({
         controllerRef.current?.abort()
         const controller = new AbortController()
         controllerRef.current = controller
+        setCopyStatus("idle")
         setState({ kind: "running", mode })
         try {
           const report = await client.run(mode, controller.signal)
@@ -1795,6 +2226,16 @@ window.__ModuleLoader__.load({
         setState({ kind: "cancelled", mode: state.mode })
       }
 
+      const copyReport = async () => {
+        if (!mountedRef.current || state.kind !== "ready") return
+        try {
+          await writeClipboardText(diagnosticsReportText(state.report))
+          if (mountedRef.current) setCopyStatus("copied")
+        } catch {
+          if (mountedRef.current) setCopyStatus("error")
+        }
+      }
+
       let result = null
       if (state.kind === "ready") {
         const report = state.report
@@ -1814,7 +2255,18 @@ window.__ModuleLoader__.load({
             `${t("diagnosticsObservedAt")} `,
             h("time", {
               dateTime: Number.isNaN(observedDate.valueOf()) ? undefined : observedDate.toISOString(),
-            }, observedLabel))),
+            }, observedLabel)),
+          h("button", {
+            type: "button",
+            className: "dshCodexInlineCopy",
+            onClick: () => void copyReport(),
+          }, t("diagnosticsCopy"))),
+        copyStatus === "idle"
+          ? null
+          : h("p", {
+              className: copyStatus === "error" ? "dshCodexError" : "dshCodexSuccess",
+              role: "status",
+            }, t(copyStatus === "error" ? "diagnosticsCopyFailed" : "diagnosticsCopied")),
         h("ul", { className: "dshCodexDiagnosticsChecks" },
           ...report.checks.map((check) => {
             const facts = check.facts === undefined
@@ -2001,10 +2453,22 @@ window.__ModuleLoader__.load({
           const metadata = [
             ...(model.contextWindow === undefined
               ? []
-              : [`${t("modelsContextWindow")} ${formatModelTokenCount(model.contextWindow, t("locale"))}`]),
+              : [{ key: "context", label: `${t("modelsContextWindow")} ${formatModelTokenCount(model.contextWindow, t("locale"))}` }]),
             ...(model.maxTokens === undefined
               ? []
-              : [`${t("modelsMaxOutput")} ${formatModelTokenCount(model.maxTokens, t("locale"))}`]),
+              : [{ key: "output", label: `${t("modelsMaxOutput")} ${formatModelTokenCount(model.maxTokens, t("locale"))}` }]),
+            ...(model.inputModalities?.includes("text") === true
+              ? [{ key: "text", label: t("modelsTextInput") }]
+              : []),
+            ...(model.inputModalities?.includes("image") === true
+              ? [{ key: "image", label: t("modelsImageInput") }]
+              : []),
+            ...(model.fast === true
+              ? [{ key: "fast", label: t("modelsFast") }]
+              : []),
+            ...(model.reasoning === undefined
+              ? []
+              : [{ key: "reasoning", label: modelReasoningLabel(model.reasoning, t) }]),
           ]
           return h("li", { key: model.id },
             h("label", {
@@ -2026,8 +2490,8 @@ window.__ModuleLoader__.load({
                 metadata.length === 0
                   ? null
                   : h("span", { className: "dshCodexModelCapabilities" },
-                      ...metadata.map((label) => h("span", {
-                        key: label,
+                      ...metadata.map(({ key, label }) => h("span", {
+                        key,
                         className: "dshCodexModelBadge",
                       }, label))))))
         })
@@ -2262,12 +2726,13 @@ window.__ModuleLoader__.load({
         ".dshCodexDiagnosticsCancel{align-self:flex-start;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-state-business-primary);font:inherit;font-size:12px;line-height:18px;cursor:pointer;padding:2px 4px}",
         ".dshCodexDiagnosticsCancel:hover{background:var(--dsw-alias-interactive-bg-hover,var(--dsw-alias-bg-layer-2))}",
         ".dshCodexDiagnosticsResult{display:flex;min-width:0;flex-direction:column;gap:8px;border-top:1px solid var(--dsw-alias-border-l2);padding-top:10px}",
-        ".dshCodexDiagnosticsResultHeader{display:flex;min-width:0;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:4px 12px;font-size:12px;line-height:18px}",
+        ".dshCodexDiagnosticsResultHeader{display:flex;min-width:0;flex-wrap:wrap;align-items:center;gap:4px 12px;font-size:12px;line-height:18px}",
         ".dshCodexDiagnosticsResultHeader strong{font-weight:500}",
         ".dshCodexDiagnosticsResult[data-outcome=pass] .dshCodexDiagnosticsResultHeader strong{color:var(--dsw-alias-state-success-primary)}",
         ".dshCodexDiagnosticsResult[data-outcome=warning] .dshCodexDiagnosticsResultHeader strong{color:var(--dsw-alias-state-warning-primary,var(--dsw-alias-label-secondary))}",
         ".dshCodexDiagnosticsResult[data-outcome=fail] .dshCodexDiagnosticsResultHeader strong{color:var(--dsw-alias-state-error-primary)}",
         ".dshCodexDiagnosticsResultHeader>span{color:var(--dsw-alias-label-tertiary)}",
+        ".dshCodexDiagnosticsResultHeader .dshCodexInlineCopy{margin-left:auto}",
         ".dshCodexDiagnosticsChecks{display:grid;min-width:0;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin:0;padding:0;list-style:none}",
         ".dshCodexDiagnosticsChecks li{display:flex;min-width:0;flex-wrap:wrap;align-items:baseline;gap:3px 7px;border-radius:8px;background:var(--dsw-alias-bg-layer-1);padding:7px 9px;font-size:12px;line-height:18px}",
         ".dshCodexDiagnosticsChecks strong{font-weight:500}",
@@ -2287,6 +2752,7 @@ window.__ModuleLoader__.load({
         ".dshCodexQuotaHeader{display:flex;min-width:0;align-items:center;justify-content:space-between;gap:12px}",
         ".dshCodexQuota h3{margin:0;font-size:16px;font-weight:500;line-height:24px}",
         ".dshCodexQuotaProduct{font-size:14px;font-weight:500;line-height:22px}",
+        ".dshCodexQuotaPlan{align-self:flex-start;margin:0;border-radius:999px;background:var(--dsw-alias-bg-layer-2,var(--dsw-alias-bg-module-platform));color:var(--dsw-alias-label-secondary);font-size:12px;line-height:18px;padding:2px 8px}",
         ".dshCodexQuotaState{display:flex;align-items:center;gap:8px;font-size:14px;line-height:22px}",
         ".dshCodexQuotaState::before{width:8px;height:8px;flex:none;border-radius:50%;background:var(--dsw-alias-state-success-primary);content:\"\"}",
         ".dshCodexQuotaUnknown::before{background:var(--dsw-alias-label-tertiary)}",
@@ -2330,7 +2796,8 @@ window.__ModuleLoader__.load({
         ".dshCodexTransportToggle[data-transport]:not([data-transport=auto]){color:var(--dsw-alias-state-business-primary)}",
         ".dshCodexTransportToggle:focus-visible,.dshCodexTransportOption:focus-visible,.dshCodexTransportReset:focus-visible{outline:2px solid var(--dsw-alias-brand-primary,var(--dsw-alias-border-l3));outline-offset:2px}",
         ".dshCodexTransportToggle:disabled{cursor:not-allowed;opacity:.45}",
-        ".dshCodexTransportMenu{position:absolute;right:0;bottom:calc(100% + 8px);z-index:40;display:flex;width:280px;max-width:calc(100vw - 32px);flex-direction:column;gap:4px;border:1px solid var(--dsw-alias-border-l2);border-radius:12px;background:var(--dsw-alias-bg-layer-1);box-shadow:0 10px 28px rgb(0 0 0 / .14);padding:6px;color:var(--dsw-alias-label-primary);font:inherit}",
+        ".dshCodexTransportMenu{position:absolute;right:0;bottom:calc(100% + 8px);z-index:40;display:flex;width:300px;max-width:calc(100vw - 32px);max-height:min(520px,calc(100vh - 96px));overflow:auto;overscroll-behavior:contain;flex-direction:column;gap:4px;border:1px solid var(--dsw-alias-border-l2);border-radius:12px;background:var(--dsw-alias-bg-layer-1);box-shadow:0 10px 28px rgb(0 0 0 / .14);padding:6px;color:var(--dsw-alias-label-primary);font:inherit}",
+        ".dshCodexTransportOptions{display:flex;min-width:0;flex-direction:column;gap:4px}",
         ".dshCodexTransportOption{display:flex;width:100%;min-width:0;align-items:center;justify-content:space-between;gap:12px;border:0;border-radius:8px;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer;padding:8px 9px}",
         ".dshCodexTransportOption:hover,.dshCodexTransportOption[data-selected=true]{background:var(--dsw-alias-interactive-bg-hover,var(--dsw-alias-bg-layer-2))}",
         ".dshCodexTransportOption[data-selected=true]{color:var(--dsw-alias-state-business-primary)}",
@@ -2338,6 +2805,14 @@ window.__ModuleLoader__.load({
         ".dshCodexTransportOptionCopy{display:flex;min-width:0;flex:1;flex-direction:column;gap:1px}",
         ".dshCodexTransportOptionCopy strong{font-size:13px;font-weight:500;line-height:20px}",
         ".dshCodexTransportOptionCopy>span{color:var(--dsw-alias-label-tertiary);font-size:11px;line-height:17px}",
+        ".dshCodexRequestSetting{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;border-top:1px solid var(--dsw-alias-border-l2);margin-top:2px;padding:8px 8px 4px}",
+        ".dshCodexRequestSetting label{display:flex;min-width:0;flex-direction:column;gap:4px;color:var(--dsw-alias-label-secondary);font-size:11px;line-height:17px}",
+        ".dshCodexRequestSetting strong{font-weight:500}",
+        ".dshCodexRequestSetting select{box-sizing:border-box;width:100%;min-width:0;height:30px;border:1px solid var(--dsw-alias-border-l2);border-radius:7px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit;font-size:12px;padding:0 7px}",
+        ".dshCodexRequestSetting select:focus-visible{outline:2px solid var(--dsw-alias-brand-primary,var(--dsw-alias-border-l3));outline-offset:2px}",
+        ".dshCodexTransportHealth{display:flex;min-width:0;flex-direction:column;gap:2px;border-top:1px solid var(--dsw-alias-border-l2);margin-top:2px;padding:7px 8px 3px;color:var(--dsw-alias-label-tertiary);font-size:11px;line-height:17px}",
+        ".dshCodexTransportHealth strong{color:var(--dsw-alias-label-secondary);font-weight:500}",
+        ".dshCodexTransportFallback{color:var(--dsw-alias-state-warning-primary,var(--dsw-alias-label-secondary))}",
         ".dshCodexTransportMenuFooter{display:flex;min-width:0;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid var(--dsw-alias-border-l2);margin-top:2px;padding:7px 8px 2px;color:var(--dsw-alias-label-tertiary);font-size:11px;line-height:17px}",
         ".dshCodexTransportReset{flex:none;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-state-business-primary);font:inherit;font-size:11px;line-height:17px;cursor:pointer;padding:2px 4px}",
         ".dshCodexTransportReset:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover,var(--dsw-alias-bg-layer-2))}",
@@ -2367,7 +2842,11 @@ window.__ModuleLoader__.load({
         ".dshCodexModelActions{justify-content:flex-end;border-top:1px solid var(--dsw-alias-border-l2);padding-top:16px}",
         ".dshCodexNotices{display:flex;min-width:0;flex-direction:column;gap:10px;margin:0;padding:0;list-style:none}",
         ".dshCodexNotices li,.dshCodexPrompt{box-sizing:border-box;min-width:0;border:1px solid var(--dsw-alias-border-l2);border-radius:12px;background:var(--dsw-alias-bg-layer-1);padding:14px 16px}",
-        ".dshCodexNotices a{display:inline-block;max-width:100%;margin-top:8px;color:var(--dsw-alias-state-business-primary)}",
+        ".dshCodexNoticeActions{display:flex;min-width:0;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-top:8px}",
+        ".dshCodexNotices a{display:inline-block;max-width:100%;color:var(--dsw-alias-state-business-primary)}",
+        ".dshCodexInlineCopy{border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-state-business-primary);font:inherit;font-size:12px;line-height:18px;cursor:pointer;padding:3px 6px}",
+        ".dshCodexInlineCopy:hover{background:var(--dsw-alias-interactive-bg-hover,var(--dsw-alias-bg-layer-2))}",
+        ".dshCodexInlineCopy:focus-visible{outline:2px solid var(--dsw-alias-brand-primary,var(--dsw-alias-border-l3));outline-offset:2px}",
         ".dshCodexCode{display:flex;min-width:0;flex-wrap:wrap;align-items:center;gap:8px;margin-top:8px;color:var(--dsw-alias-label-secondary);font-size:12px}",
         ".dshCodexCode code{min-width:0;max-width:100%;overflow-wrap:anywhere;word-break:break-all;color:var(--dsw-alias-label-primary);font-family:inherit;font-size:14px;line-height:22px;user-select:all}",
         ".dshCodexPrompt{display:flex;flex-direction:column;gap:12px}",
@@ -2406,6 +2885,7 @@ window.__ModuleLoader__.load({
     exports.CodexFastToggle = CodexFastToggle
     exports.CodexSettings = CodexSettings
     exports.DIAGNOSTICS_CHANNEL = DIAGNOSTICS_CHANNEL
+    exports.MODEL_CAPABILITIES_CHANNEL = MODEL_CAPABILITIES_CHANNEL
     exports.ModelEnablementSettings = ModelEnablementSettings
     exports.NS = NS
     exports.apply = apply
@@ -2413,9 +2893,11 @@ window.__ModuleLoader__.load({
     exports.createConnectionDiagnosticsClient = createConnectionDiagnosticsClient
     exports.createModelEnablementClient = createModelEnablementClient
     exports.createSessionPreferenceClient = createSessionPreferenceClient
+    exports.diagnosticsReportText = diagnosticsReportText
     exports.formatResetDistance = formatResetDistance
     exports.inject = inject
     exports.installSettingsNavIcon = installSettingsNavIcon
+    exports.nextAccountUsageTransition = nextAccountUsageTransition
     exports.safeQuotaSnapshot = safeQuotaSnapshot
     return module.exports
   },

@@ -263,7 +263,7 @@ jobs:
         run: |
           set -eu
           verified=false
-          for attempt in 1 2 3 4 5 6; do
+          for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
             destination="registry/readback-$attempt"
             mkdir -p "$destination"
             if npm pack "dsh-codex-community@$REQUESTED_VERSION" --pack-destination "$destination"; then
@@ -271,11 +271,11 @@ jobs:
               verified=true
               break
             fi
-            sleep 5
+            sleep 10
           done
           test "$verified" = true
           metadata_verified=false
-          for attempt in 1 2 3 4 5 6; do
+          for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
             if npm view "dsh-codex-community@$REQUESTED_VERSION" repository.url --json > release/registry-repository.json \
               && npm view "dsh-codex-community@$REQUESTED_VERSION" dist.integrity --json > release/registry-integrity.json \
               && npm view "dsh-codex-community@$REQUESTED_VERSION" dist.attestations --json > release/registry-attestations.json \
@@ -336,7 +336,7 @@ jobs:
               metadata_verified=true
               break
             fi
-            sleep 5
+            sleep 10
           done
           test "$metadata_verified" = true
       - name: Verify Registry signatures and provenance attestations
@@ -421,13 +421,14 @@ jobs:
           set -eu
           tag="v$REQUESTED_VERSION"
           set +e
-          gh release view "$tag" --json isDraft > release/existing-release.json 2> release/existing-release-error.log
+          gh release view "$tag" --json isDraft,isPrerelease > release/existing-release.json 2> release/existing-release-error.log
           release_status=$?
           set -e
           if [ "$release_status" -eq 0 ]; then
             release_state="$(node --input-type=module -e '
               import fs from "node:fs"
               const release = JSON.parse(fs.readFileSync("release/existing-release.json", "utf8"))
+              if (release.isPrerelease !== false) process.exit(1)
               if (release.isDraft === true) process.stdout.write("draft")
               else if (release.isDraft === false) process.stdout.write("published")
               else process.exit(1)
@@ -463,12 +464,14 @@ jobs:
           elif [ "$release_state" = "draft" ]; then
             gh release edit "$tag" \
               --draft \
+              --prerelease=false \
               --target "$GITHUB_SHA" \
               --title "dsh-codex-community v$REQUESTED_VERSION" \
               --notes-file "docs/releases/v$REQUESTED_VERSION.md"
           else
             gh release create "$tag" \
               --draft \
+              --prerelease=false \
               --target "$GITHUB_SHA" \
               --title "dsh-codex-community v$REQUESTED_VERSION" \
               --notes-file "docs/releases/v$REQUESTED_VERSION.md"
@@ -498,7 +501,7 @@ jobs:
             expected_draft="$1"
             metadata_path="$2"
             download_dir="$3"
-            gh release view "$tag" --json assets,body,isDraft,name,tagName > "$metadata_path"
+            gh release view "$tag" --json assets,body,isDraft,isPrerelease,name,tagName > "$metadata_path"
             EXPECTED_DRAFT="$expected_draft" EXPECTED_VERSION="$REQUESTED_VERSION" RELEASE_METADATA_PATH="$metadata_path" node --input-type=module -e '
               import fs from "node:fs"
               const release = JSON.parse(fs.readFileSync(process.env.RELEASE_METADATA_PATH, "utf8"))
@@ -527,6 +530,7 @@ jobs:
               if (release.name !== expectedTitle || normalize(release.body) !== normalize(notes)) process.exit(1)
               if (release.tagName !== `v${process.env.EXPECTED_VERSION}`) process.exit(1)
               if (release.isDraft !== (process.env.EXPECTED_DRAFT === "true")) process.exit(1)
+              if (release.isPrerelease !== false) process.exit(1)
             '
             test ! -e "$download_dir"
             mkdir "$download_dir"
@@ -544,12 +548,13 @@ jobs:
           verify_release "$initial_draft" release/github-release-assets.json "$RUNNER_TEMP/github-release-assets"
 
           if [ "$release_state" != "published" ]; then
-            gh release view "$tag" --json isDraft,tagName,targetCommitish > release/prepublish-release.json
+            gh release view "$tag" --json isDraft,isPrerelease,tagName,targetCommitish > release/prepublish-release.json
             node --input-type=module -e '
               import fs from "node:fs"
               const release = JSON.parse(fs.readFileSync("release/prepublish-release.json", "utf8"))
               if (
                 release.isDraft !== true
+                || release.isPrerelease !== false
                 || release.tagName !== `v${process.env.REQUESTED_VERSION}`
                 || release.targetCommitish !== process.env.GITHUB_SHA
               ) process.exit(1)

@@ -145,8 +145,8 @@ function assertPublicationStateMetadata(releaseDate) {
   const enReadme = publicationStateDocuments.get("README.en.md") ?? ""
   const zhCompatibility = publicationStateDocuments.get("docs/compatibility.md") ?? ""
   const enCompatibility = publicationStateDocuments.get("docs/compatibility.en.md") ?? ""
-  assert(zhReadme.includes(`当前版本：\`${version}\` 技术预览`), "README must name the current technical-preview version")
-  assert(enReadme.includes(`Current version: \`${version}\` technical preview`), "English README must name the current technical-preview version")
+  assert(zhReadme.includes(`当前版本：\`${version}\` 正式版`), "README must name the current stable release")
+  assert(enReadme.includes(`Current version: \`${version}\` stable release`), "English README must name the current stable release")
   assert(zhCompatibility.includes("发布后"), "Chinese compatibility status must describe post-release validation")
   assert(/post-release/iu.test(enCompatibility), "English compatibility status must describe post-release validation")
 }

@@ -599,7 +599,10 @@ test("settings page keeps one hero above authorization, compact diagnostics, and
 
 test("connection diagnostics stay collapsed and idle until explicitly requested", async () => {
   const harness = hookHarness()
-  const clientModule = await loadClientModule(harness.React)
+  const copied = []
+  const clientModule = await loadClientModule(harness.React, {
+    navigator: { clipboard: { writeText: async (value) => copied.push(value) } },
+  })
   const pending = []
   const calls = []
   const connection = {
@@ -685,6 +688,22 @@ test("connection diagnostics stay collapsed and idle until explicitly requested"
   assert.match(rendered, /credential-signed-out/u)
   assert.equal(rendered.includes(secret), false)
   assert.equal(rendered.includes("message="), false)
+  assert.equal(copied.length, 0, "diagnostics must never copy without an explicit click")
+  findElement(tree, (element) => element.type === "button"
+    && textContent(element) === "diagnosticsCopy").props.onClick()
+  await settle()
+  tree = harness.flush()
+  assert.equal(copied.length, 1)
+  assert.equal(copied[0].includes(secret), false)
+  assert.deepEqual(Object.keys(JSON.parse(copied[0])), [
+    "format",
+    "version",
+    "mode",
+    "outcome",
+    "observedAt",
+    "checks",
+  ])
+  assert.match(textContent(tree), /diagnosticsCopied/u)
 
   harness.unmount()
 })
@@ -1017,6 +1036,31 @@ test("connection diagnostics client uses a strict, sanitized loopback contract",
     () => failed.run("account"),
     (error) => error.code === "account-http-error" && !error.message.includes(secret),
   )
+
+  for (const code of [
+    "account-http-auth-error",
+    "account-http-rate-limited",
+    "account-http-server-error",
+  ]) {
+    const classified = clientModule.createConnectionDiagnosticsClient({
+      rpc: {
+        call: async () => ({
+          ok: true,
+          value: {
+            version: 1,
+            mode: "account",
+            outcome: "fail",
+            observedAt: 2,
+            checks: [
+              ...checksFor("local"),
+              { id: "account-usage", status: "fail", code },
+            ],
+          },
+        }),
+      },
+    })
+    assert.equal((await classified.run("account")).checks.at(-1).code, code)
+  }
 })
 
 test("browser session preference client uses the dedicated loopback contract", async () => {
@@ -1031,6 +1075,8 @@ test("browser session preference client uses the dedicated loopback contract", a
           value: {
             fast: endpoint === "set-fast" ? payload.fast : false,
             transport: endpoint === "set-transport" ? payload.transport : "auto",
+            textVerbosity: endpoint === "set-text-verbosity" ? payload.textVerbosity : "low",
+            reasoningSummary: endpoint === "set-reasoning-summary" ? payload.reasoningSummary : "auto",
             ...(payload.modelId === undefined ? {} : { fastSupported: true }),
           },
         }
@@ -1040,29 +1086,66 @@ test("browser session preference client uses the dedicated loopback contract", a
   const client = clientModule.createSessionPreferenceClient(connection).forSession("session-a")
   const signal = new AbortController().signal
 
-  assert.deepEqual({ ...(await client.get(signal)) }, { fast: false, transport: "auto" })
+  assert.deepEqual({ ...(await client.get(signal)) }, {
+    fast: false,
+    transport: "auto",
+    textVerbosity: "low",
+    reasoningSummary: "auto",
+  })
   assert.deepEqual({ ...(await client.getForModel("gpt-5.6-sol", signal)) }, {
     fast: false,
     transport: "auto",
+    textVerbosity: "low",
+    reasoningSummary: "auto",
     fastSupported: true,
   })
-  assert.deepEqual({ ...(await client.setFast(true, signal)) }, { fast: true, transport: "auto" })
+  assert.deepEqual({ ...(await client.setFast(true, signal)) }, {
+    fast: true,
+    transport: "auto",
+    textVerbosity: "low",
+    reasoningSummary: "auto",
+  })
   assert.deepEqual({ ...(await client.setTransport("websocket", signal)) }, {
     fast: false,
     transport: "websocket",
+    textVerbosity: "low",
+    reasoningSummary: "auto",
+  })
+  assert.deepEqual({ ...(await client.setTextVerbosity("high", signal)) }, {
+    fast: false,
+    transport: "auto",
+    textVerbosity: "high",
+    reasoningSummary: "auto",
+  })
+  assert.deepEqual({ ...(await client.setReasoningSummary("concise", signal)) }, {
+    fast: false,
+    transport: "auto",
+    textVerbosity: "low",
+    reasoningSummary: "concise",
   })
   assert.deepEqual(calls.map(({ channel }) => channel), [
     "/dsh-codex-session",
     "/dsh-codex-session",
     "/dsh-codex-session",
     "/dsh-codex-session",
+    "/dsh-codex-session",
+    "/dsh-codex-session",
   ])
-  assert.deepEqual(calls.map(({ endpoint }) => endpoint), ["get", "get", "set-fast", "set-transport"])
+  assert.deepEqual(calls.map(({ endpoint }) => endpoint), [
+    "get",
+    "get",
+    "set-fast",
+    "set-transport",
+    "set-text-verbosity",
+    "set-reasoning-summary",
+  ])
   assert.deepEqual(calls.map(({ payload }) => ({ ...payload })), [
     { sessionId: "session-a" },
     { sessionId: "session-a", modelId: "gpt-5.6-sol" },
     { sessionId: "session-a", fast: true },
     { sessionId: "session-a", transport: "websocket" },
+    { sessionId: "session-a", textVerbosity: "high" },
+    { sessionId: "session-a", reasoningSummary: "concise" },
   ])
 })
 
@@ -1147,6 +1230,7 @@ test("transport selector changes and resets the current session with keyboard an
   const translations = {
     transportLabel: "传输方式：{transport}",
     transportMenu: "当前会话的传输方式",
+    requestSettings: "Codex 请求设置",
     transportAuto: "自动",
     transportAutoHelp: "自动选择",
     transportSse: "SSE",
@@ -1181,7 +1265,7 @@ test("transport selector changes and resets the current session with keyboard an
   assert.ok(toggle)
   assert.equal(toggle.props["data-transport"], "auto")
   assert.equal(toggle.props["aria-label"], "传输方式：自动")
-  assert.equal(toggle.props["aria-haspopup"], "menu")
+  assert.equal(toggle.props["aria-haspopup"], "dialog")
   assert.equal(toggle.props["aria-expanded"], "false")
 
   let prevented = false
@@ -1192,7 +1276,7 @@ test("transport selector changes and resets the current session with keyboard an
   harness.flush()
   assert.equal(prevented, true)
 
-  let menu = findElement(harness.tree(), (element) => element.props?.role === "menu")
+  let menu = findElement(harness.tree(), (element) => element.props?.role === "dialog")
   assert.ok(menu)
   assert.match(menu.props.id, /^dsh-codex-transport-menu-test-/u)
   toggle = findElement(
@@ -1201,8 +1285,9 @@ test("transport selector changes and resets the current session with keyboard an
       && element.props.className?.includes("dshCodexTransportToggle"),
   )
   assert.equal(toggle.props["aria-controls"], menu.props.id)
-  assert.equal(menu.props["aria-label"], "当前会话的传输方式")
-  let options = findElements(menu, (element) => element.props?.role === "menuitemradio")
+  assert.equal(menu.props["aria-label"], "Codex 请求设置")
+  assert.equal(findElements(menu, (element) => element.type === "select").length, 2)
+  let options = findElements(menu, (element) => element.props?.role === "radio")
   assert.equal(options.length, 4)
   assert.equal(options[0].props["aria-checked"], true)
   assert.equal(options[0].props.tabIndex, 0)
@@ -1211,8 +1296,8 @@ test("transport selector changes and resets the current session with keyboard an
 
   menu.props.onKeyDown({ key: "ArrowDown", preventDefault() {} })
   harness.flush()
-  menu = findElement(harness.tree(), (element) => element.props?.role === "menu")
-  options = findElements(menu, (element) => element.props?.role === "menuitemradio")
+  menu = findElement(harness.tree(), (element) => element.props?.role === "dialog")
+  options = findElements(menu, (element) => element.props?.role === "radio")
   assert.equal(options[1].props.tabIndex, 0)
   options[1].props.onClick()
   await settle()
@@ -1226,11 +1311,11 @@ test("transport selector changes and resets the current session with keyboard an
   assert.equal(toggle.props["data-transport"], "sse")
   assert.equal(toggle.props["aria-label"], "传输方式：SSE")
   assert.equal(focusCalls, 1, "choosing a transport must return focus to its trigger")
-  assert.deepEqual(calls, [["get"], ["set-transport", "sse"]])
+  assert.deepEqual(calls, [["get"], ["get"], ["set-transport", "sse"]])
 
   toggle.props.onClick()
   harness.flush()
-  menu = findElement(harness.tree(), (element) => element.props?.role === "menu")
+  menu = findElement(harness.tree(), (element) => element.props?.role === "dialog")
   const reset = findElement(
     menu,
     (element) => element.type === "button"
@@ -1251,7 +1336,7 @@ test("transport selector changes and resets the current session with keyboard an
   )
   toggle.props.onClick()
   harness.flush()
-  menu = findElement(harness.tree(), (element) => element.props?.role === "menu")
+  menu = findElement(harness.tree(), (element) => element.props?.role === "dialog")
   prevented = false
   menu.props.onKeyDown({
     key: "Escape",
@@ -1259,7 +1344,180 @@ test("transport selector changes and resets the current session with keyboard an
   })
   harness.flush()
   assert.equal(prevented, true)
-  assert.equal(findElement(harness.tree(), (element) => element.props?.role === "menu"), undefined)
+  assert.equal(findElement(harness.tree(), (element) => element.props?.role === "dialog"), undefined)
+  harness.unmount()
+})
+
+test("Codex request settings update reply detail and reasoning summary and show safe transport health", async () => {
+  const harness = hookHarness()
+  const clientModule = await loadClientModule(harness.React)
+  const calls = []
+  let preference = {
+    fast: false,
+    transport: "websocket-cached",
+    textVerbosity: "low",
+    reasoningSummary: "auto",
+    fastSupported: true,
+    transportHealth: {
+      status: "observed",
+      requests: 4,
+      connectionsCreated: 2,
+      connectionsReused: 2,
+      cachedContextRequests: 3,
+      fullContextRequests: 2,
+      deltaRequests: 1,
+      websocketFailures: 1,
+      sseFallbacks: 1,
+      websocketFallbackActive: true,
+    },
+  }
+  const preferenceClient = {
+    async getForModel() {
+      calls.push(["get"])
+      return preference
+    },
+    async setFast() {
+      assert.fail("not used")
+    },
+    async setTransport() {
+      assert.fail("not used")
+    },
+    async setTextVerbosity(textVerbosity) {
+      calls.push(["set-text-verbosity", textVerbosity])
+      preference = { ...preference, textVerbosity }
+      return preference
+    },
+    async setReasoningSummary(reasoningSummary) {
+      calls.push(["set-reasoning-summary", reasoningSummary])
+      preference = { ...preference, reasoningSummary }
+      return preference
+    },
+  }
+  const useModelDirectory = (select) => select({
+    current: { provider: "dsh-codex", model: "gpt-5.6-sol" },
+  })
+  harness.mount(clientModule.CodexFastToggle, {
+    session: { removed: false },
+    useModelDirectory,
+    preferenceClient,
+    t: (key) => key,
+  })
+  await settle()
+  let tree = harness.flush()
+  findElement(tree, (element) => element.props.className === "dshCodexTransportToggle")
+    .props.onClick()
+  await settle()
+  tree = harness.flush()
+
+  let selects = findElements(tree, (element) => element.type === "select")
+  assert.deepEqual(selects.map(({ props }) => props.value), ["low", "auto"])
+  const healthText = textContent(findElement(
+    tree,
+    (element) => element.props.className === "dshCodexTransportHealth",
+  ))
+  assert.match(healthText, /transportHealthRequests 4/u)
+  assert.match(healthText, /transportHealthReused 2/u)
+  assert.match(healthText, /transportHealthFallbackActive/u)
+  assert.doesNotMatch(healthText, /PreviousResponse|WebSocketError|raw/iu)
+
+  let escaped = false
+  findElement(tree, (element) => element.props.role === "dialog").props.onKeyDown({
+    key: "Escape",
+    target: { tagName: "SELECT" },
+    preventDefault() { escaped = true },
+  })
+  tree = harness.flush()
+  assert.equal(escaped, true)
+  assert.equal(findElement(tree, (element) => element.props.role === "dialog"), undefined)
+  findElement(tree, (element) => element.props.className === "dshCodexTransportToggle")
+    .props.onClick()
+  await settle()
+  tree = harness.flush()
+  selects = findElements(tree, (element) => element.type === "select")
+
+  selects[0].props.onChange({ currentTarget: { value: "high" } })
+  await settle()
+  tree = harness.flush()
+  selects = findElements(tree, (element) => element.type === "select")
+  assert.equal(selects[0].props.value, "high")
+  selects[1].props.onChange({ currentTarget: { value: "concise" } })
+  await settle()
+  tree = harness.flush()
+  selects = findElements(tree, (element) => element.type === "select")
+  assert.equal(selects[1].props.value, "concise")
+  assert.deepEqual(calls, [
+    ["get"],
+    ["get"],
+    ["get"],
+    ["set-text-verbosity", "high"],
+    ["set-reasoning-summary", "concise"],
+  ])
+  harness.unmount()
+})
+
+test("reset-to-auto clears a latched SSE fallback even when Auto is already selected", async () => {
+  const harness = hookHarness()
+  const clientModule = await loadClientModule(harness.React)
+  const calls = []
+  const observedHealth = {
+    status: "observed",
+    requests: 1,
+    connectionsCreated: 1,
+    connectionsReused: 0,
+    cachedContextRequests: 0,
+    fullContextRequests: 1,
+    deltaRequests: 0,
+    websocketFailures: 1,
+    sseFallbacks: 1,
+    websocketFallbackActive: true,
+  }
+  const preferenceClient = {
+    getForModel: async () => ({
+      fast: false,
+      transport: "auto",
+      textVerbosity: "low",
+      reasoningSummary: "auto",
+      fastSupported: true,
+      transportHealth: observedHealth,
+    }),
+    setFast: async () => assert.fail("not used"),
+    async setTransport(transport) {
+      calls.push(transport)
+      return {
+        fast: false,
+        transport,
+        textVerbosity: "low",
+        reasoningSummary: "auto",
+        transportHealth: { status: "idle" },
+      }
+    },
+  }
+  harness.mount(clientModule.CodexFastToggle, {
+    session: { removed: false },
+    useModelDirectory: (select) => select({
+      current: { provider: "dsh-codex", model: "gpt-5.6-sol" },
+    }),
+    preferenceClient,
+    t: (key) => key,
+  })
+  await settle()
+  let tree = harness.flush()
+  findElement(tree, (element) => element.props.className === "dshCodexTransportToggle")
+    .props.onClick()
+  await settle()
+  tree = harness.flush()
+
+  const reset = findElement(
+    tree,
+    (element) => element.props.className === "dshCodexTransportReset",
+  )
+  assert.equal(reset.props.disabled, false)
+  reset.props.onClick()
+  await settle()
+  tree = harness.flush()
+
+  assert.deepEqual(calls, ["auto"])
+  assert.equal(findElement(tree, (element) => element.props.role === "dialog"), undefined)
   harness.unmount()
 })
 
@@ -1322,10 +1580,10 @@ test("Fast and transport controls retry a failed read and transport dismisses ou
   toggle.props.onClick()
   harness.flush()
   assert.equal(typeof pointerdown, "function")
-  assert.ok(findElement(harness.tree(), (element) => element.props?.role === "menu"))
+  assert.ok(findElement(harness.tree(), (element) => element.props?.role === "dialog"))
   pointerdown({ target: {} })
   harness.flush()
-  assert.equal(findElement(harness.tree(), (element) => element.props?.role === "menu"), undefined)
+  assert.equal(findElement(harness.tree(), (element) => element.props?.role === "dialog"), undefined)
   harness.unmount()
 })
 
@@ -1550,6 +1808,65 @@ test("a single OAuth method uses the concise ChatGPT sign-in label", async () =>
     (element) => element.type === "button" && textContent(element) === "使用 ChatGPT 登录",
   ))
   assert.equal(textContent(harness.tree()).includes("Sign in with ChatGPT"), false)
+  harness.unmount()
+})
+
+test("OAuth notices copy only the displayed sign-in link or verification code after a click", async () => {
+  const harness = hookHarness()
+  const copied = []
+  const clientModule = await loadClientModule(harness.React, {
+    navigator: { clipboard: { writeText: async (value) => copied.push(value) } },
+  })
+  const client = {
+    describe: async () => ({
+      flow: {
+        key: "dsh-codex/openai-codex",
+        label: "OpenAI Codex",
+        methods: [{ id: "device", label: "Device" }],
+        inFlight: false,
+      },
+      credential: { configured: false, state: "signed-out", writable: true },
+      quota: { status: "unknown" },
+    }),
+    start: async () => ({ attemptId: "attempt-copy" }),
+    watch: async () => ({
+      attemptId: "attempt-copy",
+      nextSeq: 1,
+      done: true,
+      events: [{
+        seq: 1,
+        type: "notice",
+        notice: {
+          message: "Complete sign-in",
+          url: "https://example.test/device",
+          code: "ABCD-EFGH",
+        },
+      }],
+    }),
+    cancel: async () => ({ accepted: true }),
+    logout: async () => ({ signedOut: true }),
+  }
+  harness.mount(clientModule.AuthorizationSettings, { client, t: (key) => key })
+  await settle()
+  let tree = harness.flush()
+  findElement(tree, (element) => element.type === "button"
+    && textContent(element) === "signInWithChatGPT").props.onClick()
+  await settle()
+  tree = harness.flush()
+
+  assert.equal(copied.length, 0)
+  findElement(tree, (element) => element.type === "button"
+    && textContent(element) === "copyLoginLink").props.onClick()
+  await settle()
+  tree = harness.flush()
+  assert.deepEqual(copied, ["https://example.test/device"])
+  assert.match(textContent(tree), /copied/u)
+
+  findElement(tree, (element) => element.type === "button"
+    && textContent(element) === "copyVerificationCode").props.onClick()
+  await settle()
+  harness.flush()
+  assert.deepEqual(copied, ["https://example.test/device", "ABCD-EFGH"])
   harness.unmount()
 })
 
@@ -2384,6 +2701,7 @@ test("signed-in settings shows the five-hour exact reset and a distant weekly re
   const secondaryReset = now + 6 * 24 * 60 * 60_000
   const usage = {
     observedAt,
+    planType: "plus",
     rateLimits: [{
       limitId: "codex",
       limitName: "Codex",
@@ -2420,6 +2738,7 @@ test("signed-in settings shows the five-hour exact reset and a distant weekly re
   const text = textContent(harness.tree())
   assert.match(text, /5 小时额度/u)
   assert.match(text, /每周额度/u)
+  assert.match(text, /套餐：plus/u)
   assert.match(text, /剩余 75%/u)
   assert.match(text, /剩余 92\.5%/u)
   assert.doesNotMatch(text, /已使用/u)
@@ -2444,6 +2763,72 @@ test("signed-in settings shows the five-hour exact reset and a distant weekly re
     (element) => element.type === "button" && textContent(element) === dictionaries.zh.refresh,
   )
   refresh.props.onClick()
+  await settle()
+  harness.flush()
+  assert.equal(usageCalls, 2)
+  harness.unmount()
+})
+
+test("smart usage scheduling switches weekly display at 24 hours and refreshes at reset", async () => {
+  const clientModule = await loadClientModule({ createElement: () => undefined })
+  const now = 1_800_000_000_000
+  const resetsAt = now + 3 * 24 * 60 * 60_000
+  const usage = {
+    observedAt: now,
+    rateLimits: [{
+      limitId: "codex",
+      secondary: {
+        usedPercent: 7,
+        windowDurationMins: 10_080,
+        resetsAt,
+      },
+    }],
+  }
+
+  assert.deepEqual(
+    { ...clientModule.nextAccountUsageTransition(usage, now) },
+    { at: resetsAt - 24 * 60 * 60_000, refresh: false },
+  )
+  assert.deepEqual(
+    { ...clientModule.nextAccountUsageTransition(usage, resetsAt - 23 * 60 * 60_000) },
+    { at: resetsAt, refresh: true },
+  )
+  assert.equal(clientModule.nextAccountUsageTransition(usage, resetsAt), undefined)
+})
+
+test("account usage refreshes once when the visible settings page regains focus", async () => {
+  const harness = hookHarness()
+  let visibilityListener
+  const document = {
+    visibilityState: "visible",
+    addEventListener(type, listener) {
+      if (type === "visibilitychange") visibilityListener = listener
+    },
+    removeEventListener(type, listener) {
+      if (type === "visibilitychange" && visibilityListener === listener) visibilityListener = undefined
+    },
+  }
+  const clientModule = await loadClientModule(harness.React, {}, { document })
+  let usageCalls = 0
+  const now = Date.now()
+  const client = {
+    describe: async () => authorizationStatus(true),
+    usage: async () => {
+      usageCalls += 1
+      return {
+        observedAt: now,
+        rateLimits: [{
+          limitId: "codex",
+          primary: { usedPercent: 1, windowDurationMins: 300, resetsAt: now + 60_000 },
+        }],
+      }
+    },
+  }
+  harness.mount(clientModule.AuthorizationSettings, { client, t: (key) => key })
+  await settle()
+  harness.flush()
+  assert.equal(usageCalls, 1)
+  visibilityListener()
   await settle()
   harness.flush()
   assert.equal(usageCalls, 2)
@@ -2603,6 +2988,58 @@ test("usage refresh failure preserves the last verified percentages and marks th
   harness.unmount()
 })
 
+test("re-authorizing never carries verified usage from the previous account", async () => {
+  const harness = hookHarness()
+  const clientModule = await loadClientModule(harness.React)
+  let usageCalls = 0
+  const client = {
+    describe: async () => authorizationStatus(true),
+    async usage() {
+      usageCalls += 1
+      if (usageCalls > 1) throw new Error("new account usage unavailable")
+      return {
+        observedAt: Date.now(),
+        rateLimits: [{
+          limitId: "codex",
+          primary: {
+            usedPercent: 40,
+            windowDurationMins: 300,
+            resetsAt: Date.now() + 60_000,
+          },
+        }],
+      }
+    },
+    start: async () => ({ attemptId: "replace-account" }),
+    watch: async () => ({
+      events: [{ seq: 1, type: "settled", status: "authorized" }],
+      nextSeq: 1,
+      done: true,
+    }),
+    cancel: async () => ({ accepted: true }),
+  }
+
+  harness.mount(clientModule.AuthorizationSettings, { client, t: (key) => key })
+  await settle()
+  harness.flush()
+  assert.deepEqual(
+    findElements(harness.tree(), (element) => element.type === "progress")
+      .map(({ props }) => props.value),
+    [60],
+  )
+
+  findElement(
+    harness.tree(),
+    (element) => element.type === "button" && textContent(element) === "signInAgain",
+  ).props.onClick()
+  await settle()
+  harness.flush()
+
+  assert.equal(usageCalls, 2)
+  assert.equal(findElements(harness.tree(), (element) => element.type === "progress").length, 0)
+  assert.doesNotMatch(textContent(harness.tree()), /60%|new account usage unavailable/u)
+  harness.unmount()
+})
+
 test("signed-out settings never request account usage", async () => {
   const harness = hookHarness()
   const clientModule = await loadClientModule(harness.React)
@@ -2679,7 +3116,6 @@ test("model enablement client reads the plugin-owned Codex settings namespace di
                 name: "GPT A",
                 contextWindow: 272_000,
                 maxTokens: 128_000,
-                reasoningOptions: ["not-a-catalog-field"],
                 ignored: true,
               },
               { id: "gpt-b", name: "GPT B", contextWindow: 0, maxTokens: 1.5 },
@@ -2692,6 +3128,35 @@ test("model enablement client reads the plugin-owned Codex settings namespace di
         async mutate() {
           throw new Error("not used")
         },
+      },
+    },
+    rpc: {
+      async call(channel, endpoint, payload, receivedSignal) {
+        calls.push({ method: "modelCapabilities", channel, endpoint, payload, signal: receivedSignal })
+        return {
+          ok: true,
+          value: {
+            models: [
+              {
+                id: "gpt-a",
+                name: "Capability name must not replace discovery",
+                contextWindow: 1,
+                maxTokens: 2,
+                inputModalities: ["text", "image", "audio", "text"],
+                reasoning: {
+                  efforts: [
+                    { id: "low", name: "Low" },
+                    { id: "high", name: "High" },
+                  ],
+                  defaultEffort: "low",
+                },
+                fast: true,
+                ignored: true,
+              },
+              { id: "capability-only-model", fast: true },
+            ],
+          },
+        }
       },
     },
   }
@@ -2717,7 +3182,21 @@ test("model enablement client reads the plugin-owned Codex settings namespace di
   assert.equal(snapshot.settingsNs, "dsh-codex")
   assert.deepEqual([...snapshot.settingsPath], [])
   assert.deepEqual(plain(snapshot.models), [
-    { id: "gpt-a", name: "GPT A", contextWindow: 272_000, maxTokens: 128_000 },
+    {
+      id: "gpt-a",
+      name: "GPT A",
+      contextWindow: 272_000,
+      maxTokens: 128_000,
+      inputModalities: ["text", "image"],
+      reasoning: {
+        efforts: [
+          { id: "low", name: "Low" },
+          { id: "high", name: "High" },
+        ],
+        defaultEffort: "low",
+      },
+      fast: true,
+    },
     { id: "gpt-b", name: "GPT B" },
   ])
   assert.deepEqual([...snapshot.catalogIds], ["gpt-a", "gpt-b"])
@@ -2725,12 +3204,16 @@ test("model enablement client reads the plugin-owned Codex settings namespace di
   assert.deepEqual(plain(snapshot.configuredModels), [
     { id: "gpt-a", futureField: { enabled: true } },
   ])
-  assert.deepEqual(calls.map((call) => call.method), ["discoverModels", "ensure"])
+  assert.deepEqual(calls.map((call) => call.method), ["discoverModels", "ensure", "modelCapabilities"])
   assert.deepEqual(plain(calls[0].payload), { settingsNs: "dsh-codex", provider: "dsh-codex" })
   assert.equal(calls[0].signal, signal)
+  assert.equal(calls[2].channel, clientModule.MODEL_CAPABILITIES_CHANNEL)
+  assert.equal(calls[2].endpoint, "get")
+  assert.deepEqual(plain(calls[2].payload), {})
+  assert.equal(calls[2].signal, signal)
 })
 
-test("model settings shows exact catalog context and output metadata without inferred capabilities", async () => {
+test("model settings formats exact catalog capabilities and never infers them for unknown models", async () => {
   const ready = {
     kind: "ready",
     writable: true,
@@ -2738,7 +3221,21 @@ test("model settings shows exact catalog context and output metadata without inf
     settingsNs: "dsh-codex",
     settingsPath: [],
     models: [
-      { id: "gpt-codex", name: "GPT Codex", contextWindow: 272_000, maxTokens: 128_000 },
+      {
+        id: "gpt-codex",
+        name: "GPT Codex",
+        contextWindow: 272_000,
+        maxTokens: 128_000,
+        inputModalities: ["text", "image"],
+        fast: true,
+        reasoning: {
+          efforts: [
+            { id: "low", name: "Low" },
+            { id: "medium", name: "Medium" },
+            { id: "high", name: "High" },
+          ],
+        },
+      },
       { id: "gpt-without-metadata", name: "No metadata" },
     ],
     catalogIds: ["gpt-codex", "gpt-without-metadata"],
@@ -2746,9 +3243,19 @@ test("model settings shows exact catalog context and output metadata without inf
     configuredModels: [],
   }
 
-  for (const { locale, contextLabel, outputLabel } of [
-    { locale: "zh", contextLabel: "上下文 272K", outputLabel: "最大输出 128K" },
-    { locale: "en", contextLabel: "Context 272K", outputLabel: "Max output 128K" },
+  for (const { locale, contextLabel, outputLabel, reasoningLabel } of [
+    {
+      locale: "zh",
+      contextLabel: "上下文 272K",
+      outputLabel: "最大输出 128K",
+      reasoningLabel: "推理 Low–High",
+    },
+    {
+      locale: "en",
+      contextLabel: "Context 272K",
+      outputLabel: "Max output 128K",
+      reasoningLabel: "Reasoning Low–High",
+    },
   ]) {
     const harness = hookHarness()
     const clientModule = await loadClientModule(harness.React)
@@ -2768,6 +3275,11 @@ test("model settings shows exact catalog context and output metadata without inf
     const text = textContent(harness.tree())
     assert.match(text, new RegExp(contextLabel, "u"))
     assert.match(text, new RegExp(outputLabel, "u"))
+    assert.match(text, new RegExp(reasoningLabel, "u"))
+    assert.doesNotMatch(text, /默认 Medium|default Medium/iu)
+    assert.match(text, /Text input|文本输入/u)
+    assert.match(text, /Image input|图片输入/u)
+    assert.match(text, /Fast 1\.5×/u)
     assert.doesNotMatch(text, /272,000 tokens/u)
     assert.doesNotMatch(text, /128,000 tokens/u)
     assert.doesNotMatch(text, /推理档位|reasoning effort|not-a-catalog-field/iu)
@@ -2776,7 +3288,7 @@ test("model settings shows exact catalog context and output metadata without inf
         .map((element) => textContent(element)),
       ["gpt-codex", "gpt-without-metadata"],
     )
-    assert.equal(findElements(harness.tree(), (element) => element.props.className === "dshCodexModelBadge").length, 2)
+    assert.equal(findElements(harness.tree(), (element) => element.props.className === "dshCodexModelBadge").length, 6)
     harness.unmount()
   }
 })

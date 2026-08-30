@@ -6,6 +6,18 @@ export const SESSION_PREFERENCE_RPC_CHANNEL = "/dsh-codex-session"
 const MAX_SESSION_ID_CHARS = 256
 const MAX_MODEL_ID_CHARS = 256
 const TRANSPORTS = new Set(["auto", "sse", "websocket", "websocket-cached"])
+const TEXT_VERBOSITIES = new Set(["low", "medium", "high"])
+const REASONING_SUMMARIES = new Set(["auto", "concise", "detailed", "off"])
+const TRANSPORT_HEALTH_COUNT_KEYS = Object.freeze([
+  "requests",
+  "connectionsCreated",
+  "connectionsReused",
+  "cachedContextRequests",
+  "fullContextRequests",
+  "deltaRequests",
+  "websocketFailures",
+  "sseFallbacks",
+])
 
 class RpcInputError extends Error {
   constructor(message) {
@@ -16,13 +28,14 @@ class RpcInputError extends Error {
 
 /**
  * Narrow browser bridge for the existing process-local session preferences.
- * The client can read or change only the public Fast and transport controls
- * for one explicitly named session; store internals remain host-only.
+ * The client can read or change only the public request controls for one
+ * explicitly named session; store internals remain host-only.
  */
 export class CodexSessionPreferenceBridge {
   #preferences
+  #sessionResources
 
-  constructor(sessionPreferences) {
+  constructor(sessionPreferences, sessionResourcesOrOptions) {
     if (
       sessionPreferences === null
       || typeof sessionPreferences !== "object"
@@ -32,6 +45,7 @@ export class CodexSessionPreferenceBridge {
       throw new TypeError("sessionPreferences must provide resolve and configure")
     }
     this.#preferences = sessionPreferences
+    this.#sessionResources = optionalSessionResources(sessionResourcesOrOptions)
   }
 
   get(payload, signal) {
@@ -43,6 +57,7 @@ export class CodexSessionPreferenceBridge {
     const result = {
       ...publicPreferenceSnapshot(this.#preferences.resolve(sessionId)),
       ...(modelId === undefined ? {} : { fastSupported: supportsCodexFast(modelId) }),
+      ...this.#transportHealth(sessionId),
     }
     throwIfCancelled(signal)
     return result
@@ -56,7 +71,10 @@ export class CodexSessionPreferenceBridge {
     if (!Object.hasOwn(input, "fast") || typeof input.fast !== "boolean") {
       throw new RpcInputError("fast must be a boolean")
     }
-    const result = publicPreferenceSnapshot(this.#preferences.configure(sessionId, { fast: input.fast }))
+    const result = {
+      ...publicPreferenceSnapshot(this.#preferences.configure(sessionId, { fast: input.fast })),
+      ...this.#transportHealth(sessionId),
+    }
     throwIfCancelled(signal)
     return result
   }
@@ -69,9 +87,53 @@ export class CodexSessionPreferenceBridge {
     if (!Object.hasOwn(input, "transport") || !TRANSPORTS.has(input.transport)) {
       throw new RpcInputError("transport must be auto, sse, websocket, or websocket-cached")
     }
-    const result = publicPreferenceSnapshot(this.#preferences.configure(sessionId, {
+    const snapshot = publicPreferenceSnapshot(this.#preferences.configure(sessionId, {
       transport: input.transport,
     }))
+    this.#sessionResources?.reset?.(sessionId)
+    const result = {
+      ...snapshot,
+      ...this.#transportHealth(sessionId),
+    }
+    throwIfCancelled(signal)
+    return result
+  }
+
+  setTextVerbosity(payload, signal) {
+    throwIfCancelled(signal)
+    const input = objectInput(payload)
+    assertOnlyKeys(input, ["sessionId", "textVerbosity"])
+    const sessionId = requiredSessionId(input)
+    if (!Object.hasOwn(input, "textVerbosity") || !TEXT_VERBOSITIES.has(input.textVerbosity)) {
+      throw new RpcInputError("textVerbosity must be low, medium, or high")
+    }
+    const result = {
+      ...publicPreferenceSnapshot(this.#preferences.configure(sessionId, {
+        textVerbosity: input.textVerbosity,
+      })),
+      ...this.#transportHealth(sessionId),
+    }
+    throwIfCancelled(signal)
+    return result
+  }
+
+  setReasoningSummary(payload, signal) {
+    throwIfCancelled(signal)
+    const input = objectInput(payload)
+    assertOnlyKeys(input, ["sessionId", "reasoningSummary"])
+    const sessionId = requiredSessionId(input)
+    if (
+      !Object.hasOwn(input, "reasoningSummary")
+      || !REASONING_SUMMARIES.has(input.reasoningSummary)
+    ) {
+      throw new RpcInputError("reasoningSummary must be auto, concise, detailed, or off")
+    }
+    const result = {
+      ...publicPreferenceSnapshot(this.#preferences.configure(sessionId, {
+        reasoningSummary: input.reasoningSummary,
+      })),
+      ...this.#transportHealth(sessionId),
+    }
     throwIfCancelled(signal)
     return result
   }
@@ -81,14 +143,25 @@ export class CodexSessionPreferenceBridge {
       case "get": return this.get(payload, signal)
       case "set-fast": return this.setFast(payload, signal)
       case "set-transport": return this.setTransport(payload, signal)
+      case "set-text-verbosity": return this.setTextVerbosity(payload, signal)
+      case "set-reasoning-summary": return this.setReasoningSummary(payload, signal)
       default: throw new RpcInputError("Unknown session preference RPC endpoint")
+    }
+  }
+
+  #transportHealth(sessionId) {
+    if (this.#sessionResources === undefined) return {}
+    return {
+      transportHealth: publicTransportHealth(
+        this.#sessionResources.transportHealth(sessionId),
+      ),
     }
   }
 }
 
 /** Register the session-only request controls on a dedicated loopback channel. */
-export function registerSessionPreferenceRpc(ctx, sessionPreferences) {
-  const bridge = new CodexSessionPreferenceBridge(sessionPreferences)
+export function registerSessionPreferenceRpc(ctx, sessionPreferences, sessionResourcesOrOptions) {
+  const bridge = new CodexSessionPreferenceBridge(sessionPreferences, sessionResourcesOrOptions)
   ctx.connection.rpc.handle(
     SESSION_PREFERENCE_RPC_CHANNEL,
     createSessionPreferenceRpcHandler(bridge),
@@ -130,10 +203,58 @@ function publicPreferenceSnapshot(value) {
     || typeof value !== "object"
     || typeof value.fast !== "boolean"
     || !TRANSPORTS.has(value.transport)
+    || !TEXT_VERBOSITIES.has(value.textVerbosity)
+    || !REASONING_SUMMARIES.has(value.reasoningSummary)
   ) {
     throw new TypeError("session preference store returned an invalid snapshot")
   }
-  return { fast: value.fast, transport: value.transport }
+  return {
+    fast: value.fast,
+    transport: value.transport,
+    textVerbosity: value.textVerbosity,
+    reasoningSummary: value.reasoningSummary,
+  }
+}
+
+function optionalSessionResources(value) {
+  if (value === undefined) return undefined
+  const candidate = value !== null
+    && typeof value === "object"
+    && Object.hasOwn(value, "sessionResources")
+    ? value.sessionResources
+    : value
+  if (candidate === undefined) return undefined
+  if (
+    candidate === null
+    || typeof candidate !== "object"
+    || typeof candidate.transportHealth !== "function"
+    || (candidate.reset !== undefined && typeof candidate.reset !== "function")
+  ) {
+    throw new TypeError("sessionResources must provide transportHealth and an optional reset")
+  }
+  return candidate
+}
+
+function publicTransportHealth(value) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new TypeError("session resources returned invalid transport health")
+  }
+  if (value.status === "idle") return { status: "idle" }
+  if (value.status !== "observed") {
+    throw new TypeError("session resources returned invalid transport health")
+  }
+  const result = { status: "observed" }
+  for (const key of TRANSPORT_HEALTH_COUNT_KEYS) {
+    if (!Number.isSafeInteger(value[key]) || value[key] < 0) {
+      throw new TypeError("session resources returned invalid transport health")
+    }
+    result[key] = value[key]
+  }
+  if (typeof value.websocketFallbackActive !== "boolean") {
+    throw new TypeError("session resources returned invalid transport health")
+  }
+  result.websocketFallbackActive = value.websocketFallbackActive
+  return result
 }
 
 function objectInput(value) {

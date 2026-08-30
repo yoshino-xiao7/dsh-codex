@@ -11,7 +11,7 @@ DSH Web 设置 ── loopback RPC ── AuthorizationBridge
         │                             │
         ├── 按需诊断 ────────── ConnectionDiagnostics
         │                             │
-        │ 进入页面 / 手动刷新          │
+        │ 进入 / 可见 / 重置刷新       │
         ▼                             ▼
 AccountUsageReader ────────── CodexCredentialStore
         │                             │
@@ -20,7 +20,7 @@ Codex Web usage endpoint      ChatGPT OAuth grant
 
 Harness Agent Loop
         │
-        ├── SessionPreferences ── Fast 按钮、Transport 菜单
+        ├── SessionPreferences ── Fast、Transport、回复与摘要
         │
         ▼
 StreamResilience ── CodexRouteAdapter (`dsh-codex`)
@@ -49,41 +49,43 @@ Web 设置页只接收登录方法、脱敏提示、授权页面地址、验证�
 
 Host 端通过 DSH authorization service 启动、取消和观察登录流程，并通过 credentials service 查询“是否已配置”或执行退出。RPC 限制并发 attempt、长轮询 waiter、事件数量、字符串长度和可接受 URL。登录结果返回后，插件会在 credentials service 持有该记录的串行写锁时再次检查取消信号；这个 mutate 回调是取消的线性化点：回调选择 grant 前的取消会阻止写入，选择后写入会完成，插件不会再用补偿性删除回滚，因为那可能删除另一个 DSH 进程已经排队的新登录。无凭据内容的 generation tracker 会把提交阶段保持到对应 `authorization/settled`；设置页和 `/codex-login cancel` 在同一同步调用栈内拒绝已经过线性化点的取消，并继续观察最终 `authorized` 状态。退出登录绕过这道限制，先中止活动 attempt，再通过同一串行记录路径显式删除凭据，因此已经开始的旧写入不能在退出完成后复活。已经结束但仍处于短期保留期的 attempt ID 不能取消后来启动的登录。
 
-`/codex-login status|cancel|logout` 使用同一边界，并禁止把命令输入写入会话记录。
+`/codex-login status|cancel|logout` 使用同一边界，并禁止把命令输入写入会话记录。授权页面地址和验证码仅以受限字段送到设置页；复制动作由用户点击触发，Host 不接收剪贴板内容，也不把短期授权材料写入日志或持久化状态。
 
 ## AccountUsageReader
 
-设置页每次挂载以及用户点击“刷新”时，Host 端 `AccountUsageReader` 使用当前 OAuth grant 请求官方 Codex 客户端使用的 Web 后端 usage 兼容接口。它严格解析使用百分比、窗口时长和 reset 时间，并把五小时与每周窗口转换为不含凭据的最小快照；access token、refresh token、account ID、原始响应和任意响应头都不会跨过 loopback RPC。
+设置页挂载、重新变为可见、额度窗口到达重置节点，以及用户点击“刷新”或执行 `/codex-usage refresh` 时，Host 端 `AccountUsageReader` 使用当前 OAuth grant 请求官方 Codex 客户端使用的 Web 后端 usage 兼容接口。页面使用单次定时器对准最近临界点，不做后台轮询；每周窗口进入不足 24 小时的显示区间时只在本地重新渲染精确时间，不额外联网。Reader 严格解析使用百分比、窗口时长、reset 时间和可选套餐类型，并把五小时与每周窗口转换为不含凭据的最小快照；access token、refresh token、account ID、原始响应和任意响应头都不会跨过 loopback RPC。
 
-该接口是 Web 后端兼容边界，不被当作稳定的插件公共 API。请求具有超时、响应大小和数值范围限制；网络失败、鉴权失败或结构变化不会被显示成零余额，也不会清除最近一次已验证读数。若没有可保留的实时读数，页面会安全降级为最近请求产生的 `QuotaObserver` 状态或“未知”，而不是推断额度。
+该接口是 Web 后端兼容边界，不被当作稳定的插件公共 API。请求具有超时、响应大小和数值范围限制；网络失败、鉴权失败或结构变化不会被显示成零余额，也不会清除最近一次已验证读数。若没有可保留的实时读数，页面会安全降级为最近请求产生的 `QuotaObserver` 状态或“未知”，而不是推断额度。`/codex-usage status` 只读取这份进程内请求观测；只有 `refresh` 调用 `AccountUsageReader` 读取真实账号窗口。
 
 ## ConnectionDiagnostics
 
 连接诊断使用独立的 `/dsh-codex-diagnostics` loopback RPC，而不是扩展授权 RPC。设置页默认折叠且不会自动运行。`local` 只读取进程内 route、模型目录、启用数量和本机凭据元数据，不访问网络、不刷新 OAuth，也不持有 stream seam；`account` 在相同本机检查后只调用一次既有 `AccountUsageReader`，因此可能按其正常合同刷新 OAuth，但不会发起模型请求或消耗模型额度。
 
-浏览器报告固定为版本、模式、总结果、观测时间和检查数组。检查只包含固定 ID、固定状态码和受限的布尔、数字或枚举事实；token、完整 grant、account ID、原始响应、Header、任意异常消息和 Provider 对象不会跨过边界。主动模型请求诊断不在 `0.0.4` 范围内，避免把真实请求副作用或流恢复误判成诊断成功。
+浏览器报告固定为版本、模式、总结果、观测时间和检查数组。检查只包含固定 ID、固定状态码和受限的布尔、数字或枚举事实；token、完整 grant、account ID、原始响应、Header、任意异常消息和 Provider 对象不会跨过边界。账号读取的 HTTP 失败被固定分类为 401/403 鉴权错误、429 限流、5xx 服务端错误或其他 HTTP 错误，不把原始状态文案或响应体送到浏览器。复制功能序列化的正是这份已验证安全投影，不会回读原始异常。主动模型请求诊断不在 `1.0.0` 范围内，避免把真实请求副作用或流恢复误判成诊断成功。
 
 ## SessionPreferences
 
-模型选择器左侧的闪电按钮、相邻的 Transport 菜单和 `/codex` 修改同一份当前会话状态：
+模型选择器左侧的闪电按钮、相邻的会话请求菜单和 `/codex` 修改同一份当前会话状态：
 
 - 闪电按钮或 `fast on|off` 控制是否发送 Fast priority service tier，默认关闭；
 - `transport` 可选 `auto`、`sse`、`websocket` 或 `websocket-cached`，默认 `auto`；
+- `verbosity` 可选 `low`、`medium` 或 `high`，默认 `low`，真实映射到回复详略请求字段；
+- `summary` 可选 `auto`、`concise`、`detailed` 或 `off`，默认 `auto`，真实映射到推理摘要请求字段；
 - `reset` 恢复当前会话默认值。
 
-偏好保存在有容量上限的内存表中，返回不可变快照，不写入全局 provider 设置，进程重启后恢复默认。Fast 只对 GPT-5.4、GPT-5.5、GPT-5.6 Luna、Sol 和 Terra 请求生效，使用官方 priority service tier，目标速度为 1.5 倍并消耗更多额度；其他模型不会携带该 tier。切换只影响下一次请求，已经开始的请求不变。Fast 请求失败后不会自动以另一 service tier 重放，避免重复工具副作用。
+偏好保存在有容量上限的内存表中，返回不可变快照，不写入全局 provider 设置，进程重启后恢复默认。Fast 只对 GPT-5.4、GPT-5.5、GPT-5.6 Luna、Sol 和 Terra 请求生效，使用官方 priority service tier，目标速度为 1.5 倍并消耗更多额度；其他模型不会携带该 tier。所有切换只影响下一次请求，已经开始的请求不变。Fast 请求失败后不会自动以另一 service tier 重放，避免重复工具副作用。
 
-DSH 原始 session ID 只用于偏好查询和消息/replay provenance；传给 pi-ai 的 transport/cache session ID 带有 `dsh-codex:` 命名空间。`/codex reset`、`agent/disposed` 和 runtime dispose 只通过 pi-ai 的公开、精确 session API 清理本插件拥有的 WebSocket 连接、fallback 与 debug 状态，不调用无参全局清理，也不影响同进程其他 pi-ai consumer 的 session。该命名空间只进入 pi-ai stream options，不改写历史消息或 replay envelope。
+DSH 原始 session ID 只用于偏好查询和消息/replay provenance；传给 pi-ai 的 transport/cache session ID 带有 `dsh-codex:` 命名空间。Host 从公开的精确 session debug 统计中只投影请求、连接创建与复用、增量上下文、WebSocket 失败和 SSE 回退等计数；response ID、原始 WebSocket 错误与输入内容不会跨过 RPC。`/codex reset`、`agent/disposed` 和 runtime dispose 只清理本插件拥有的精确 session 状态，不调用无参全局清理，也不影响同进程其他 pi-ai consumer 的 session。
 
 ## ModelEnablement
 
-本插件的设置页通过 `llm.discoverModels` 从当前 pi-ai catalog 展示可请求模型，并把选择写入 `dsh-codex` 设置命名空间。Runtime 只注册该命名空间的直接 discovery handler，不为本 route 注册通用 configurable-provider directory，避免干扰 DSH 的通用模型编辑器。
+本插件的设置页通过 `llm.discoverModels` 从当前 pi-ai catalog 读取 Harness 通用 schema 能承载的模型标识、名称、上下文与最大输出，并把选择写入 `dsh-codex` 设置命名空间。输入模态、当前目录实际提供的可选推理档位与 Fast 支持则通过独立的 loopback-only 只读 RPC `/dsh-codex-model-capabilities` 获取；它只接受空对象的 `get` 请求，返回失败时设置页保留通用目录字段并省略无法证实的能力标签。Runtime 不为本 route 注册通用 configurable-provider directory，避免干扰 DSH 的通用模型编辑器。
 
 设置页至少要求选中一个模型。全选且条目没有自定义字段时移除 `models` 覆盖，使目录随 pi-ai 版本更新；部分选择、额外字段和自定义参数保留显式配置。目录筛选只影响模型发现，精确指定的隐藏模型仍可解析，因此旧会话不会仅因模型被隐藏而失效。
 
-模型名称、上下文窗口与输入能力来自当前安装的 provider catalog，不声称是账号动态目录。推理选择器由 `CodexRouteAdapter` 按已核验的订阅 Codex 模型目录重新投影：删除通用 `Default`、`Off` 与 `Minimal`，写入逐模型默认值，并只暴露可以由 Provider 请求层诚实表达的 Low 至 Max。Codex 的 `Ultra` 同时代表最高普通推理与主动任务委派，属于 Agent 编排模式；本插件不会只发送一个伪造的 `ultra` 值，也不会静默退化成 `Max`。未知模型不获得推断能力，route 边界也拒绝直接注入未核验档位。
+模型名称、上下文窗口与输入能力来自当前安装的 provider catalog，不声称是账号动态目录。推理选择器由 `CodexRouteAdapter` 按当前安装 provider catalog 的实际语义重新投影：删除不属于当前可选档位的通用 `Default`、`Off` 与 `Minimal`，并只暴露可以由 Provider 请求层诚实表达的 Low 至 Max。插件不会虚构、标注或写入 catalog 未提供的逐模型默认值；没有显式 effort 时，请求层把默认行为交给当前 Provider 或服务端。Codex 的 `Ultra` 同时代表最高普通推理与主动任务委派，属于 Agent 编排模式；本插件不会只发送一个伪造的 `ultra` 值，也不会静默退化成 `Max`。未知模型不获得推断能力，route 边界也拒绝直接注入目录未提供的档位。
 
-`codexModelCapabilityDescriptor` 是目录字段与已核验控件的单一 Host 投影：它只允许模型 ID、名称、上下文、最大输出、输入模态、推理档位和 Fast 支持通过，并返回不可变快照。Provider、route adapter 与会话 Fast 查询复用同一来源；Web 客户端不再维护一份按模型 ID 硬编码的 Fast 清单。未知模型保留目录可用性，但不会获得推断出的推理或 Fast 能力。
+`codexModelCapabilityDescriptor` 是目录字段与实际可表达控件的单一 Host 投影：它只允许模型 ID、名称、上下文、最大输出、输入模态、推理档位和 Fast 支持通过，并返回不可变快照。Provider、route adapter、设置页能力标签与会话 Fast 查询复用同一来源；Web 客户端不再维护一份按模型 ID 硬编码的 Fast 清单。未知模型保留目录可用性，但不会获得推断出的输入、推理或 Fast 能力。
 
 ## ImagePolicy
 

@@ -112,7 +112,25 @@ export interface AuthorizationClient {
 export interface CodexSessionPreference {
   fast: boolean
   transport: "auto" | "sse" | "websocket" | "websocket-cached"
+  textVerbosity: "low" | "medium" | "high"
+  reasoningSummary: "auto" | "concise" | "detailed" | "off"
+  transportHealth?: CodexTransportHealth
 }
+
+export type CodexTransportHealth =
+  | { status: "idle" }
+  | {
+      status: "observed"
+      requests: number
+      connectionsCreated: number
+      connectionsReused: number
+      cachedContextRequests: number
+      fullContextRequests: number
+      deltaRequests: number
+      websocketFailures: number
+      sseFallbacks: number
+      websocketFallbackActive: boolean
+    }
 
 export interface CodexSessionModelPreference extends CodexSessionPreference {
   fastSupported: boolean
@@ -124,6 +142,14 @@ export interface SessionPreferenceClient {
   setFast(fast: boolean, signal?: AbortSignal): Promise<CodexSessionPreference>
   setTransport(
     transport: CodexSessionPreference["transport"],
+    signal?: AbortSignal,
+  ): Promise<CodexSessionPreference>
+  setTextVerbosity(
+    textVerbosity: CodexSessionPreference["textVerbosity"],
+    signal?: AbortSignal,
+  ): Promise<CodexSessionPreference>
+  setReasoningSummary(
+    reasoningSummary: CodexSessionPreference["reasoningSummary"],
     signal?: AbortSignal,
   ): Promise<CodexSessionPreference>
 }
@@ -151,6 +177,12 @@ export interface CodexModelCatalogEntry {
   name?: string
   contextWindow?: number
   maxTokens?: number
+  inputModalities?: Array<"text" | "image">
+  reasoning?: {
+    efforts: Array<{ id: string; name: string }>
+    defaultEffort?: string
+  }
+  fast?: boolean
 }
 
 export interface CodexModelEnablementSnapshot {
@@ -224,6 +256,7 @@ export declare function createModelEnablementClient(
   connection: unknown,
   settingsFace?: SettingsDescribeFace,
 ): ModelEnablementClient
+export declare const MODEL_CAPABILITIES_CHANNEL: "/dsh-codex-model-capabilities"
 export declare function safeQuotaSnapshot(value: unknown, now?: number):
   | { status: "unknown" }
   | { status: "recent-success"; observedAt: number }
@@ -233,6 +266,11 @@ export declare function safeQuotaSnapshot(value: unknown, now?: number):
       resetAt?: number
       remainingMinutes?: number
     }
+export declare function diagnosticsReportText(value: unknown): string
+export declare function nextAccountUsageTransition(
+  usage: CodexAccountUsage,
+  now?: number,
+): { at: number; refresh: boolean } | undefined
 export declare function AuthorizationSettings(props: {
   client: AuthorizationClient
   t(key: string): string
