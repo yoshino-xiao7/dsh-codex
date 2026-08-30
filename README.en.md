@@ -4,7 +4,7 @@
 
 A Codex plugin for DeepSeek Harness with ChatGPT OAuth sign-in, Codex models, image input, and reliable streaming responses.
 
-> Current version: `1.1.0` is in development and unpublished. npm `latest` remains `dsh-codex-community@1.0.0`; capabilities marked as “1.1.0 in development” on this page have not yet shipped in a stable release.
+> Current version: `1.1.0` stable release, published through npm `latest` and a full GitHub Release. npm package: `dsh-codex-community`.
 
 ## Features
 
@@ -25,7 +25,7 @@ A Codex plugin for DeepSeek Harness with ChatGPT OAuth sign-in, Codex models, im
 - run an on-demand local or account check from collapsed connection diagnostics and copy a sanitized report containing only fixed statuses and bounded facts;
 - inspect sanitized per-conversation transport health, including request count, connection reuse, delta context, and SSE fallbacks.
 
-`1.1.0` in development:
+Added in `1.1.0`:
 
 - persist global defaults for Fast, Transport, reply verbosity, and reasoning summary in plugin settings; conversations retain only explicit overrides, and `/codex reset` restores the current global defaults;
 - show low-usage, exhausted-window, and reset-refresh reminders from verified five-hour and weekly readings while the app is running, without background polling or operating-system notifications;
@@ -42,7 +42,7 @@ A Codex plugin for DeepSeek Harness with ChatGPT OAuth sign-in, Codex models, im
 Install the exact version:
 
 ```sh
-dsh plugin --profile web add dsh-codex-community@1.0.0
+dsh plugin --profile web add dsh-codex-community@1.1.0
 dsh web
 ```
 
@@ -68,12 +68,12 @@ Available commands:
 /codex set summary auto|concise|detailed|off
 ```
 
-In `1.0.0`, these four preferences live only in the current session and process. The `1.1.0` development version makes off, `auto`, `low`, and `auto` persistent safe global defaults; a conversation stores only fields the user explicitly changes, so untouched fields follow later default changes. Every change applies to the next request. For GPT-5.4, GPT-5.5, GPT-5.6 Luna, Sol, and Terra, Fast uses the official priority service tier, targets 1.5× speed, and consumes more usage. A failed request is not replayed automatically on a lower tier.
+`1.1.0` makes off, `auto`, `low`, and `auto` persistent safe global defaults; a conversation stores only fields the user explicitly changes, so untouched fields follow later default changes. Every change applies to the next request. For GPT-5.4, GPT-5.5, GPT-5.6 Luna, Sol, and Terra, Fast uses the official priority service tier, targets 1.5× speed, and consumes more usage. A failed request is not replayed automatically on a lower tier.
 
 Update:
 
 ```sh
-dsh plugin --profile web update dsh-codex-community@1.0.0
+dsh plugin --profile web update dsh-codex-community@1.1.0
 dsh web
 ```
 
@@ -95,12 +95,12 @@ See [Troubleshooting](docs/troubleshooting.en.md) for diagnostic steps.
 
 ## Support boundaries
 
-- The complete checks and Linux, macOS, and Windows CI/profile smoke for `1.0.0` passed `3/3` against this release candidate and were approved by the maintainer. Post-release live-account validation starts at `0/13`; see the [acceptance record](docs/releases/v1.0.0.acceptance.json).
-- Historical `0.0.4` release evidence remains available but is not inherited as `1.0.0` acceptance.
+- The complete checks and Linux, macOS, and Windows CI/profile smoke for `1.1.0` passed `3/3` against this release candidate and were approved by the maintainer. Post-release live-account validation starts at `0/13`; see the [acceptance record](docs/releases/v1.1.0.acceptance.json).
+- Historical `1.0.0` release evidence remains available but is not inherited as `1.1.0` acceptance.
 - The settings page reads usage through the Web-backend compatibility endpoint used by the official Codex client. If that endpoint is unavailable or malformed, the page retains the latest safe reading and falls back to request observation or an unknown state instead of presenting the error as zero remaining usage.
 - Model names, context windows, maximum outputs, and selectable Low-through-Max reasoning efforts follow the actual semantics of the installed provider catalog. The plugin neither invents nor labels a default effort that the catalog does not provide; when no effort is explicit, the current Provider or service applies its default behavior. Generic `Default`, `Off`, and `Minimal` entries are hidden, and agent-level `Ultra` is not disguised as a plain reasoning effort.
 - Fast is limited to GPT-5.4, GPT-5.5, GPT-5.6 Luna, Sol, and Terra and consumes more usage. Other models never receive the Fast service tier.
-- Local and account diagnostics still send no model request. The one-shot real-network diagnostic under development for `1.1.0` uses the model listed in the confirmation to send one short prompt and consume usage after a second confirmation. It has no server-side hard output limit and only tears down after the first visible text, so it still does not replace complete acceptance for images, tools, Fast, or every transport.
+- Local and account diagnostics send no model request. The one-shot real-network diagnostic uses the model listed in the confirmation to send one short prompt and consume usage only after a second confirmation. It has no server-side hard output limit and only tears down after the first visible text, so it still does not replace complete acceptance for images, tools, Fast, or every transport.
 - Image generation and editing are not provided.
 - See [Compatibility](docs/compatibility.en.md) for Windows, Linux, real OAuth, and real Codex network acceptance status.
 

@@ -4,7 +4,7 @@
 
 面向 DeepSeek Harness 的 Codex 插件，提供 ChatGPT OAuth 登录、Codex 模型、图片输入和可靠的流式回复。
 
-> 当前版本：`1.1.0` 开发中，尚未发布。npm `latest` 仍为 `dsh-codex-community@1.0.0`；本页标注为“1.1.0 开发中”的能力尚未随正式版发布。
+> 当前版本：`1.1.0` 正式版，通过 npm `latest` 与正式 GitHub Release 发布。npm 包名：`dsh-codex-community`。
 
 ## 功能
 
@@ -25,7 +25,7 @@
 - 在默认折叠的连接诊断中按需运行“本机检查”或“账号检查”，并复制仅含固定状态与受限事实的脱敏报告；
 - 在会话请求设置中查看本会话的请求数、连接复用、增量上下文和 SSE 回退等脱敏传输健康状态。
 
-`1.1.0` 开发中：
+`1.1.0` 新增：
 
 - 在插件设置中持久化 Fast、Transport、回复详略和推理摘要的全局默认值；会话只保存显式覆盖，`/codex reset` 恢复当前全局默认值；
 - 在应用运行期间，依据已验证的 5 小时与每周窗口显示低额度、耗尽和到期刷新提醒；不做后台轮询，不发送操作系统通知；
@@ -42,7 +42,7 @@
 请固定安装精确版本：
 
 ```sh
-dsh plugin --profile web add dsh-codex-community@1.0.0
+dsh plugin --profile web add dsh-codex-community@1.1.0
 dsh web
 ```
 
@@ -68,12 +68,12 @@ dsh web
 /codex set summary auto|concise|detailed|off
 ```
 
-`1.0.0` 中的这四项偏好只保存在当前进程的当前会话中。`1.1.0` 开发版将关闭、`auto`、`low` 和 `auto` 作为可持久化的安全全局默认；会话只记录用户明确修改的字段，所以未覆盖的字段会跟随新默认值。所有切换从下一次请求生效。Fast 在 GPT-5.4、GPT-5.5、GPT-5.6 Luna、Sol 和 Terra 上使用官方 priority service tier，目标速度为 1.5 倍并消耗更多额度；失败请求不会自动降级重放。
+`1.1.0` 将关闭、`auto`、`low` 和 `auto` 作为可持久化的安全全局默认；会话只记录用户明确修改的字段，所以未覆盖的字段会跟随新默认值。所有切换从下一次请求生效。Fast 在 GPT-5.4、GPT-5.5、GPT-5.6 Luna、Sol 和 Terra 上使用官方 priority service tier，目标速度为 1.5 倍并消耗更多额度；失败请求不会自动降级重放。
 
 更新：
 
 ```sh
-dsh plugin --profile web update dsh-codex-community@1.0.0
+dsh plugin --profile web update dsh-codex-community@1.1.0
 dsh web
 ```
 
@@ -95,12 +95,12 @@ dsh web
 
 ## 支持边界
 
-- `1.0.0` 的完整检查与 Linux、macOS、Windows CI/profile smoke 已按本版本候选 `3/3` 通过并获维护者批准；发布后真实账号验证从 `0/13` 开始，状态见[验收记录](docs/releases/v1.0.0.acceptance.json)；
-- `0.0.4` 的历史发布证据继续保留，但不会继承为 `1.0.0` 的验收结果；
+- `1.1.0` 的完整检查与 Linux、macOS、Windows CI/profile smoke 已按本版本候选 `3/3` 通过并获维护者批准；发布后真实账号验证从 `0/13` 开始，状态见[验收记录](docs/releases/v1.1.0.acceptance.json)；
+- `1.0.0` 的历史发布证据继续保留，但不会继承为 `1.1.0` 的验收结果；
 - 设置页额度通过官方 Codex 客户端使用的 Web 后端兼容接口读取；接口不可用或返回异常时保留最近的安全读数，并降级为请求观测或未知状态，不把错误伪装成零余额；
 - 模型名称、上下文、最大输出和可选的 Low 至 Max 推理档位来自当前安装 provider catalog 的实际语义；插件不会虚构或标注 catalog 未提供的默认档位，无显式 effort 时由当前 Provider 或服务端采用其默认行为。选择器不展示通用的 `Default`、`Off`、`Minimal`，也不把需要主动任务委派的 `Ultra` 伪装成普通推理档位；
 - Fast 仅用于 GPT-5.4、GPT-5.5、GPT-5.6 Luna、Sol 和 Terra，并会提高额度消耗；其他模型不会发送 Fast service tier；
-- 本机和账号诊断仍不发送模型请求；`1.1.0` 开发中的真实网络诊断会在二次确认后使用页面列出的模型单独发送一次短提示并消耗额度。它没有服务端硬输出上限，只会在首次可见文本后尽快结束流，仍不能替代图片、工具、Fast 或全部传输方式的完整验收；
+- 本机和账号诊断不发送模型请求；一次性真实网络诊断只会在二次确认后使用页面列出的模型单独发送一次短提示并消耗额度。它没有服务端硬输出上限，只会在首次可见文本后尽快结束流，仍不能替代图片、工具、Fast 或全部传输方式的完整验收；
 - 不提供图片生成或编辑；
 - Windows、Linux、真实 OAuth 与真实 Codex 网络验收状态见[兼容性文档](docs/compatibility.md)。
 

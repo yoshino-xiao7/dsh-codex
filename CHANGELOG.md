@@ -3,7 +3,7 @@
 本项目遵循 Keep a Changelog 的结构；`1.0.0` 起作为正式版发布，具体兼容性边界以对应发布说明为准。
 This project follows the Keep a Changelog structure. Starting with `1.0.0`, releases are stable; each release note defines its exact compatibility boundary.
 
-## [1.1.0] - Unreleased
+## [1.1.0] - 2026-08-30
 
 ### 中文
 
