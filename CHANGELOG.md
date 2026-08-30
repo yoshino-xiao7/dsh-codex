@@ -3,6 +3,48 @@
 本项目遵循 Keep a Changelog 的结构；`1.0.0` 起作为正式版发布，具体兼容性边界以对应发布说明为准。
 This project follows the Keep a Changelog structure. Starting with `1.0.0`, releases are stable; each release note defines its exact compatibility boundary.
 
+## [1.1.0] - Unreleased
+
+### 中文
+
+#### 新增
+
+- 插件设置新增 Fast、Transport、回复详略和推理摘要的持久化全局默认值；安全默认仍为关闭、`auto`、`low` 和 `auto`。
+- 设置页新增应用运行期间的低额度、耗尽和重置提醒；只使用已验证的 Codex 5 小时与每周窗口，剩余不高于 20% 时提醒。不增加后台轮询、循环重试或操作系统通知。
+- 连接诊断新增用户显式二次确认的一次性真实网络检查。同意框显示经白名单字符与长度校验的实际模型 ID，执行时使用同一模型；请求会消耗账号额度，使用 SSE、关闭 Fast、仅携带一条短提示，不携带会话历史或工具，也不自动重试。请求保持 Codex SDK 的公开 wire schema，不写入私有输出上限；专用端点没有可用的服务端硬输出上限，插件会在首次可见文本后立即 teardown，但取消或 teardown 不能保证未消耗额度。
+- 诊断新增最多 20 条的进程内脱敏历史，支持显式加载、清空与导出通过固定 schema 验证的 JSON；历史不写入配置或磁盘，进程重启后清空。
+
+#### 变更
+
+- 会话偏好改为只保存显式覆盖的稀疏字段，解析请求时再与当前全局默认值合并；`/codex reset` 恢复当前默认值，进程重启只清除会话覆盖。
+
+#### 修复
+
+- 每周额度的相对天数会在页面停留期间按 `ceil(剩余时间 / 24 小时)` 的本地显示边界递减；这些边界不读取账号额度，只有真实 reset 节点才触发一次 usage RPC。
+- 修改全局 Transport 时，仅继承该默认值的会话会 rollover 到新的 transport generation；下一次请求不继承旧连接、缓存或 WebSocket→SSE 回退锁存，显式覆盖会话保持不变，在途请求结束后才清理旧 generation。
+- 诊断报告升级为新的固定版本；真实请求只输出固定成功或失败分类、受限布尔事实和经校验的实际模型 ID，不包含 token、account ID、请求 ID、提示、模型输出、原始响应或原始错误。
+- 真实诊断的前置检查有 30 秒 deadline，内部超时与用户取消使用不同固定状态，且前置通过前不会进入模型请求 probe。真实请求超时或取消后，进程级隔离只在旧 `next()` 收敛、`return()` 成功返回 `{ done: true }` 且临时状态清理成功后放行；无法确认时保持 busy，需重启进程恢复。开始发送后的取消会作为“已尝试”写入脱敏历史，并提示取消不能保证未消耗额度。
+
+### English
+
+#### Added
+
+- Plugin settings now persist global defaults for Fast, Transport, reply verbosity, and reasoning summary. The safe defaults remain off, `auto`, `low`, and `auto`.
+- Settings now shows low-usage, exhausted-window, and reset reminders while the app is running. Reminders use only verified Codex five-hour and weekly windows and appear at 20% remaining or below. They add no background polling, retry loop, or operating-system notification.
+- Connection diagnostics now provides a one-shot real-network check behind an explicit second confirmation. The consent names the actual model ID after character-allowlist and length validation, and execution uses that same model. It consumes account usage, forces SSE with Fast off, carries one short prompt with no conversation history or tools, and performs no automatic retry. The request stays on the public Codex SDK wire schema and injects no private output cap. The dedicated endpoint exposes no usable server-side hard output limit; the plugin tears down after the first visible text, but cancellation or teardown cannot guarantee that no usage was consumed.
+- Diagnostics now retains at most 20 sanitized reports in process memory, with explicit loading, clearing, and export of fixed-schema-validated JSON. History is written to neither configuration nor disk and disappears at restart.
+
+#### Changed
+
+- Conversation preferences now retain only explicitly overridden sparse fields and merge them with the current global defaults when resolving a request. `/codex reset` restores those current defaults, while process restart clears only conversation overrides.
+
+#### Fixed
+
+- Weekly relative-day labels now decrement at local `ceil(remaining time / 24 hours)` display boundaries while the page remains open. These boundaries do not read account usage; only the actual reset boundary triggers one usage RPC.
+- Changing the global Transport default rolls only inheriting conversations onto a new transport generation. The next request cannot inherit the old connection, cache, or WebSocket-to-SSE fallback latch; explicitly overridden conversations remain unchanged, and an old generation is cleaned only after its in-flight request drains.
+- Diagnostic reports use a new fixed version. A real request exposes only fixed success/failure categories, bounded boolean facts, and the validated actual model ID, never tokens, account IDs, request IDs, prompts, model output, raw responses, or raw errors.
+- Real-diagnostic preflight has a 30-second deadline, reports internal timeout separately from user cancellation, and cannot enter the model-request probe before preflight passes. After request timeout or cancellation, process-wide quarantine is released only after the old `next()` settles, `return()` successfully yields `{ done: true }`, and temporary-state cleanup succeeds. If any condition cannot be confirmed, the diagnostic remains busy until process restart. Cancellation after dispatch is retained as an attempted sanitized-history entry and warns that cancellation cannot guarantee no usage was consumed.
+
 ## [1.0.0] - 2026-08-30
 
 ### 中文

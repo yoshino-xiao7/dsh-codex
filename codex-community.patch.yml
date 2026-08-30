@@ -5,6 +5,10 @@
     - id: dsh-codex
       name: 'dsh-codex-community'
       config:
+        defaultFast: false
+        defaultTransport: auto
+        defaultTextVerbosity: low
+        defaultReasoningSummary: auto
         partialResponseRecovery: true
         cacheRetention: short
         streamIdleTimeoutMs: 300000

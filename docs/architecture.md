@@ -10,6 +10,7 @@
 DSH Web 设置 ── loopback RPC ── AuthorizationBridge
         │                             │
         ├── 按需诊断 ────────── ConnectionDiagnostics
+        │                             └── 单次授权 ── CodexNetworkProbe
         │                             │
         │ 进入 / 可见 / 重置刷新       │
         ▼                             ▼
@@ -53,29 +54,37 @@ Host 端通过 DSH authorization service 启动、取消和观察登录流程，
 
 ## AccountUsageReader
 
-设置页挂载、重新变为可见、额度窗口到达重置节点，以及用户点击“刷新”或执行 `/codex-usage refresh` 时，Host 端 `AccountUsageReader` 使用当前 OAuth grant 请求官方 Codex 客户端使用的 Web 后端 usage 兼容接口。页面使用单次定时器对准最近临界点，不做后台轮询；每周窗口进入不足 24 小时的显示区间时只在本地重新渲染精确时间，不额外联网。Reader 严格解析使用百分比、窗口时长、reset 时间和可选套餐类型，并把五小时与每周窗口转换为不含凭据的最小快照；access token、refresh token、account ID、原始响应和任意响应头都不会跨过 loopback RPC。
+设置页挂载、重新变为可见、额度窗口到达重置节点，以及用户点击“刷新”或执行 `/codex-usage refresh` 时，Host 端 `AccountUsageReader` 使用当前 OAuth grant 请求官方 Codex 客户端使用的 Web 后端 usage 兼容接口。页面使用单次定时器对准最近临界点，不做后台轮询；每周窗口按 `ceil(剩余时间 / 24 小时)` 的本地显示边界递减相对天数，进入不足 24 小时的显示区间时也只在本地重新渲染精确时间，不额外联网。Reader 严格解析使用百分比、窗口时长、reset 时间和可选套餐类型，并把五小时与每周窗口转换为不含凭据的最小快照；access token、refresh token、account ID、原始响应和任意响应头都不会跨过 loopback RPC。
+
+低额度与重置提醒是这份脱敏快照的纯客户端投影：只考虑 `limitId=codex` 的 300 分钟和 10080 分钟窗口，剩余不高于 20% 时提醒，剩余 0% 时显示耗尽状态。到达已验证的重置节点时只刷新一次以确认服务端状态，失败后保留上次安全读数并等待用户手动刷新，不自动循环重试。提醒只存在于应用运行期间的插件页面，既不启动后台任务，也不请求操作系统通知权限。
 
 该接口是 Web 后端兼容边界，不被当作稳定的插件公共 API。请求具有超时、响应大小和数值范围限制；网络失败、鉴权失败或结构变化不会被显示成零余额，也不会清除最近一次已验证读数。若没有可保留的实时读数，页面会安全降级为最近请求产生的 `QuotaObserver` 状态或“未知”，而不是推断额度。`/codex-usage status` 只读取这份进程内请求观测；只有 `refresh` 调用 `AccountUsageReader` 读取真实账号窗口。
 
 ## ConnectionDiagnostics
 
-连接诊断使用独立的 `/dsh-codex-diagnostics` loopback RPC，而不是扩展授权 RPC。设置页默认折叠且不会自动运行。`local` 只读取进程内 route、模型目录、启用数量和本机凭据元数据，不访问网络、不刷新 OAuth，也不持有 stream seam；`account` 在相同本机检查后只调用一次既有 `AccountUsageReader`，因此可能按其正常合同刷新 OAuth，但不会发起模型请求或消耗模型额度。
+连接诊断使用独立的 `/dsh-codex-diagnostics` loopback RPC，而不是扩展授权 RPC。设置页默认折叠且不会自动运行。`local` 只读取进程内 route、模型目录、启用数量和本机凭据元数据，不访问网络、不刷新 OAuth；`account` 在相同本机检查后只调用一次既有 `AccountUsageReader`，因此可能按其正常合同刷新 OAuth，但不会发起模型请求或消耗模型额度。
 
-浏览器报告固定为版本、模式、总结果、观测时间和检查数组。检查只包含固定 ID、固定状态码和受限的布尔、数字或枚举事实；token、完整 grant、account ID、原始响应、Header、任意异常消息和 Provider 对象不会跨过边界。账号读取的 HTTP 失败被固定分类为 401/403 鉴权错误、429 限流、5xx 服务端错误或其他 HTTP 错误，不把原始状态文案或响应体送到浏览器。复制功能序列化的正是这份已验证安全投影，不会回读原始异常。主动模型请求诊断不在 `1.0.0` 范围内，避免把真实请求副作用或流恢复误判成诊断成功。
+`network` 是彼此隔离的主动模式。第一步只读取本机 runtime 模型快照，按现有顺序绑定第一个已启用模型，校验模型 ID 只含白名单字符且不超过 256 字符，然后创建一个短期、单次使用的同意凭据；确认框明确显示这个模型 ID 与消耗说明。只有第二步携带该凭据时，`CodexNetworkProbe` 才使用同一模型，绕过 AgentLoop 和 `StreamResilience`，直接调用 `CodexRouteAdapter` 发送一次固定短提示。进入 probe 前，本机状态与凭据前置检查共用 30 秒 deadline；内部超时固定报告为 `preflight-timeout`，不会冒充用户取消，也不会进入模型请求。probe 强制使用 SSE、关闭 Fast，不携带当前会话历史、当前会话系统提示或工具，也不经过恢复或自动重试。请求保持当前 Codex SDK 的公开 wire schema，不向专用端点强插 `max_output_tokens`。该端点没有可用的服务端硬输出上限；probe 在首次看到非空模型文本后立即调用 iterator teardown 以尽量减少消耗，但取消或 teardown 不能保证服务端尚未计费。自动化用真实 Provider→PiAiAdapter→Route→Probe 链路和 mock HTTP 边界覆盖 200、`response.incomplete` 与 400，不代表真实账号线上验收。Provider 仍可按其公开合同加入固定默认指令。因为 probe 确实访问模型，所以会消耗账号额度。同意过期或已使用时不能重放；请求开始后取消不能保证尚未发送或未消耗额度，会以 `attempted=true` 和经校验模型 ID 的固定脱敏结果进入历史。
+
+真实诊断使用进程级 coordinator 跨 runtime replacement 隔离。请求超时、取消或插件卸载后，只有旧 `next()` 已收敛、显式 `return()` 成功返回 `{ done: true }`，并且临时安全偏好与 transport 资源都清理成功，才允许下一次真实诊断；缺少 `return()`、返回不完整、teardown/cleanup 抛错或旧迭代器不收敛时都会继续返回 busy，页面热重载不能绕过。此时必须完整重启应用进程才能恢复，避免两个可能仍在运行的计费请求重叠。
+
+浏览器报告固定为版本、模式、总结果、观测时间和检查数组。检查只包含固定 ID、固定状态码、受限的布尔/数字/枚举事实，以及真实诊断中经白名单与长度校验的实际模型 ID；token、完整 grant、account ID、原始响应、Header、任意异常消息、请求 ID、提示和模型输出不会跨过边界。账号读取和真实请求失败都转换为固定脱敏分类；`INVALID_REQUEST`、`PI_AI_ERROR`、`UNKNOWN_MODEL` 与 `MISSING_CREDENTIAL` 也各自落入固定代码，不把原始状态文案或响应体送到浏览器。
+
+每个完成或取消的报告进入最多 20 条的进程内循环历史；不写入插件配置或磁盘，重启即清空。Web 端只在用户主动读取历史时加载，并在复制或导出 JSON 前再次按固定 schema 验证；清空历史也是显式用户操作。
 
 ## SessionPreferences
 
 模型选择器左侧的闪电按钮、相邻的会话请求菜单和 `/codex` 修改同一份当前会话状态：
 
-- 闪电按钮或 `fast on|off` 控制是否发送 Fast priority service tier，默认关闭；
-- `transport` 可选 `auto`、`sse`、`websocket` 或 `websocket-cached`，默认 `auto`；
-- `verbosity` 可选 `low`、`medium` 或 `high`，默认 `low`，真实映射到回复详略请求字段；
-- `summary` 可选 `auto`、`concise`、`detailed` 或 `off`，默认 `auto`，真实映射到推理摘要请求字段；
-- `reset` 恢复当前会话默认值。
+- 闪电按钮或 `fast on|off` 控制是否发送 Fast priority service tier；
+- `transport` 可选 `auto`、`sse`、`websocket` 或 `websocket-cached`；
+- `verbosity` 可选 `low`、`medium` 或 `high`，真实映射到回复详略请求字段；
+- `summary` 可选 `auto`、`concise`、`detailed` 或 `off`，真实映射到推理摘要请求字段；
+- `reset` 删除当前会话覆盖，恢复当前全局默认值。
 
-偏好保存在有容量上限的内存表中，返回不可变快照，不写入全局 provider 设置，进程重启后恢复默认。Fast 只对 GPT-5.4、GPT-5.5、GPT-5.6 Luna、Sol 和 Terra 请求生效，使用官方 priority service tier，目标速度为 1.5 倍并消耗更多额度；其他模型不会携带该 tier。所有切换只影响下一次请求，已经开始的请求不变。Fast 请求失败后不会自动以另一 service tier 重放，避免重复工具副作用。
+全局默认值保存在 `dsh-codex` 设置命名空间；有容量上限的内存表只保存每个会话显式覆盖的字段，解析时与当前默认值合并并返回不可变快照。因此，修改全局默认值不会覆盖会话已显式选择的字段，但未覆盖字段会立即跟随。全局 Transport 变化只 rollover 当前继承该默认值的会话：下一次请求获得新的 transport generation，不再继承旧连接、缓存或回退锁存；显式覆盖 Transport 的会话保持原 generation。在途请求持有旧 generation 的 lease，直到 stream 终止且 iterator teardown 收敛后才清理，不会被设置热更新关闭。进程重启会清除会话覆盖，但持久化默认值仍保留。Fast 只对 GPT-5.4、GPT-5.5、GPT-5.6 Luna、Sol 和 Terra 请求生效，使用官方 priority service tier，目标速度为 1.5 倍并消耗更多额度；其他模型不会携带该 tier。所有切换只影响下一次请求，已经开始的请求不变。Fast 请求失败后不会自动以另一 service tier 重放，避免重复工具副作用。
 
-DSH 原始 session ID 只用于偏好查询和消息/replay provenance；传给 pi-ai 的 transport/cache session ID 带有 `dsh-codex:` 命名空间。Host 从公开的精确 session debug 统计中只投影请求、连接创建与复用、增量上下文、WebSocket 失败和 SSE 回退等计数；response ID、原始 WebSocket 错误与输入内容不会跨过 RPC。`/codex reset`、`agent/disposed` 和 runtime dispose 只清理本插件拥有的精确 session 状态，不调用无参全局清理，也不影响同进程其他 pi-ai consumer 的 session。
+DSH 原始 session ID 只用于偏好查询和消息/replay provenance；传给 pi-ai 的 transport/cache session ID 带有 `dsh-codex:` 命名空间，并把每个 manager 独有的 epoch 与 generation 放在逻辑 session ID 之前，因此即使 pi-ai 截断 prompt-cache key，热替换 manager 与不同 generation 也不会碰撞。Host 只读取当前 generation 的公开精确 session debug 统计，并投影请求、连接创建与复用、增量上下文、WebSocket 失败和 SSE 回退等计数；response ID、原始 WebSocket 错误与输入内容不会跨过 RPC。`/codex reset` 与显式会话 Transport 变更会 rollover 当前精确会话，`agent/disposed` 与 runtime dispose 会停止拥有相应 generation；这些路径都让在途 lease 排空后再清理，只清理当前 manager 已记录拥有的精确 ID，对未知逻辑 session 的 dispose 是 no-op，不调用无参全局清理，也不影响同进程其他 pi-ai consumer 的 session。资源表有容量上限；空闲会话可被回收，仍有 active lease 时不会被逐出。
 
 ## ModelEnablement
 

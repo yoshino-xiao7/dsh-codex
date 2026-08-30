@@ -22,9 +22,10 @@ const SAFE_DEFAULTS = Object.freeze({
  * Process-local, per-session request preferences.
  *
  * Callers see one immutable snapshot and never learn how entries are bounded or
- * merged. The provider may resolve with no session id for direct/diagnostic
- * calls; those always use safe defaults. Lifecycle owners remove an entry when
- * its agent is disposed.
+ * merged. The provider may resolve with no session id for direct calls; those
+ * inherit the current global defaults. The real-network diagnostic always
+ * supplies its own isolated session with stricter fixed preferences. Lifecycle
+ * owners remove an entry when its agent is disposed.
  */
 export function createSessionPreferences(options = {}) {
   const input = plainObject(options, "options")
@@ -39,7 +40,7 @@ export function createSessionPreferences(options = {}) {
   if (!Number.isSafeInteger(maxSessions) || maxSessions < 1 || maxSessions > MAX_MAX_SESSIONS) {
     throw new TypeError(`maxSessions must be an integer from 1 to ${MAX_MAX_SESSIONS}`)
   }
-  const defaults = snapshot({
+  let defaults = snapshot({
     fast: input.defaultFast ?? SAFE_DEFAULTS.fast,
     transport: input.defaultTransport ?? SAFE_DEFAULTS.transport,
     textVerbosity: input.defaultTextVerbosity ?? SAFE_DEFAULTS.textVerbosity,
@@ -51,7 +52,14 @@ export function createSessionPreferences(options = {}) {
   return Object.freeze({
     resolve(sessionId) {
       if (disposed || sessionId === undefined) return defaults
-      return entries.get(validSessionId(sessionId)) ?? defaults
+      const overrides = entries.get(validSessionId(sessionId))
+      return overrides === undefined ? defaults : snapshot({ ...defaults, ...overrides })
+    },
+
+    hasOverride(sessionId, key) {
+      if (disposed || sessionId === undefined) return false
+      if (!PREFERENCE_KEYS.has(key)) throw new TypeError("unknown preference key")
+      return Object.hasOwn(entries.get(validSessionId(sessionId)) ?? {}, key)
     },
 
     configure(sessionId, patch) {
@@ -67,9 +75,23 @@ export function createSessionPreferences(options = {}) {
       if (!entries.has(id) && entries.size >= maxSessions) {
         throw new Error("session preference capacity reached")
       }
-      const next = snapshot({ ...(entries.get(id) ?? defaults), ...change })
-      entries.set(id, next)
+      const overrides = Object.freeze({ ...(entries.get(id) ?? {}), ...change })
+      const next = snapshot({ ...defaults, ...overrides })
+      entries.set(id, overrides)
       return next
+    },
+
+    replaceDefaults(value) {
+      if (disposed) throw new Error("session preferences are disposed")
+      const next = plainObject(value, "preference defaults")
+      const keys = Object.keys(next)
+      if (keys.length !== PREFERENCE_KEYS.size || keys.some((key) => !PREFERENCE_KEYS.has(key))) {
+        throw new TypeError(
+          "preference defaults must set fast, transport, textVerbosity, and reasoningSummary",
+        )
+      }
+      defaults = snapshot(next)
+      return defaults
     },
 
     remove(sessionId) {
@@ -81,6 +103,7 @@ export function createSessionPreferences(options = {}) {
       if (disposed) return
       disposed = true
       entries.clear()
+      defaults = SAFE_DEFAULTS
     },
   })
 }

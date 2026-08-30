@@ -81,6 +81,28 @@ test("/codex controls the current session transport and supports reset", async (
   assert.deepEqual(resets, ["session-a", "session-a"])
 })
 
+test("/codex reset inherits the latest global request defaults", async () => {
+  const { invoke, preferences } = commandFixture()
+
+  await invoke("set transport websocket-cached")
+  await invoke("set fast off")
+  preferences.replaceDefaults({
+    fast: true,
+    transport: "sse",
+    textVerbosity: "medium",
+    reasoningSummary: "concise",
+  })
+
+  const reset = await invoke("reset")
+  assert.equal(reset.kind, "success")
+  assert.deepEqual(preferences.resolve("session-a"), {
+    fast: true,
+    transport: "sse",
+    textVerbosity: "medium",
+    reasoningSummary: "concise",
+  })
+})
+
 test("/codex controls reply verbosity and reasoning summaries for the current session", async () => {
   const { invoke, preferences } = commandFixture()
 

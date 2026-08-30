@@ -26,7 +26,12 @@ export { Config }
 export function apply(ctx, config = {}) {
   const entry = Config(config)
   const authorizationCommitTracker = createAuthorizationCommitTracker()
-  const sessionPreferences = createSessionPreferences({ defaultTransport: "auto" })
+  const sessionPreferences = createSessionPreferences({
+    defaultFast: entry.defaultFast,
+    defaultTransport: entry.defaultTransport,
+    defaultTextVerbosity: entry.defaultTextVerbosity,
+    defaultReasoningSummary: entry.defaultReasoningSummary,
+  })
   const sessionResources = createCodexSessionResourceManager()
   const runtime = installCodexProviderRuntime(ctx, entry, {
     authorizationCommitTracker,
@@ -36,9 +41,13 @@ export function apply(ctx, config = {}) {
   ctx.effect(
     () => () => {
       try {
-        sessionPreferences.dispose()
+        runtime.dispose()
       } finally {
-        sessionResources.dispose()
+        try {
+          sessionPreferences.dispose()
+        } finally {
+          sessionResources.dispose()
+        }
       }
     },
     "dsh-codex: session resources",
@@ -50,7 +59,7 @@ export function apply(ctx, config = {}) {
       try {
         sessionPreferences.remove(sessionId)
       } finally {
-        sessionResources.reset(sessionId)
+        sessionResources.disposeSession(sessionId)
       }
     },
     { global: true },

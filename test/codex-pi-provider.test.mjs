@@ -1,10 +1,14 @@
 import assert from "node:assert/strict"
 import test from "node:test"
+import { zstdDecompressSync } from "node:zlib"
 
 import { getSupportedThinkingLevels } from "@earendil-works/pi-ai"
 import { openaiCodexProvider } from "@earendil-works/pi-ai/providers/openai-codex"
 
 import { createCodexPiProvider } from "../src/internal/codex-pi-provider.mjs"
+import {
+  CODEX_NETWORK_PROBE_SESSION_PREFIX,
+} from "../src/internal/codex-network-probe-contract.mjs"
 import { codexTransportSessionId } from "../src/internal/codex-session-resources.mjs"
 
 const CONTEXT = Object.freeze({
@@ -47,6 +51,42 @@ async function capturePayload(provider, options = {}, modelId = "gpt-5.4") {
   return captured
 }
 
+async function captureNetworkPayload(provider, options = {}, modelId = "gpt-5.4") {
+  const model = provider.getModels().find((candidate) => candidate.id === modelId)
+    ?? provider.getModels()[0]
+  const originalFetch = globalThis.fetch
+  let captured
+  let fetchCalls = 0
+  globalThis.fetch = async (_url, request) => {
+    fetchCalls += 1
+    const headers = new Headers(request.headers)
+    const bytes = Buffer.from(request.body)
+    const json = headers.get("content-encoding") === "zstd"
+      ? zstdDecompressSync(bytes).toString("utf8")
+      : bytes.toString("utf8")
+    captured = JSON.parse(json)
+    return new Response("capture complete", { status: 400 })
+  }
+
+  try {
+    const stream = provider.streamSimple(model, CONTEXT, {
+      apiKey: fakeAccessToken(),
+      transport: "sse",
+      maxRetries: 0,
+      ...options,
+    })
+    for await (const event of stream) {
+      if (event.type === "error") break
+    }
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+
+  assert.equal(fetchCalls, 1)
+  assert.notEqual(captured, undefined)
+  return captured
+}
+
 test("keeps the published Codex provider catalog and OAuth owner", () => {
   const published = openaiCodexProvider()
   const wrapped = createCodexPiProvider()
@@ -78,6 +118,49 @@ test("defaults to the published streamSimple payload without a service tier", as
 
   assert.equal(actual.service_tier, undefined)
   assert.deepEqual(actual, expected)
+})
+
+test("keeps ordinary request payloads free of the network probe output cap", async () => {
+  const wrapped = createCodexPiProvider()
+  let onPayloadCalls = 0
+
+  const actual = await captureNetworkPayload(wrapped, {
+    sessionId: "session-not-a-network-probe",
+    maxTokens: 321,
+    onPayload(payload) {
+      onPayloadCalls += 1
+      return { ...payload, caller_marker: true }
+    },
+  })
+
+  assert.equal(onPayloadCalls, 1)
+  assert.equal(actual.caller_marker, true)
+  assert.equal(Object.hasOwn(actual, "max_output_tokens"), false)
+})
+
+test("keeps the network probe on the published Codex SDK wire schema", async () => {
+  let preferenceReads = 0
+  const wrapped = createCodexPiProvider({
+    resolveSessionPreferences() {
+      preferenceReads += 1
+      return {
+        fast: true,
+        transport: "websocket-cached",
+        textVerbosity: "high",
+        reasoningSummary: "detailed",
+      }
+    },
+  })
+  const actual = await captureNetworkPayload(wrapped, {
+    sessionId: `${CODEX_NETWORK_PROBE_SESSION_PREFIX}sdk-schema`,
+  })
+
+  assert.equal(preferenceReads, 0)
+  assert.equal(actual.service_tier, undefined)
+  assert.equal(actual.text?.verbosity, "low")
+  assert.equal(actual.reasoning, undefined)
+  assert.equal(Object.hasOwn(actual, "max_output_tokens"), false)
+  assert.equal(actual.tools === undefined || actual.tools.length === 0, true)
 })
 
 test("resolves Fast per session and changes only service_tier", async () => {
@@ -212,6 +295,17 @@ test("rejects invalid factory options and session preferences", () => {
     () => createCodexPiProvider({ resolveTransportSessionId: true }),
     /resolveTransportSessionId must be a function/u,
   )
+  assert.throws(
+    () => createCodexPiProvider({ acquireTransportSession: true }),
+    /acquireTransportSession must be a function/u,
+  )
+  assert.throws(
+    () => createCodexPiProvider({
+      acquireTransportSession: () => undefined,
+      resolveTransportSessionId: () => undefined,
+    }),
+    /mutually exclusive/u,
+  )
 
   const invalidResolvedSession = createCodexPiProvider({
     resolveTransportSessionId: () => "",
@@ -223,6 +317,18 @@ test("rejects invalid factory options and session preferences", () => {
       { sessionId: "session-invalid" },
     ),
     /resolved transport session id must be a non-empty string/u,
+  )
+
+  const invalidLease = createCodexPiProvider({
+    acquireTransportSession: () => ({ sessionId: "", release() {} }),
+  })
+  assert.throws(
+    () => invalidLease.streamSimple(
+      invalidLease.getModels()[0],
+      CONTEXT,
+      { sessionId: "session-invalid-lease" },
+    ),
+    /transport lease/u,
   )
 
   const invalid = createCodexPiProvider({

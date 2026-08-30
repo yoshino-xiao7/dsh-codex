@@ -24,7 +24,7 @@ function deferred() {
   return { promise, resolve, reject }
 }
 
-function hookHarness() {
+function hookHarness(options = {}) {
   const hooks = []
   let component
   let props
@@ -34,6 +34,33 @@ function hookHarness() {
   let pendingEffects = []
   let unmounted = false
   let updatesAfterUnmount = 0
+  const assignedRefs = new Set()
+
+  const assignHostRefs = (value) => {
+    if (typeof options.createHostNode !== "function") return
+    if (value === null || value === undefined || value === false) return
+    if (Array.isArray(value)) {
+      for (const child of value) assignHostRefs(child)
+      return
+    }
+    if (typeof value !== "object") return
+    const ref = value.props?.ref
+    if (typeof value.type === "string" && ref !== undefined) {
+      const node = options.createHostNode(value)
+      if (typeof ref === "function") ref(node)
+      else if (typeof ref === "object" && ref !== null) ref.current = node
+      assignedRefs.add(ref)
+    }
+    assignHostRefs(value.children)
+  }
+
+  const clearHostRefs = () => {
+    for (const ref of assignedRefs) {
+      if (typeof ref === "function") ref(null)
+      else if (typeof ref === "object" && ref !== null) ref.current = null
+    }
+    assignedRefs.clear()
+  }
 
   const sameDependencies = (left, right) => left !== undefined
     && right !== undefined
@@ -88,10 +115,12 @@ function hookHarness() {
   }
 
   function render() {
+    clearHostRefs()
     hookIndex = 0
     pendingEffects = []
     dirty = false
     tree = component(props)
+    assignHostRefs(tree)
     for (const pending of pendingEffects) {
       hooks[pending.index]?.cleanup?.()
       hooks[pending.index] = {
@@ -117,6 +146,7 @@ function hookHarness() {
     tree: () => tree,
     unmount() {
       unmounted = true
+      clearHostRefs()
       for (const hook of hooks) hook?.cleanup?.()
     },
     updatesAfterUnmount: () => updatesAfterUnmount,
@@ -170,7 +200,7 @@ async function loadClientModule(React, windowOverrides = {}, options = {}) {
     ...windowOverrides,
     __ModuleLoader__: { load: (spec) => { registration = spec } },
   }
-  const globals = { AbortController, window }
+  const globals = { AbortController, Blob, URL, window, ...options.globals }
   if (options.document !== undefined) globals.document = options.document
   vm.runInNewContext(source, globals)
   return registration.factory((specifier) => {
@@ -294,6 +324,29 @@ function settingsMirror(view, hooks = {}) {
       }
       for (const listener of listeners) listener()
     },
+  }
+}
+
+function requestDefaultsScope(value, { writable = true, status = "ready" } = {}) {
+  let snapshot = { status, value, writable }
+  const listeners = new Set()
+  const writes = []
+  return {
+    getSnapshot: () => snapshot,
+    subscribe(listener) {
+      listeners.add(listener)
+      return () => listeners.delete(listener)
+    },
+    async set(field, nextValue) {
+      writes.push({ field, value: nextValue })
+      snapshot = {
+        ...snapshot,
+        status: "ready",
+        value: { ...snapshot.value, [field]: nextValue },
+      }
+      for (const listener of listeners) listener()
+    },
+    writes,
   }
 }
 
@@ -454,10 +507,20 @@ test("classic web bundle registers the package id and Codex settings section", a
   const dictionaries = []
   const sections = []
   const injectedSlots = []
+  const defaultsScope = requestDefaultsScope({
+    defaultFast: false,
+    defaultTransport: "auto",
+    defaultTextVerbosity: "low",
+    defaultReasoningSummary: "auto",
+  })
   const context = {
     connection: { rpc: { call: async () => ({ ok: true, value: {} }) } },
     settingsScope: {
       describe: () => settingsMirror({ writable: true, namespaces: [] }),
+      bind(spec) {
+        assert.deepEqual(plain(spec), { namespace: "dsh-codex" })
+        return defaultsScope
+      },
     },
     effect(callback) {
       callback()
@@ -573,16 +636,28 @@ test("classic web bundle registers the package id and Codex settings section", a
   assert.match(dictionaries[0].value.zh.diagnosticsAccountHelp, /刷新 OAuth.*不发送模型请求.*不消耗额度/u)
   assert.match(dictionaries[0].value.en.diagnosticsLocalHelp, /No network.*credential refresh.*model request/iu)
   assert.match(dictionaries[0].value.en.diagnosticsAccountHelp, /refreshes OAuth.*never sends a model request.*consumes usage/iu)
+  assert.match(dictionaries[0].value.zh.diagnosticsNetworkConsentHelp, /一次真实 Codex 请求.*消耗额度.*SSE.*关闭 Fast.*短提示.*不携带当前会话内容或工具.*不会自动重试.*没有可用的服务端硬输出上限.*首次看到模型文本.*不能保证.*未消耗额度/u)
+  assert.match(dictionaries[0].value.en.diagnosticsNetworkConsentHelp, /one real Codex request.*consumes usage.*SSE.*Fast off.*short prompt.*no conversation history or tools.*no automatic retry.*no usable server-side hard output limit.*first visible model text.*cannot guarantee.*usage/iu)
+  assert.equal(dictionaries[0].value.zh.diagnosticsNetworkConfirm, "我了解会消耗额度，执行一次")
+  assert.equal(dictionaries[0].value.en.diagnosticsNetworkConfirm, "I understand this consumes usage; run once")
+  assert.match(dictionaries[0].value.zh.diagnosticsHistoryHelp, /点击后.*最多 20 条.*脱敏.*不会自动加载/u)
+  assert.match(dictionaries[0].value.en.diagnosticsHistoryHelp, /up to 20 sanitized reports.*after you click.*never loads automatically/iu)
   assert.equal(typeof settingsSection.spec.inject().diagnosticsClient.run, "function")
+  assert.equal(typeof settingsSection.spec.inject().diagnosticsClient.prepareNetwork, "function")
+  assert.equal(typeof settingsSection.spec.inject().diagnosticsClient.runNetwork, "function")
+  assert.equal(typeof settingsSection.spec.inject().diagnosticsClient.history, "function")
+  assert.equal(typeof settingsSection.spec.inject().diagnosticsClient.clearHistory, "function")
+  assert.equal(typeof settingsSection.spec.inject().defaultsClient.set, "function")
 })
 
-test("settings page keeps one hero above authorization, compact diagnostics, and models", async () => {
+test("settings page keeps one hero above authorization, diagnostics, request defaults, and models", async () => {
   const harness = hookHarness()
   const clientModule = await loadClientModule(harness.React)
   const page = clientModule.CodexSettings({
     client: {},
     diagnosticsClient: {},
     modelClient: {},
+    defaultsClient: {},
     t: (key) => key,
   })
 
@@ -594,7 +669,260 @@ test("settings page keeps one hero above authorization, compact diagnostics, and
   assert.match(textContent(hero), /titledescription/u)
   assert.equal(page.children[1].type, clientModule.AuthorizationSettings)
   assert.equal(page.children[2].type, clientModule.ConnectionDiagnosticsSettings)
-  assert.equal(page.children[3].type, clientModule.ModelEnablementSettings)
+  assert.equal(page.children[3].type, clientModule.GlobalRequestDefaultsSettings)
+  assert.equal(page.children[4].type, clientModule.ModelEnablementSettings)
+})
+
+test("global request defaults expose full-row native selectors with current values and ARIA labels", async () => {
+  const harness = hookHarness()
+  const clientModule = await loadClientModule(harness.React)
+  const dictionaries = registeredClientDictionaries(clientModule)
+  const scope = requestDefaultsScope({
+    defaultFast: false,
+    defaultTransport: "auto",
+    defaultTextVerbosity: "low",
+    defaultReasoningSummary: "auto",
+  })
+
+  harness.mount(clientModule.GlobalRequestDefaultsSettings, {
+    client: clientModule.createGlobalRequestDefaultsClient(scope),
+    t: (key) => dictionaries.en[key] ?? key,
+  })
+  const tree = harness.flush()
+  const title = findElement(tree, (element) => element.type === "h3"
+    && textContent(element) === "Global request defaults")
+  const group = findElement(tree, (element) => element.props.role === "group")
+  assert.ok(title?.props.id)
+  assert.equal(group.props["aria-labelledby"], title.props.id)
+
+  const rows = findElements(tree, (element) => element.type === "label"
+    && element.props.className?.includes("dshCodexDefaultsRow"))
+  assert.equal(rows.length, 4)
+
+  const fastRow = rows.find(({ props }) => props.className.includes("dshCodexDefaultsFastRow"))
+  const fastInput = findElement(fastRow, (element) => element.type === "input"
+    && element.props.type === "checkbox")
+  const fastLabel = findElement(fastRow, (element) => element.type === "span"
+    && element.props.className === "dshCodexDefaultsLabel")
+  assert.equal(fastRow.props.htmlFor, fastInput.props.id)
+  assert.equal(fastInput.props["aria-labelledby"], fastLabel.props.id)
+  assert.equal(fastRow.props["data-checked"], "false")
+
+  const selectRows = rows.filter(({ props }) => props.className.includes("dshCodexDefaultsSelectRow"))
+  assert.equal(selectRows.length, 3)
+  assert.deepEqual(selectRows.map((row) => {
+    const select = findElement(row, (element) => element.type === "select")
+    const label = findElement(row, (element) => element.type === "span"
+      && element.props.className === "dshCodexDefaultsLabel")
+    const visual = findElement(row, (element) => element.type === "span"
+      && element.props.className === "dshCodexDefaultsSelectVisual")
+    const current = findElement(row, (element) => element.type === "span"
+      && element.props.className === "dshCodexDefaultsSelectCurrent")
+    assert.equal(row.props.htmlFor, select.props.id)
+    assert.equal(select.props.className, "dshCodexDefaultsNativeSelect")
+    assert.equal(select.props["aria-labelledby"], label.props.id)
+    assert.equal(select.props.disabled, false)
+    assert.equal(visual.props["aria-hidden"], "true")
+    assert.ok(findElement(visual, (element) => element.type === "svg"))
+    return textContent(current)
+  }), ["Auto", "Concise", "Auto"])
+  harness.unmount()
+})
+
+test("global request defaults bind one Codex namespace and save each field independently", async () => {
+  const harness = hookHarness()
+  const clientModule = await loadClientModule(harness.React)
+  const dictionaries = registeredClientDictionaries(clientModule)
+  const scope = requestDefaultsScope({
+    defaultFast: false,
+    defaultTransport: "auto",
+    defaultTextVerbosity: "low",
+    defaultReasoningSummary: "auto",
+  })
+  const client = clientModule.createGlobalRequestDefaultsClient(scope)
+
+  harness.mount(clientModule.GlobalRequestDefaultsSettings, {
+    client,
+    t: (key) => dictionaries.en[key] ?? key,
+  })
+  harness.flush()
+  assert.match(textContent(harness.tree()), /Global request defaults/u)
+  assert.match(textContent(harness.tree()), /existing conversations.*next request.*already in progress.*unchanged/u)
+
+  let controls = findElements(
+    harness.tree(),
+    (element) => (element.type === "input" && element.props.type === "checkbox") || element.type === "select",
+  )
+  assert.equal(controls.length, 4)
+  assert.equal(controls[0].props.checked, false)
+  assert.deepEqual(controls.slice(1).map(({ props }) => props.value), ["auto", "low", "auto"])
+
+  controls[0].props.onChange({ target: { checked: true } })
+  await settle()
+  harness.flush()
+  controls = findElements(
+    harness.tree(),
+    (element) => (element.type === "input" && element.props.type === "checkbox") || element.type === "select",
+  )
+  controls[1].props.onChange({ target: { value: "websocket" } })
+  await settle()
+  harness.flush()
+  controls = findElements(
+    harness.tree(),
+    (element) => (element.type === "input" && element.props.type === "checkbox") || element.type === "select",
+  )
+  controls[2].props.onChange({ target: { value: "high" } })
+  await settle()
+  harness.flush()
+  controls = findElements(
+    harness.tree(),
+    (element) => (element.type === "input" && element.props.type === "checkbox") || element.type === "select",
+  )
+  controls[3].props.onChange({ target: { value: "detailed" } })
+  await settle()
+  harness.flush()
+
+  assert.deepEqual(plain(scope.writes), [
+    { field: "defaultFast", value: true },
+    { field: "defaultTransport", value: "websocket" },
+    { field: "defaultTextVerbosity", value: "high" },
+    { field: "defaultReasoningSummary", value: "detailed" },
+  ])
+  assert.equal(scope.writes.every(({ field }) => typeof field === "string"), true)
+  assert.match(textContent(harness.tree()), /Enable Fast \(1\.5×\) by default/u)
+  assert.deepEqual(findElements(
+    harness.tree(),
+    (element) => element.props.className === "dshCodexDefaultsSelectCurrent",
+  ).map(textContent), ["WebSocket", "Detailed", "Detailed"])
+  harness.unmount()
+})
+
+test("global request defaults show unavailable and read-only states without attempting writes", async () => {
+  const unavailableHarness = hookHarness()
+  const unavailableModule = await loadClientModule(unavailableHarness.React)
+  const dictionaries = registeredClientDictionaries(unavailableModule)
+  unavailableHarness.mount(unavailableModule.GlobalRequestDefaultsSettings, {
+    client: unavailableModule.createGlobalRequestDefaultsClient(),
+    t: (key) => dictionaries.zh[key] ?? key,
+  })
+  unavailableHarness.flush()
+  assert.match(textContent(unavailableHarness.tree()), /没有可用.*默认值设置接口/u)
+  assert.equal(findElements(unavailableHarness.tree(), (element) => element.type === "select").length, 0)
+  unavailableHarness.unmount()
+
+  const readOnlyHarness = hookHarness()
+  const readOnlyModule = await loadClientModule(readOnlyHarness.React)
+  const readOnlyScope = requestDefaultsScope({
+    defaultFast: false,
+    defaultTransport: "auto",
+    defaultTextVerbosity: "low",
+    defaultReasoningSummary: "auto",
+  }, { writable: false })
+  readOnlyHarness.mount(readOnlyModule.GlobalRequestDefaultsSettings, {
+    client: readOnlyModule.createGlobalRequestDefaultsClient(readOnlyScope),
+    t: (key) => dictionaries.zh[key] ?? key,
+  })
+  readOnlyHarness.flush()
+  assert.match(textContent(readOnlyHarness.tree()), /设置存储为只读/u)
+  const controls = findElements(
+    readOnlyHarness.tree(),
+    (element) => (element.type === "input" && element.props.type === "checkbox") || element.type === "select",
+  )
+  assert.equal(controls.length, 4)
+  assert.equal(controls.every(({ props }) => props.disabled), true)
+  const rows = findElements(
+    readOnlyHarness.tree(),
+    (element) => element.type === "label" && element.props.className?.includes("dshCodexDefaultsRow"),
+  )
+  assert.equal(rows.length, 4)
+  assert.equal(rows.every(({ props }) => props["data-disabled"] === "true"), true)
+  assert.deepEqual(readOnlyScope.writes, [])
+  readOnlyHarness.unmount()
+})
+
+test("global request defaults reject malformed ready snapshots", async () => {
+  const harness = hookHarness()
+  const clientModule = await loadClientModule(harness.React)
+  const valid = {
+    defaultFast: false,
+    defaultTransport: "auto",
+    defaultTextVerbosity: "low",
+    defaultReasoningSummary: "auto",
+  }
+  const malformed = [
+    [],
+    { defaultFast: "yes" },
+    { ...valid, defaultTransport: "http" },
+    { ...valid, defaultTextVerbosity: "verbose" },
+    { ...valid, defaultReasoningSummary: "full" },
+  ]
+
+  for (const value of malformed) {
+    const client = clientModule.createGlobalRequestDefaultsClient(requestDefaultsScope(value))
+    assert.deepEqual(plain(client.load()), { kind: "unavailable" })
+  }
+
+  const client = clientModule.createGlobalRequestDefaultsClient(requestDefaultsScope({
+    ...valid,
+    futureSetting: true,
+  }))
+  assert.deepEqual(plain(client.load()), {
+    kind: "ready",
+    writable: true,
+    value: valid,
+  })
+})
+
+test("global request defaults disable controls while a field write is saving", async () => {
+  const harness = hookHarness()
+  const clientModule = await loadClientModule(harness.React)
+  const dictionaries = registeredClientDictionaries(clientModule)
+  const pending = deferred()
+  const listeners = new Set()
+  const scope = {
+    getSnapshot: () => ({
+      status: "ready",
+      writable: true,
+      value: {
+        defaultFast: false,
+        defaultTransport: "auto",
+        defaultTextVerbosity: "low",
+        defaultReasoningSummary: "auto",
+      },
+    }),
+    subscribe(listener) {
+      listeners.add(listener)
+      return () => listeners.delete(listener)
+    },
+    set: () => pending.promise,
+  }
+  harness.mount(clientModule.GlobalRequestDefaultsSettings, {
+    client: clientModule.createGlobalRequestDefaultsClient(scope),
+    t: (key) => dictionaries.en[key] ?? key,
+  })
+  harness.flush()
+  findElement(harness.tree(), (element) => element.type === "input" && element.props.type === "checkbox")
+    .props.onChange({ target: { checked: true } })
+  harness.flush()
+  assert.match(textContent(harness.tree()), /Saving…/u)
+  const savingControls = findElements(
+    harness.tree(),
+    (element) => (element.type === "input" && element.props.type === "checkbox") || element.type === "select",
+  )
+  assert.equal(savingControls.every(({ props }) => props.disabled), true)
+  assert.equal(findElements(
+    harness.tree(),
+    (element) => element.type === "label" && element.props.className?.includes("dshCodexDefaultsRow"),
+  ).every(({ props }) => props["data-disabled"] === "true"), true)
+  pending.resolve()
+  await settle()
+  harness.flush()
+  const savedControls = findElements(
+    harness.tree(),
+    (element) => (element.type === "input" && element.props.type === "checkbox") || element.type === "select",
+  )
+  assert.equal(savedControls.every(({ props }) => props.disabled === false), true)
+  harness.unmount()
 })
 
 test("connection diagnostics stay collapsed and idle until explicitly requested", async () => {
@@ -645,13 +973,13 @@ test("connection diagnostics stay collapsed and idle until explicitly requested"
   assert.equal(textContent(findElement(tree, (element) => element.type === "button"
     && element.props["aria-busy"] === "true")), "diagnosticsLocalRunning")
   assert.equal(findElements(tree, (element) => element.type === "button"
-    && element.props.disabled === true).length, 2)
+    && element.props.disabled === true).length, 3)
 
   const secret = "raw-host-diagnostic-secret"
   pending[0].resolve({
     ok: true,
     value: {
-      version: 1,
+      version: 2,
       mode: "local",
       outcome: "warning",
       observedAt: 1,
@@ -750,6 +1078,470 @@ test("connection diagnostics can be cancelled and abort safely on unmount", asyn
   pending[1].resolve({ ok: false, error: { code: "cancelled", message: "ignored" } })
   await settle()
   assert.equal(harness.updatesAfterUnmount(), 0)
+})
+
+test("real request diagnostics require a fresh second confirmation and never replay automatically", async () => {
+  const harness = hookHarness()
+  const clientModule = await loadClientModule(harness.React)
+  const calls = []
+  const pending = []
+  const consentId = "00000000-0000-4000-8000-000000000000"
+  const connection = {
+    rpc: {
+      call(channel, endpoint, payload, signal) {
+        const request = deferred()
+        calls.push({ channel, endpoint, payload, signal })
+        pending.push(request)
+        return request.promise
+      },
+    },
+  }
+  harness.mount(clientModule.ConnectionDiagnosticsSettings, {
+    client: clientModule.createConnectionDiagnosticsClient(connection),
+    t: (key) => key === "locale" ? "en-US" : key,
+  })
+  findElement(harness.tree(), (element) => element.props?.className === "dshCodexDiagnosticsToggle")
+    .props.onClick()
+  let tree = harness.flush()
+  assert.equal(calls.length, 0)
+  assert.match(textContent(tree), /diagnosticsNetworkHelp/u)
+  assert.match(textContent(tree), /diagnosticsHistoryHelp/u)
+
+  findElement(tree, (element) => element.type === "button"
+    && textContent(element) === "diagnosticsNetwork").props.onClick()
+  tree = harness.flush()
+  assert.equal(calls.length, 1)
+  assert.equal(calls[0].endpoint, "prepare-network")
+  assert.deepEqual({ ...calls[0].payload }, {})
+  assert.equal(findElement(tree, (element) => textContent(element) === "diagnosticsNetworkConfirm"), undefined)
+
+  pending[0].resolve({
+    ok: true,
+    value: {
+      version: 1,
+      consentId,
+      expiresAt: 60_000,
+      modelId: "gpt-fixture",
+      transport: "sse",
+    },
+  })
+  await settle()
+  tree = harness.flush()
+  assert.match(textContent(tree), /diagnosticsNetworkConsentHelp/u)
+  assert.match(textContent(tree), /diagnosticsNetworkModel.*gpt-fixture/u)
+  assert.equal(calls.length, 1, "preparing confirmation must not send a model request")
+  assert.equal(findElements(tree, (element) => element.type === "button"
+    && ["diagnosticsLocal", "diagnosticsAccount", "diagnosticsNetwork"].includes(textContent(element)))
+    .every(({ props }) => props.disabled), true)
+
+  findElement(tree, (element) => element.type === "button"
+    && textContent(element) === "diagnosticsNetworkConfirm").props.onClick()
+  tree = harness.flush()
+  assert.equal(calls.length, 2)
+  assert.equal(calls[1].endpoint, "run-network")
+  assert.deepEqual({ ...calls[1].payload }, { consentId })
+  assert.equal(textContent(findElement(tree, (element) => element.props?.["aria-busy"] === "true")), "diagnosticsNetworkRunning")
+
+  pending[1].resolve({
+    ok: true,
+    value: {
+      version: 2,
+      mode: "network",
+      outcome: "pass",
+      observedAt: 1,
+      checks: [{
+        id: "runtime",
+        status: "pass",
+        code: "runtime-ready",
+        facts: { route: "dsh-codex", registered: true },
+      }, {
+        id: "credential",
+        status: "pass",
+        code: "credential-ready",
+        facts: { configured: true, state: "signed-in", writable: true },
+      }, {
+        id: "models",
+        status: "pass",
+        code: "models-ready",
+        facts: { catalogCount: 1, enabledCount: 1, selection: "all", allEnabled: true },
+      }, {
+        id: "model-request",
+        status: "pass",
+        code: "model-request-ready",
+        facts: { attempted: true, outputObserved: true, modelId: "gpt-fixture" },
+      }],
+    },
+  })
+  await settle()
+  tree = harness.flush()
+  assert.match(textContent(tree), /diagnosticsCheckModelRequest/u)
+  assert.match(textContent(tree), /model-request-ready/u)
+  assert.equal(calls.length, 2, "a completed request must never replay automatically")
+
+  findElement(tree, (element) => element.type === "button"
+    && textContent(element) === "diagnosticsNetwork").props.onClick()
+  pending[2].resolve({
+    ok: true,
+    value: {
+      version: 1,
+      consentId: "11111111-1111-4111-8111-111111111111",
+      expiresAt: 60_001,
+      modelId: "gpt-fixture",
+      transport: "sse",
+    },
+  })
+  await settle()
+  tree = harness.flush()
+  findElement(tree, (element) => element.type === "button"
+    && textContent(element) === "diagnosticsNetworkConsentCancel").props.onClick()
+  tree = harness.flush()
+  assert.equal(calls.length, 3, "cancelling local consent must not run the prepared request")
+  assert.equal(findElement(tree, (element) => textContent(element) === "diagnosticsNetworkConfirm"), undefined)
+  harness.unmount()
+})
+
+test("cancelling an active real diagnostic warns that usage may already be consumed", async () => {
+  const harness = hookHarness()
+  const clientModule = await loadClientModule(harness.React)
+  const pending = deferred()
+  let networkSignal
+  const client = {
+    prepareNetwork: async () => ({
+      version: 1,
+      consentId: "00000000-0000-4000-8000-000000000000",
+      expiresAt: Date.now() + 60_000,
+      modelId: "gpt-fixture",
+      transport: "sse",
+    }),
+    runNetwork(_consentId, signal) {
+      networkSignal = signal
+      return pending.promise
+    },
+    run: async () => { throw new Error("not used") },
+    history: async () => ({ version: 1, limit: 20, reports: [] }),
+    clearHistory: async () => ({ cleared: 0 }),
+  }
+  harness.mount(clientModule.ConnectionDiagnosticsSettings, {
+    client,
+    t: (key) => key === "locale" ? "en-US" : key,
+  })
+  findElement(harness.tree(), (element) => element.props?.className === "dshCodexDiagnosticsToggle")
+    .props.onClick()
+  let tree = harness.flush()
+  findElement(tree, (element) => element.type === "button"
+    && textContent(element) === "diagnosticsNetwork").props.onClick()
+  await settle()
+  tree = harness.flush()
+  findElement(tree, (element) => element.type === "button"
+    && textContent(element) === "diagnosticsNetworkConfirm").props.onClick()
+  tree = harness.flush()
+  assert.equal(networkSignal.aborted, false)
+  findElement(tree, (element) => element.type === "button"
+    && textContent(element) === "diagnosticsCancel").props.onClick()
+  tree = harness.flush()
+  assert.equal(networkSignal.aborted, true)
+  assert.match(textContent(tree), /diagnosticsNetworkCancelledAfterStart/u)
+  assert.doesNotMatch(textContent(tree), /diagnosticsOutcomeCancelled/u)
+  pending.resolve({
+    version: 2,
+    mode: "network",
+    outcome: "warning",
+    observedAt: 1,
+    checks: [],
+  })
+  await settle()
+  assert.equal(harness.updatesAfterUnmount(), 0)
+  harness.unmount()
+})
+
+test("cancelling while preparing real-diagnostic consent never claims a request was sent", async () => {
+  const harness = hookHarness()
+  const clientModule = await loadClientModule(harness.React)
+  const pending = deferred()
+  let prepareSignal
+  const client = {
+    prepareNetwork(signal) {
+      prepareSignal = signal
+      return pending.promise
+    },
+    runNetwork: async () => { throw new Error("must not dispatch") },
+    run: async () => { throw new Error("not used") },
+    history: async () => ({ version: 1, limit: 20, reports: [] }),
+    clearHistory: async () => ({ cleared: 0 }),
+  }
+  harness.mount(clientModule.ConnectionDiagnosticsSettings, {
+    client,
+    t: (key) => key === "locale" ? "en-US" : key,
+  })
+  findElement(harness.tree(), (element) => element.props?.className === "dshCodexDiagnosticsToggle")
+    .props.onClick()
+  let tree = harness.flush()
+  findElement(tree, (element) => element.type === "button"
+    && textContent(element) === "diagnosticsNetwork").props.onClick()
+  tree = harness.flush()
+  assert.equal(prepareSignal.aborted, false)
+  findElement(tree, (element) => element.type === "button"
+    && textContent(element) === "diagnosticsCancel").props.onClick()
+  tree = harness.flush()
+  assert.equal(prepareSignal.aborted, true)
+  assert.match(textContent(tree), /diagnosticsOutcomeCancelled/u)
+  assert.doesNotMatch(textContent(tree), /diagnosticsNetworkCancelledAfterStart/u)
+  pending.resolve({
+    version: 1,
+    consentId: "00000000-0000-4000-8000-000000000000",
+    expiresAt: Date.now() + 60_000,
+    modelId: "gpt-fixture",
+    transport: "sse",
+  })
+  await settle()
+  assert.equal(harness.updatesAfterUnmount(), 0)
+  harness.unmount()
+})
+
+test("diagnostic confirmations expose alertdialog names and move focus to and from destructive choices", async () => {
+  const focused = []
+  const harness = hookHarness({
+    createHostNode: (element) => ({
+      focus: () => focused.push(textContent(element)),
+    }),
+  })
+  const clientModule = await loadClientModule(harness.React)
+  const dictionaries = registeredClientDictionaries(clientModule)
+  const client = {
+    prepareNetwork: async () => ({
+      version: 1,
+      consentId: "00000000-0000-4000-8000-000000000000",
+      expiresAt: Date.now() + 60_000,
+      modelId: "gpt-fixture",
+      transport: "sse",
+    }),
+    runNetwork: async () => { throw new Error("not used") },
+    run: async () => { throw new Error("not used") },
+    history: async () => ({
+      version: 1,
+      limit: 20,
+      reports: [{
+        version: 2,
+        mode: "local",
+        outcome: "pass",
+        observedAt: 1,
+        checks: [],
+      }],
+    }),
+    clearHistory: async () => ({ cleared: 1 }),
+  }
+  harness.mount(clientModule.ConnectionDiagnosticsSettings, {
+    client,
+    t: (key) => dictionaries.zh[key] ?? key,
+  })
+  findElement(harness.tree(), (element) => element.props?.className === "dshCodexDiagnosticsToggle")
+    .props.onClick()
+  let tree = harness.flush()
+  const networkTrigger = findElement(tree, (element) => element.type === "button"
+    && textContent(element) === dictionaries.zh.diagnosticsNetwork)
+  assert.equal(networkTrigger.props["aria-haspopup"], "dialog")
+  networkTrigger.props.onClick()
+  await settle()
+  tree = harness.flush()
+
+  let dialog = findElement(tree, (element) => element.props?.role === "alertdialog")
+  assert.ok(dialog)
+  assert.equal(
+    textContent(findElement(tree, (element) => element.props?.id === dialog.props["aria-labelledby"])),
+    dictionaries.zh.diagnosticsNetworkConsentTitle,
+  )
+  assert.equal(
+    textContent(findElement(tree, (element) => element.props?.id === dialog.props["aria-describedby"])),
+    dictionaries.zh.diagnosticsNetworkConsentHelp,
+  )
+  assert.equal(focused.at(-1), dictionaries.zh.diagnosticsNetworkConfirm)
+  let prevented = 0
+  dialog.props.onKeyDown({
+    key: "Escape",
+    preventDefault: () => { prevented += 1 },
+    stopPropagation: () => undefined,
+  })
+  tree = harness.flush()
+  assert.equal(prevented, 1)
+  assert.equal(findElement(tree, (element) => element.props?.role === "alertdialog"), undefined)
+  assert.equal(focused.at(-1), dictionaries.zh.diagnosticsNetwork)
+
+  findElement(tree, (element) => element.type === "button"
+    && textContent(element) === dictionaries.zh.diagnosticsHistoryLoad).props.onClick()
+  await settle()
+  tree = harness.flush()
+  assert.match(textContent(tree), /本机/u)
+  assert.doesNotMatch(textContent(tree), /local\s*·/u)
+  const clearTrigger = findElement(tree, (element) => element.type === "button"
+    && textContent(element) === dictionaries.zh.diagnosticsHistoryClear)
+  assert.equal(clearTrigger.props["aria-haspopup"], "dialog")
+  clearTrigger.props.onClick()
+  tree = harness.flush()
+  dialog = findElement(tree, (element) => element.props?.role === "alertdialog")
+  assert.ok(dialog)
+  assert.equal(
+    textContent(findElement(tree, (element) => element.props?.id === dialog.props["aria-labelledby"])),
+    dictionaries.zh.diagnosticsHistoryClearConfirmTitle,
+  )
+  assert.equal(
+    textContent(findElement(tree, (element) => element.props?.id === dialog.props["aria-describedby"])),
+    dictionaries.zh.diagnosticsHistoryClearConfirmHelp,
+  )
+  assert.equal(focused.at(-1), dictionaries.zh.diagnosticsHistoryClearConfirm)
+  dialog.props.onKeyDown({
+    key: "Escape",
+    preventDefault: () => { prevented += 1 },
+    stopPropagation: () => undefined,
+  })
+  tree = harness.flush()
+  assert.equal(prevented, 2)
+  assert.equal(findElement(tree, (element) => element.props?.role === "alertdialog"), undefined)
+  assert.equal(focused.at(-1), dictionaries.zh.diagnosticsHistoryClear)
+  harness.unmount()
+})
+
+test("diagnostic history loads explicitly, exports only validated JSON, revokes its URL, and clears after confirmation", async () => {
+  const harness = hookHarness()
+  const blobs = []
+  const urls = []
+  const revoked = []
+  const anchors = []
+  class ExportBlob {
+    constructor(parts, options) {
+      this.parts = parts
+      this.options = options
+      blobs.push(this)
+    }
+  }
+  const objectUrl = {
+    createObjectURL(blob) {
+      assert.equal(blob, blobs.at(-1))
+      const value = `blob:diagnostics-${urls.length + 1}`
+      urls.push(value)
+      return value
+    },
+    revokeObjectURL(value) {
+      revoked.push(value)
+    },
+  }
+  const document = {
+    createElement(tag) {
+      assert.equal(tag, "a")
+      const anchor = {
+        href: "",
+        download: "",
+        rel: "",
+        clicks: 0,
+        click() {
+          this.clicks += 1
+        },
+      }
+      anchors.push(anchor)
+      return anchor
+    },
+  }
+  const clientModule = await loadClientModule(harness.React, {}, {
+    globals: { Blob: ExportBlob, URL: objectUrl, document },
+  })
+  const calls = []
+  const pending = []
+  const secret = "diagnostic-history-secret"
+  const connection = {
+    rpc: {
+      call(channel, endpoint, payload, signal) {
+        const request = deferred()
+        calls.push({ channel, endpoint, payload, signal })
+        pending.push(request)
+        return request.promise
+      },
+    },
+  }
+  harness.mount(clientModule.ConnectionDiagnosticsSettings, {
+    client: clientModule.createConnectionDiagnosticsClient(connection),
+    t: (key) => key === "locale" ? "en-US" : key,
+  })
+  findElement(harness.tree(), (element) => element.props?.className === "dshCodexDiagnosticsToggle")
+    .props.onClick()
+  let tree = harness.flush()
+  assert.equal(calls.length, 0, "mounting and expanding must not read diagnostic history")
+  assert.equal(findElement(tree, (element) => textContent(element) === "diagnosticsHistoryExport"), undefined)
+
+  findElement(tree, (element) => element.type === "button"
+    && textContent(element) === "diagnosticsHistoryLoad").props.onClick()
+  tree = harness.flush()
+  assert.equal(calls.length, 1)
+  assert.equal(calls[0].endpoint, "history")
+  assert.deepEqual({ ...calls[0].payload }, {})
+  assert.match(textContent(tree), /diagnosticsHistoryLoading/u)
+  pending[0].resolve({
+    ok: true,
+    value: {
+      version: 1,
+      limit: 20,
+      reports: [{
+        version: 2,
+        mode: "local",
+        outcome: "pass",
+        observedAt: 1,
+        rawError: secret,
+        checks: [{
+          id: "runtime",
+          status: "pass",
+          code: "runtime-ready",
+          facts: { route: "dsh-codex", registered: true },
+          message: secret,
+        }, {
+          id: "credential",
+          status: "pass",
+          code: "credential-ready",
+          facts: { configured: true, state: "signed-in", writable: true },
+        }, {
+          id: "models",
+          status: "pass",
+          code: "models-ready",
+          facts: { catalogCount: 1, enabledCount: 1, selection: "all", allEnabled: true },
+        }],
+      }],
+    },
+  })
+  await settle()
+  tree = harness.flush()
+  assert.match(textContent(tree), /runtime-ready/u)
+  assert.equal(textContent(tree).includes(secret), false)
+  assert.equal(calls.length, 1)
+
+  findElement(tree, (element) => element.type === "button"
+    && textContent(element) === "diagnosticsHistoryExport").props.onClick()
+  tree = harness.flush()
+  assert.equal(blobs.length, 1)
+  assert.equal(blobs[0].options.type, "application/json;charset=utf-8")
+  assert.equal(anchors.length, 1)
+  assert.equal(anchors[0].clicks, 1)
+  assert.equal(anchors[0].download, "dsh-codex-diagnostics-history.json")
+  assert.deepEqual(revoked, urls)
+  const exported = blobs[0].parts.join("")
+  assert.equal(exported.includes(secret), false)
+  assert.equal(JSON.parse(exported).format, "dsh-codex-diagnostics-history")
+  assert.match(textContent(tree), /diagnosticsHistoryExported/u)
+
+  findElement(tree, (element) => element.type === "button"
+    && textContent(element) === "diagnosticsHistoryClear").props.onClick()
+  tree = harness.flush()
+  assert.equal(calls.length, 1, "the first clear click must only reveal confirmation")
+  assert.match(textContent(tree), /diagnosticsHistoryClearConfirm/u)
+  findElement(tree, (element) => element.type === "button"
+    && textContent(element) === "diagnosticsHistoryClearConfirm").props.onClick()
+  tree = harness.flush()
+  assert.equal(calls.length, 2)
+  assert.equal(calls[1].endpoint, "clear-history")
+  assert.deepEqual({ ...calls[1].payload }, {})
+  assert.match(textContent(tree), /diagnosticsHistoryClearing/u)
+  pending[1].resolve({ ok: true, value: { cleared: 1 } })
+  await settle()
+  tree = harness.flush()
+  assert.match(textContent(tree), /diagnosticsHistoryEmpty/u)
+  assert.match(textContent(tree), /diagnosticsHistoryCleared/u)
+  harness.unmount()
 })
 
 test("settings section selection reaches the public settings API and live route directory", async () => {
@@ -872,6 +1664,7 @@ test("connection diagnostics client uses a strict, sanitized loopback contract",
   const clientModule = await loadClientModule({ createElement: () => undefined })
   const calls = []
   const secret = "raw secret must not cross the client boundary"
+  const consentId = "00000000-0000-4000-8000-000000000000"
   const checksFor = (mode) => [
     {
       id: "runtime",
@@ -898,21 +1691,49 @@ test("connection diagnostics client uses a strict, sanitized loopback contract",
       code: "account-usage-ready",
       facts: { rateLimitCount: 1, primaryWindows: 1, secondaryWindows: 1 },
     }] : []),
+    ...(mode === "network" ? [{
+      id: "model-request",
+      status: "pass",
+      code: "model-request-ready",
+      facts: { attempted: true, outputObserved: true, modelId: "gpt-fixture" },
+      response: secret,
+    }] : []),
   ]
+  const reportFor = (mode, observedAt = 0) => ({
+    version: 2,
+    mode,
+    outcome: "pass",
+    observedAt,
+    rawError: secret,
+    checks: checksFor(mode),
+  })
   const connection = {
     rpc: {
       async call(channel, endpoint, payload, signal) {
         calls.push({ channel, endpoint, payload, signal })
+        if (endpoint === "prepare-network") {
+          return {
+            ok: true,
+            value: {
+              version: 1,
+              consentId,
+              expiresAt: 60_000,
+              modelId: "gpt-fixture",
+              transport: "sse",
+            },
+          }
+        }
+        if (endpoint === "run-network") return { ok: true, value: reportFor("network", 1) }
+        if (endpoint === "history") {
+          return {
+            ok: true,
+            value: { version: 1, limit: 20, reports: [reportFor("local"), reportFor("network", 1)] },
+          }
+        }
+        if (endpoint === "clear-history") return { ok: true, value: { cleared: 2 } }
         return {
           ok: true,
-          value: {
-            version: 1,
-            mode: payload.mode,
-            outcome: "pass",
-            observedAt: 0,
-            rawError: secret,
-            checks: checksFor(payload.mode),
-          },
+          value: reportFor(payload.mode),
         }
       },
     },
@@ -924,7 +1745,7 @@ test("connection diagnostics client uses a strict, sanitized loopback contract",
   const account = plain(await client.run("account", signal))
 
   assert.deepEqual(local, {
-    version: 1,
+    version: 2,
     mode: "local",
     outcome: "pass",
     observedAt: 0,
@@ -962,6 +1783,44 @@ test("connection diagnostics client uses a strict, sanitized loopback contract",
     (error) => error.name === "TypeError" && error.message === "Unsupported diagnostics mode.",
   )
   assert.equal(calls.length, 2, "an unsupported mode must not reach RPC")
+
+  const consent = plain(await client.prepareNetwork(signal))
+  assert.deepEqual(consent, {
+    version: 1,
+    consentId,
+    expiresAt: 60_000,
+    modelId: "gpt-fixture",
+    transport: "sse",
+  })
+  const network = plain(await client.runNetwork(consentId, signal))
+  assert.equal(network.mode, "network")
+  assert.equal(network.checks.at(-1).code, "model-request-ready")
+  assert.equal(JSON.stringify(network).includes(secret), false)
+  const history = plain(await client.history(signal))
+  assert.equal(history.version, 1)
+  assert.equal(history.limit, 20)
+  assert.deepEqual(history.reports.map(({ mode }) => mode), ["local", "network"])
+  assert.equal(JSON.stringify(history).includes(secret), false)
+  assert.deepEqual(plain(await client.clearHistory(signal)), { cleared: 2 })
+  assert.deepEqual(calls.slice(2).map(({ endpoint }) => endpoint), [
+    "prepare-network",
+    "run-network",
+    "history",
+    "clear-history",
+  ])
+  assert.deepEqual(calls.slice(2).map(({ payload }) => ({ ...payload })), [
+    {},
+    { consentId },
+    {},
+    {},
+  ])
+  assert.ok(calls.slice(2).every(({ signal: value }) => value === signal))
+  assert.equal(JSON.parse(clientModule.diagnosticsHistoryText(history)).format, "dsh-codex-diagnostics-history")
+  await assert.rejects(
+    () => client.runNetwork("not-a-consent"),
+    (error) => error.name === "TypeError" && error.message === "Invalid diagnostics consent ID.",
+  )
+  assert.equal(calls.length, 6, "an invalid consent ID must not reach RPC")
 
   const invalidReports = [
     { label: "empty", checks: [] },
@@ -1012,7 +1871,7 @@ test("connection diagnostics client uses a strict, sanitized loopback contract",
         call: async () => ({
           ok: true,
           value: {
-            version: 1,
+            version: 2,
             mode: "local",
             outcome: invalidReport.outcome ?? "pass",
             observedAt: 1,
@@ -1047,7 +1906,7 @@ test("connection diagnostics client uses a strict, sanitized loopback contract",
         call: async () => ({
           ok: true,
           value: {
-            version: 1,
+            version: 2,
             mode: "account",
             outcome: "fail",
             observedAt: 2,
@@ -1061,6 +1920,230 @@ test("connection diagnostics client uses a strict, sanitized loopback contract",
     })
     assert.equal((await classified.run("account")).checks.at(-1).code, code)
   }
+})
+
+test("network diagnostics distinguish an internal preflight deadline from user cancellation", async () => {
+  const clientModule = await loadClientModule({ createElement: () => undefined })
+  const report = {
+    version: 2,
+    mode: "network",
+    outcome: "fail",
+    observedAt: 0,
+    checks: [{
+      id: "runtime",
+      status: "pass",
+      code: "runtime-ready",
+      facts: { route: "dsh-codex", registered: true },
+    }, {
+      id: "credential",
+      status: "fail",
+      code: "preflight-timeout",
+    }, {
+      id: "models",
+      status: "skipped",
+      code: "preflight-not-run",
+    }, {
+      id: "model-request",
+      status: "skipped",
+      code: "preflight-not-run",
+    }],
+  }
+  const client = clientModule.createConnectionDiagnosticsClient({
+    rpc: { call: async () => ({ ok: true, value: report }) },
+  })
+
+  assert.deepEqual(plain(await client.runNetwork(
+    "00000000-0000-4000-8000-000000000000",
+  )), report)
+})
+
+test("real request diagnostics accept only fixed model-request codes and attempted facts", async () => {
+  const clientModule = await loadClientModule({ createElement: () => undefined })
+  const consentId = "00000000-0000-4000-8000-000000000000"
+  const prerequisites = [{
+    id: "runtime",
+    status: "pass",
+    code: "runtime-ready",
+    facts: { route: "dsh-codex", registered: true },
+  }, {
+    id: "credential",
+    status: "pass",
+    code: "credential-ready",
+    facts: { configured: true, state: "signed-in", writable: true },
+  }, {
+    id: "models",
+    status: "pass",
+    code: "models-ready",
+    facts: { catalogCount: 1, enabledCount: 1, selection: "all", allEnabled: true },
+  }]
+  const cases = [
+    ["model-request-ready", "pass", "pass", true],
+    ["model-request-max-tokens", "warning", "warning", true],
+    ["model-request-tool-call", "warning", "warning", true],
+    ["model-response-empty", "warning", "warning", true],
+    ["model-request-auth-error", "fail", "fail", true],
+    ["model-request-quota-exhausted", "fail", "fail", true],
+    ["model-request-rate-limited", "fail", "fail", true],
+    ["model-request-timeout", "fail", "fail", true],
+    ["model-request-server-error", "fail", "fail", true],
+    ["model-request-transport-error", "fail", "fail", true],
+    ["model-request-unsupported", "fail", "fail", true],
+    ["model-request-invalid", "fail", "fail", true],
+    ["model-request-provider-error", "fail", "fail", true],
+    ["model-request-unknown-model", "fail", "fail", true],
+    ["model-request-credential-missing", "fail", "fail", true],
+    ["model-request-aborted", "fail", "fail", true],
+    ["model-request-cancelled-after-attempt", "warning", "warning", true],
+    ["model-request-failed", "fail", "fail", true],
+    ["model-request-prerequisite-failed", "fail", "fail", false],
+    ["model-request-unavailable", "fail", "fail", false],
+    ["model-request-busy", "fail", "fail", false],
+    ["cancelled", "skipped", "cancelled", false],
+  ]
+  for (const [code, status, outcome, hasFacts] of cases) {
+    const client = clientModule.createConnectionDiagnosticsClient({
+      rpc: {
+        call: async () => ({
+          ok: true,
+          value: {
+            version: 2,
+            mode: "network",
+            outcome,
+            observedAt: 0,
+            checks: [
+              ...prerequisites,
+              {
+                id: "model-request",
+                status,
+                code,
+                ...(hasFacts ? {
+                  facts: { attempted: true, outputObserved: false, modelId: "gpt-fixture" },
+                } : {}),
+              },
+            ],
+          },
+        }),
+      },
+    })
+    assert.equal((await client.runNetwork(consentId)).checks.at(-1).code, code)
+  }
+
+  const invalidChecks = [{
+    id: "model-request",
+    status: "fail",
+    code: "model-request-mystery",
+  }, {
+    id: "model-request",
+    status: "fail",
+    code: "model-request-busy",
+    facts: { attempted: true, outputObserved: false, modelId: "gpt-fixture" },
+  }, {
+    id: "model-request",
+    status: "fail",
+    code: "model-request-prerequisite-failed",
+    facts: { attempted: true, outputObserved: false, modelId: "gpt-fixture" },
+  }, {
+    id: "model-request",
+    status: "fail",
+    code: "model-request-failed",
+    facts: { attempted: false, outputObserved: false, modelId: "gpt-fixture" },
+  }, {
+    id: "model-request",
+    status: "fail",
+    code: "model-request-failed",
+    facts: { attempted: true, outputObserved: false, modelId: "unsafe model id" },
+  }]
+  for (const modelRequest of invalidChecks) {
+    const invalid = clientModule.createConnectionDiagnosticsClient({
+      rpc: {
+        call: async () => ({
+          ok: true,
+          value: {
+            version: 2,
+            mode: "network",
+            outcome: "fail",
+            observedAt: 0,
+            checks: [...prerequisites, modelRequest],
+          },
+        }),
+      },
+    })
+    await assert.rejects(
+      () => invalid.runNetwork(consentId),
+      (error) => error.code === "INVALID_DIAGNOSTICS_RESPONSE",
+      modelRequest.code,
+    )
+  }
+})
+
+test("network consent and diagnostic history envelopes are strictly bounded and errors stay sanitized", async () => {
+  const clientModule = await loadClientModule({ createElement: () => undefined })
+  const consentId = "00000000-0000-4000-8000-000000000000"
+  const secret = "raw-consent-error"
+  const validConsent = {
+    version: 1,
+    consentId,
+    expiresAt: 60_000,
+    modelId: "gpt-fixture",
+    transport: "sse",
+  }
+  for (const value of [
+    { ...validConsent, modelId: `gpt-fixture\n${secret}` },
+    { ...validConsent, modelId: "g".repeat(257) },
+    { ...validConsent, transport: "websocket" },
+    { ...validConsent, expiresAt: -1 },
+    { ...validConsent, consentId: "not-a-uuid" },
+    { ...validConsent, extra: secret },
+  ]) {
+    const invalid = clientModule.createConnectionDiagnosticsClient({
+      rpc: { call: async () => ({ ok: true, value }) },
+    })
+    await assert.rejects(
+      () => invalid.prepareNetwork(),
+      (error) => error.code === "INVALID_DIAGNOSTICS_RESPONSE" && !error.message.includes(secret),
+    )
+  }
+
+  const emptyHistory = { version: 1, limit: 50, reports: [] }
+  for (const value of [
+    { ...emptyHistory, limit: 0 },
+    { ...emptyHistory, limit: 51 },
+    { ...emptyHistory, reports: Array.from({ length: 51 }, () => null) },
+    { ...emptyHistory, extra: secret },
+  ]) {
+    const invalid = clientModule.createConnectionDiagnosticsClient({
+      rpc: { call: async () => ({ ok: true, value }) },
+    })
+    await assert.rejects(
+      () => invalid.history(),
+      (error) => error.code === "INVALID_DIAGNOSTICS_RESPONSE" && !error.message.includes(secret),
+    )
+  }
+
+  for (const value of [{ cleared: -1 }, { cleared: 51 }, { cleared: 1, extra: secret }]) {
+    const invalid = clientModule.createConnectionDiagnosticsClient({
+      rpc: { call: async () => ({ ok: true, value }) },
+    })
+    await assert.rejects(
+      () => invalid.clearHistory(),
+      (error) => error.code === "INVALID_DIAGNOSTICS_RESPONSE" && !error.message.includes(secret),
+    )
+  }
+
+  const expired = clientModule.createConnectionDiagnosticsClient({
+    rpc: {
+      call: async () => ({
+        ok: false,
+        error: { code: "consent-invalid", message: secret },
+      }),
+    },
+  })
+  await assert.rejects(
+    () => expired.runNetwork(consentId),
+    (error) => error.code === "consent-invalid"
+      && error.message === "Connection diagnostics failed."
+      && !error.message.includes(secret),
+  )
 })
 
 test("browser session preference client uses the dedicated loopback contract", async () => {
@@ -2437,6 +3520,11 @@ test("client styles bound narrow-screen provider text and actions", async () => 
   assert.match(css, /\.dshCodexModelList\{[^}]*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/u)
   assert.match(css, /@media\(max-width:760px\)\{\.dshCodexQuotaWindows,\.dshCodexModelList,\.dshCodexDiagnosticsModes,\.dshCodexDiagnosticsChecks\{grid-template-columns:1fr\}/u)
   assert.match(css, /\.dshCodexButton:focus-visible,[^{]+input:focus-visible/u)
+  assert.match(css, /\.dshCodexDefaultsRow\{[^}]*position:relative[^}]*min-height:44px/u)
+  assert.match(css, /\.dshCodexDefaultsSelectVisual\{[^}]*border-radius:8px[^}]*pointer-events:none/u)
+  assert.match(css, /\.dshCodexDefaultsNativeSelect\{[^}]*position:absolute[^}]*inset:0[^}]*width:100%[^}]*height:100%[^}]*opacity:0[^}]*font:inherit/u)
+  assert.match(css, /\.dshCodexDefaultsRow:has\(\.dshCodexDefaultsCheckbox:focus-visible\),\.dshCodexDefaultsRow:has\(\.dshCodexDefaultsNativeSelect:focus-visible\)/u)
+  assert.match(css, /\.dshCodexDefaultsCheckbox\{[^}]*width:18px[^}]*accent-color:/u)
   assert.match(css, /\.dshCodexModelId\{[^}]*font-family:inherit/u)
   assert.match(css, /\.dshCodexModelCapabilities\{[^}]*flex-wrap:wrap/u)
   assert.match(css, /\.dshCodexModelBadge\{[^}]*border-radius:999px[^}]*font-family:inherit/u)
@@ -2449,6 +3537,9 @@ test("client styles bound narrow-screen provider text and actions", async () => 
   assert.match(css, /\.dshCodexDiagnostics\{[^}]*border-radius:12px/u)
   assert.match(css, /\.dshCodexDiagnosticsToggle\{[^}]*font:inherit/u)
   assert.match(css, /\.dshCodexDiagnosticsChecks code,[^{]+\{[^}]*font:inherit/u)
+  assert.match(css, /\.dshCodexDiagnosticsConsent\{[^}]*state-warning-primary[^}]*font-size:12px/u)
+  assert.match(css, /\.dshCodexDiagnosticsHistoryList\{[^}]*max-height:220px[^}]*overflow:auto/u)
+  assert.match(css, /\.dshCodexDiagnosticsHistoryList code\{[^}]*overflow-wrap:anywhere[^}]*font:inherit/u)
   assert.match(css, /@media\(max-width:480px\)\{/u)
   assert.match(css, /\.dshCodexDiagnosticsMode\{flex-direction:column\}/u)
   assert.match(css, /\.dshCodexDiagnosticsMode \.dshCodexButton\{width:100%;min-width:0\}/u)
@@ -2769,7 +3860,7 @@ test("signed-in settings shows the five-hour exact reset and a distant weekly re
   harness.unmount()
 })
 
-test("smart usage scheduling switches weekly display at 24 hours and refreshes at reset", async () => {
+test("smart usage scheduling advances weekly relative days locally and refreshes only at reset", async () => {
   const clientModule = await loadClientModule({ createElement: () => undefined })
   const now = 1_800_000_000_000
   const resetsAt = now + 3 * 24 * 60 * 60_000
@@ -2787,6 +3878,10 @@ test("smart usage scheduling switches weekly display at 24 hours and refreshes a
 
   assert.deepEqual(
     { ...clientModule.nextAccountUsageTransition(usage, now) },
+    { at: resetsAt - 2 * 24 * 60 * 60_000, refresh: false },
+  )
+  assert.deepEqual(
+    { ...clientModule.nextAccountUsageTransition(usage, resetsAt - 2 * 24 * 60 * 60_000) },
     { at: resetsAt - 24 * 60 * 60_000, refresh: false },
   )
   assert.deepEqual(
@@ -2794,6 +3889,225 @@ test("smart usage scheduling switches weekly display at 24 hours and refreshes a
     { at: resetsAt, refresh: true },
   )
   assert.equal(clientModule.nextAccountUsageTransition(usage, resetsAt), undefined)
+})
+
+test("weekly relative-day boundary rerenders without another usage request", async () => {
+  const harness = hookHarness()
+  const timers = []
+  const dayMs = 24 * 60 * 60_000
+  let now = 1_800_000_000_000
+  const initialNow = now
+  const resetsAt = initialNow + 3 * dayMs
+  class FakeDate extends Date {
+    constructor(...args) {
+      super(...(args.length === 0 ? [now] : args))
+    }
+
+    static now() {
+      return now
+    }
+  }
+  const clientModule = await loadClientModule(harness.React, {
+    setTimeout(callback, delay) {
+      timers.push({ callback, delay, cleared: false })
+      return timers.length
+    },
+    clearTimeout(id) {
+      if (timers[id - 1] !== undefined) timers[id - 1].cleared = true
+    },
+  }, { globals: { Date: FakeDate } })
+  const dictionaries = registeredClientDictionaries(clientModule)
+  let usageCalls = 0
+  const client = {
+    describe: async () => authorizationStatus(true),
+    usage: async () => {
+      usageCalls += 1
+      return {
+        observedAt: initialNow,
+        rateLimits: [{
+          limitId: "codex",
+          secondary: {
+            usedPercent: 7,
+            windowDurationMins: 10_080,
+            resetsAt,
+          },
+        }],
+      }
+    },
+  }
+
+  harness.mount(clientModule.AuthorizationSettings, {
+    client,
+    t: (key) => dictionaries.zh[key] ?? key,
+  })
+  await settle()
+  harness.flush()
+
+  assert.equal(usageCalls, 1)
+  assert.match(textContent(harness.tree()), /3 天后重置/u)
+  const dayBoundary = timers.find(({ delay, cleared }) => !cleared && delay === dayMs)
+  assert.ok(dayBoundary)
+
+  now = resetsAt - 2 * dayMs
+  dayBoundary.callback()
+  harness.flush()
+
+  assert.equal(usageCalls, 1)
+  assert.match(textContent(harness.tree()), /2 天后重置/u)
+  const nextBoundary = timers.find(({ delay, cleared }) => !cleared && delay === dayMs)
+  assert.ok(nextBoundary)
+  harness.unmount()
+})
+
+test("quota reminders use only validated Codex five-hour and weekly low-balance windows", async () => {
+  const clientModule = await loadClientModule({ createElement: () => undefined })
+  const now = 1_800_000_000_000
+  const reminders = clientModule.accountUsageReminders({
+    observedAt: now,
+    rateLimits: [
+      {
+        limitId: "codex",
+        primary: { usedPercent: 80, windowDurationMins: 300, resetsAt: now + 60_000 },
+        secondary: { usedPercent: 100, windowDurationMins: 10_080, resetsAt: now + 120_000 },
+      },
+      {
+        limitId: "codex",
+        primary: { usedPercent: 99, windowDurationMins: 300, resetsAt: now - 1 },
+      },
+      {
+        limitId: "other",
+        primary: { usedPercent: 100, windowDurationMins: 300, resetsAt: now + 60_000 },
+      },
+      {
+        limitId: "codex",
+        primary: { usedPercent: 100, windowDurationMins: 60, resetsAt: now + 60_000 },
+      },
+    ],
+  }, now)
+
+  assert.deepEqual(plain(reminders), [
+    {
+      kind: "low",
+      windowDurationMins: 300,
+      remainingPercent: 20,
+      resetsAt: now + 60_000,
+    },
+    {
+      kind: "exhausted",
+      windowDurationMins: 10_080,
+      remainingPercent: 0,
+      resetsAt: now + 120_000,
+    },
+  ])
+  assert.deepEqual(plain(clientModule.accountUsageReminders({
+    observedAt: now,
+    rateLimits: [{
+      limitId: "codex",
+      primary: { usedPercent: 79.9, windowDurationMins: 300, resetsAt: now + 60_000 },
+    }],
+  }, now)), [])
+})
+
+test("quota reminders announce low balance politely and exhaustion assertively", async () => {
+  for (const [usedPercent, role, live, copy] of [
+    [85, "status", "polite", "quotaReminderLow"],
+    [100, "alert", "assertive", "quotaReminderExhausted"],
+  ]) {
+    const harness = hookHarness()
+    const clientModule = await loadClientModule(harness.React)
+    const client = {
+      describe: async () => authorizationStatus(true),
+      usage: async () => ({
+        observedAt: Date.now(),
+        rateLimits: [{
+          limitId: "codex",
+          primary: {
+            usedPercent,
+            windowDurationMins: 300,
+            resetsAt: Date.now() + 60 * 60_000,
+          },
+        }],
+      }),
+    }
+    harness.mount(clientModule.AuthorizationSettings, { client, t: (key) => key })
+    await settle()
+    harness.flush()
+
+    const reminder = findElement(
+      harness.tree(),
+      (element) => element.props.className === `dshCodexQuotaReminder dshCodexQuotaReminder-${usedPercent === 100 ? "exhausted" : "low"}`,
+    )
+    assert.equal(reminder.props.role, role)
+    assert.equal(reminder.props["aria-live"], live)
+    assert.match(textContent(reminder), new RegExp(copy, "u"))
+    const quota = findElement(harness.tree(), (element) => element.props.className === "dshCodexQuota")
+    assert.equal(quota.props["aria-live"], undefined)
+    harness.unmount()
+  }
+})
+
+test("quota reset boundary performs one refresh and reports confirmation", async () => {
+  const harness = hookHarness()
+  const timers = []
+  const clientModule = await loadClientModule(harness.React, {
+    setTimeout(callback, delay) {
+      timers.push({ callback, delay, cleared: false })
+      return timers.length
+    },
+    clearTimeout(id) {
+      if (timers[id - 1] !== undefined) timers[id - 1].cleared = true
+    },
+  })
+  const resetUsage = deferred()
+  let usageCalls = 0
+  const initialNow = Date.now()
+  const client = {
+    describe: async () => authorizationStatus(true),
+    usage: async () => {
+      usageCalls += 1
+      if (usageCalls === 1) {
+        return {
+          observedAt: initialNow,
+          rateLimits: [{
+            limitId: "codex",
+            primary: {
+              usedPercent: 95,
+              windowDurationMins: 300,
+              resetsAt: initialNow + 500,
+            },
+          }],
+        }
+      }
+      return resetUsage.promise
+    },
+  }
+
+  harness.mount(clientModule.AuthorizationSettings, { client, t: (key) => key })
+  await settle()
+  harness.flush()
+  const resetTimer = timers.find(({ delay, cleared }) => !cleared && delay <= 1_000)
+  assert.ok(resetTimer)
+  resetTimer.callback()
+  await settle()
+  harness.flush()
+  assert.equal(usageCalls, 2)
+  assert.match(textContent(harness.tree()), /quotaResetRefreshing/u)
+
+  resetUsage.resolve({
+    observedAt: Date.now(),
+    rateLimits: [{
+      limitId: "codex",
+      primary: {
+        usedPercent: 0,
+        windowDurationMins: 300,
+        resetsAt: Date.now() + 5 * 60 * 60_000,
+      },
+    }],
+  })
+  await settle()
+  harness.flush()
+  assert.match(textContent(harness.tree()), /quotaResetConfirmed/u)
+  harness.unmount()
 })
 
 test("account usage refreshes once when the visible settings page regains focus", async () => {

@@ -38,6 +38,10 @@ test("bundle preserves the base pi-ai row and inserts one independent Codex row"
   assert.equal(resilienceRows.length, 1)
 
   assert.deepEqual(resilienceRows[0].config, {
+    defaultFast: false,
+    defaultTransport: "auto",
+    defaultTextVerbosity: "low",
+    defaultReasoningSummary: "auto",
     partialResponseRecovery: true,
     cacheRetention: "short",
     streamIdleTimeoutMs: 300_000,

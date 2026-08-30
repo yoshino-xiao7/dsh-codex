@@ -2,6 +2,10 @@ import type { Context } from "@deepseek-ai/cordis"
 import type Schema from "@deepseek-ai/schemastery"
 
 export interface Config {
+  defaultFast?: boolean
+  defaultTransport?: "auto" | "sse" | "websocket" | "websocket-cached"
+  defaultTextVerbosity?: "low" | "medium" | "high"
+  defaultReasoningSummary?: "auto" | "concise" | "detailed" | "off"
   partialResponseRecovery?: boolean
   models?: Array<{
     id: string
