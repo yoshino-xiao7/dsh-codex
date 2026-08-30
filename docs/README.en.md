@@ -10,6 +10,7 @@
 - [Testing strategy](testing.en.md)
 - [Release process](releasing.en.md)
 - [GitHub About and topics](github-about.md)
+- [v0.0.4 Release copy (development draft)](releases/v0.0.4.md)
 - [v0.0.3 Release copy](releases/v0.0.3.md)
 - [v0.0.2 Release copy](releases/v0.0.2.md)
 - [v0.0.1 Release copy](releases/v0.0.1.md)

@@ -4,9 +4,9 @@
 
 ## `Image request maxPixels must be a positive integer.`
 
-`0.0.1` 的 bundle 显式提供 `requestImagePixelBudget: 4194304`，并在测试中让真实 PNG 穿过 DSH attachment seam。若仍出现该错误：
+当前实现显式提供 `requestImagePixelBudget: 4194304`，并在测试中让真实 PNG 穿过 DSH attachment seam。若仍出现该错误：
 
-1. 确认运行的是 `dsh-codex-community@0.0.1` 的精确包体；
+1. 确认运行的是已安装的精确包体；当前正式版为 `dsh-codex-community@0.0.3`，不要把其他版本的文件混入同一 profile；
 2. 确认 profile 中的 `dsh-codex` 配置包含完整的三项图片预算；
 3. 检查 settings 中是否把图片字段写成 `0`、负数、浮点或其他显式非法值；缺省和 `null` 会回填安全默认值；
 4. 运行 `npm test -- --test-name-pattern=maxPixels` 或完整 `pnpm test`；
@@ -42,6 +42,15 @@ pi-ai 可能只返回通用的 ChatGPT usage-limit 文案，而不再提供原�
 先确认当前选择的是 GPT-5.4、GPT-5.5、GPT-5.6 Luna、Sol 或 Terra；闪电按钮在 GPT-5.3 Codex Spark、GPT-5.4 mini 和未知模型上不可用，也不会发送 Fast service tier。点击模型选择器左侧的闪电按钮，或运行 `/codex status` 与 `/codex set fast on|off` 检查和修改当前会话状态。切换从下一次请求生效；进程重启后恢复关闭。
 
 Fast 使用官方 priority service tier，目标速度为 1.5 倍并消耗更多额度。插件不会把失败请求自动降级重放；关闭 Fast 后，需要由用户决定是否重新发送请求。
+
+## 使用连接诊断
+
+打开 **设置 → OpenAI Codex → 连接诊断**。该区域默认折叠且不会自动运行：
+
+- “检查本机”只读取本机 route、模型目录、启用数量和凭据元数据，不联网、不刷新 OAuth，也不发送模型请求；
+- “检查账号”在本机检查后读取一次额度，必要时可按既有凭据合同刷新 OAuth，但不发送模型请求、不消耗模型额度。
+
+诊断只显示固定检查项、状态码和受限事实，不显示 token、account ID、原始响应或原始错误。它能区分本机配置与账号额度读取问题，但不能证明真实文本、图片、工具、Fast 或指定 Transport 请求可用；这些仍需由用户主动发送请求验证。
 
 ## 模型或推理档位与预期不同
 

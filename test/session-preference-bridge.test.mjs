@@ -9,7 +9,7 @@ import {
 } from "../src/internal/session-preference-bridge.mjs"
 import { createSessionPreferences } from "../src/internal/session-preferences.mjs"
 
-test("session preference bridge gets and changes only Fast for one exact session", async () => {
+test("session preference bridge gets and changes public controls for one exact session", async () => {
   const preferences = createSessionPreferences()
   const bridge = new CodexSessionPreferenceBridge(preferences)
   const handler = createSessionPreferenceRpcHandler(bridge)
@@ -17,26 +17,47 @@ test("session preference bridge gets and changes only Fast for one exact session
 
   assert.deepEqual(await handler("get", { sessionId: "session-a" }, signal), {
     ok: true,
-    value: { fast: false },
+    value: { fast: false, transport: "auto" },
+  })
+  assert.deepEqual(await handler("get", {
+    sessionId: "session-a",
+    modelId: "gpt-5.6-sol",
+  }, signal), {
+    ok: true,
+    value: { fast: false, transport: "auto", fastSupported: true },
+  })
+  assert.deepEqual(await handler("get", {
+    sessionId: "session-a",
+    modelId: "gpt-future",
+  }, signal), {
+    ok: true,
+    value: { fast: false, transport: "auto", fastSupported: false },
   })
   assert.deepEqual(await handler("get", { sessionId: "x" }, signal), {
     ok: true,
-    value: { fast: false },
+    value: { fast: false, transport: "auto" },
   })
   assert.deepEqual(await handler("get", { sessionId: "x".repeat(256) }, signal), {
     ok: true,
-    value: { fast: false },
+    value: { fast: false, transport: "auto" },
   })
   assert.deepEqual(await handler("set-fast", {
     sessionId: "session-a",
     fast: true,
   }, signal), {
     ok: true,
-    value: { fast: true },
+    value: { fast: true, transport: "auto" },
   })
-  assert.deepEqual(preferences.resolve("session-a"), { fast: true, transport: "auto" })
+  assert.deepEqual(await handler("set-transport", {
+    sessionId: "session-a",
+    transport: "websocket-cached",
+  }, signal), {
+    ok: true,
+    value: { fast: true, transport: "websocket-cached" },
+  })
+  assert.deepEqual(preferences.resolve("session-a"), { fast: true, transport: "websocket-cached" })
   assert.deepEqual(preferences.resolve("session-b"), { fast: false, transport: "auto" })
-  assert.deepEqual(Object.keys((await bridge.get({ sessionId: "session-a" }))).sort(), ["fast"])
+  assert.deepEqual(Object.keys((await bridge.get({ sessionId: "session-a" }))).sort(), ["fast", "transport"])
 })
 
 test("session preference RPC strictly rejects malformed payloads and unknown endpoints", async () => {
@@ -62,9 +83,14 @@ test("session preference RPC strictly rejects malformed payloads and unknown end
     ["get", { sessionId: "x".repeat(257) }],
     ["get", { sessionId: 1 }],
     ["get", { sessionId: "session-a", fast: false }],
+    ["get", { sessionId: "session-a", modelId: "" }],
+    ["get", { sessionId: "session-a", modelId: "x".repeat(257) }],
     ["set-fast", { sessionId: "session-a" }],
     ["set-fast", { sessionId: "session-a", fast: "true" }],
     ["set-fast", { sessionId: "session-a", fast: true, transport: "sse" }],
+    ["set-transport", { sessionId: "session-a" }],
+    ["set-transport", { sessionId: "session-a", transport: "udp" }],
+    ["set-transport", { sessionId: "session-a", transport: "sse", fast: false }],
     ["unknown", { sessionId: "session-a" }],
   ]
 
@@ -130,6 +156,6 @@ test("session preference RPC registers on its own loopback-only channel", async 
   assert.deepEqual(registrations[0].options, { authority: "loopback" })
   assert.deepEqual(
     await registrations[0].handler("get", { sessionId: "session-a" }, new AbortController().signal),
-    { ok: true, value: { fast: false } },
+    { ok: true, value: { fast: false, transport: "auto" } },
   )
 })

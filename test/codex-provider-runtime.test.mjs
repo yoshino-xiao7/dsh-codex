@@ -385,13 +385,26 @@ test("an explicit empty model list hides discovery without invalidating exact mo
   const provider = createCodexPiProvider()
   const first = provider.getModels()[0]
   const harness = fakeHarness()
-  installCodexProviderRuntime(harness.ctx, Config({ models: [] }), {
+  const runtime = installCodexProviderRuntime(harness.ctx, Config({ models: [] }), {
     provider,
     sessionPreferences: { resolve: () => ({ fast: false, transport: "auto" }) },
   })
 
   assert.deepEqual(await harness.adapters[0].listModels(CODEX_ROUTE_ID), [])
   assert.equal((await harness.adapters[0].resolveModel(CODEX_ROUTE_ID, first.id)).id, first.id)
+  const report = await runtime.connectionDiagnostics.run("local", new AbortController().signal)
+  assert.equal(report.outcome, "warning")
+  assert.deepEqual(report.checks.find(({ id }) => id === "models"), {
+    id: "models",
+    status: "warning",
+    code: "models-disabled",
+    facts: {
+      catalogCount: provider.getModels().length,
+      enabledCount: 0,
+      selection: "custom",
+      allEnabled: false,
+    },
+  })
 })
 
 function fakeHarness(options = {}) {

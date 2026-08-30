@@ -1,7 +1,11 @@
+import { supportsCodexFast } from "./codex-model-capabilities.mjs"
+
 // Connection channels are one path segment; endpoints are appended by RPC.
 export const SESSION_PREFERENCE_RPC_CHANNEL = "/dsh-codex-session"
 
 const MAX_SESSION_ID_CHARS = 256
+const MAX_MODEL_ID_CHARS = 256
+const TRANSPORTS = new Set(["auto", "sse", "websocket", "websocket-cached"])
 
 class RpcInputError extends Error {
   constructor(message) {
@@ -12,8 +16,8 @@ class RpcInputError extends Error {
 
 /**
  * Narrow browser bridge for the existing process-local session preferences.
- * Transport choices and all store internals remain host-only; the client can
- * read or change only Fast for one explicitly named session.
+ * The client can read or change only the public Fast and transport controls
+ * for one explicitly named session; store internals remain host-only.
  */
 export class CodexSessionPreferenceBridge {
   #preferences
@@ -33,9 +37,13 @@ export class CodexSessionPreferenceBridge {
   get(payload, signal) {
     throwIfCancelled(signal)
     const input = objectInput(payload)
-    assertOnlyKeys(input, ["sessionId"])
+    assertOnlyKeys(input, ["sessionId", "modelId"])
     const sessionId = requiredSessionId(input)
-    const result = publicFastSnapshot(this.#preferences.resolve(sessionId))
+    const modelId = optionalModelId(input)
+    const result = {
+      ...publicPreferenceSnapshot(this.#preferences.resolve(sessionId)),
+      ...(modelId === undefined ? {} : { fastSupported: supportsCodexFast(modelId) }),
+    }
     throwIfCancelled(signal)
     return result
   }
@@ -48,7 +56,22 @@ export class CodexSessionPreferenceBridge {
     if (!Object.hasOwn(input, "fast") || typeof input.fast !== "boolean") {
       throw new RpcInputError("fast must be a boolean")
     }
-    const result = publicFastSnapshot(this.#preferences.configure(sessionId, { fast: input.fast }))
+    const result = publicPreferenceSnapshot(this.#preferences.configure(sessionId, { fast: input.fast }))
+    throwIfCancelled(signal)
+    return result
+  }
+
+  setTransport(payload, signal) {
+    throwIfCancelled(signal)
+    const input = objectInput(payload)
+    assertOnlyKeys(input, ["sessionId", "transport"])
+    const sessionId = requiredSessionId(input)
+    if (!Object.hasOwn(input, "transport") || !TRANSPORTS.has(input.transport)) {
+      throw new RpcInputError("transport must be auto, sse, websocket, or websocket-cached")
+    }
+    const result = publicPreferenceSnapshot(this.#preferences.configure(sessionId, {
+      transport: input.transport,
+    }))
     throwIfCancelled(signal)
     return result
   }
@@ -57,12 +80,13 @@ export class CodexSessionPreferenceBridge {
     switch (endpoint) {
       case "get": return this.get(payload, signal)
       case "set-fast": return this.setFast(payload, signal)
+      case "set-transport": return this.setTransport(payload, signal)
       default: throw new RpcInputError("Unknown session preference RPC endpoint")
     }
   }
 }
 
-/** Register the session-only Fast surface on a dedicated loopback channel. */
+/** Register the session-only request controls on a dedicated loopback channel. */
 export function registerSessionPreferenceRpc(ctx, sessionPreferences) {
   const bridge = new CodexSessionPreferenceBridge(sessionPreferences)
   ctx.connection.rpc.handle(
@@ -100,11 +124,16 @@ export function createSessionPreferenceRpcHandler(bridge) {
   }
 }
 
-function publicFastSnapshot(value) {
-  if (value === null || typeof value !== "object" || typeof value.fast !== "boolean") {
+function publicPreferenceSnapshot(value) {
+  if (
+    value === null
+    || typeof value !== "object"
+    || typeof value.fast !== "boolean"
+    || !TRANSPORTS.has(value.transport)
+  ) {
     throw new TypeError("session preference store returned an invalid snapshot")
   }
-  return { fast: value.fast }
+  return { fast: value.fast, transport: value.transport }
 }
 
 function objectInput(value) {
@@ -136,6 +165,19 @@ function requiredSessionId(value) {
     throw new RpcInputError(`sessionId must contain 1 to ${MAX_SESSION_ID_CHARS} characters`)
   }
   return sessionId
+}
+
+function optionalModelId(value) {
+  const modelId = value.modelId
+  if (modelId === undefined) return undefined
+  if (
+    typeof modelId !== "string"
+    || modelId.length < 1
+    || modelId.length > MAX_MODEL_ID_CHARS
+  ) {
+    throw new RpcInputError(`modelId must contain 1 to ${MAX_MODEL_ID_CHARS} characters`)
+  }
+  return modelId
 }
 
 function throwIfCancelled(signal) {

@@ -3,6 +3,36 @@
 本项目遵循 Keep a Changelog 的结构；`0.0.x` 为技术预览。
 This project follows the Keep a Changelog structure; `0.0.x` is a technical preview.
 
+## [0.0.4] - Unreleased
+
+### 中文
+
+#### 新增
+
+- 会话输入区新增独立的传输方式按钮，以图形菜单选择自动、SSE、WebSocket 或 WebSocket 缓存；支持键盘导航、焦点退出、恢复自动以及中英文提示，并与 `/codex set transport` 共用当前会话状态。
+- 设置页新增默认折叠的连接诊断，可按需执行完全离线的本机检查或只读取账号额度的账号检查；两种检查均不发送模型请求或消耗模型额度，报告只包含固定状态码和受限事实。
+- Host 新增不可变的模型能力描述接口，统一提供 provider catalog 的名称、上下文、最大输出、输入模态以及逐模型核验的推理档位与 Fast 支持。
+
+#### 修复
+
+- Web 客户端不再维护 Fast 支持模型的硬编码副本，模型切换后直接向 Host 查询当前模型能力，避免目录升级后前后端能力漂移。
+- Transport 不再只能通过命令修改；会话输入区能够读取并展示真实当前值，写入失败时可安全重试，进程重启后仍按既有合同恢复自动。
+- 诊断 RPC 与授权 RPC 分离并限制为 loopback；凭据、account ID、原始响应、请求头和原始错误不会进入浏览器报告。
+
+### English
+
+#### Added
+
+- The conversation composer now has a dedicated transport button with a graphical menu for Auto, SSE, WebSocket, or cached WebSocket. It supports keyboard navigation, focus dismissal, reset-to-Auto, bilingual copy, and the same current-session state as `/codex set transport`.
+- Settings now provides collapsed, on-demand connection diagnostics: a fully offline local check and an account check limited to reading usage. Neither sends a model request nor consumes model usage, and reports contain only fixed codes and bounded facts.
+- The Host now exposes an immutable model-capability descriptor that combines provider-catalog names, context, maximum output, and input modalities with model-specific verified reasoning levels and Fast support.
+
+#### Fixed
+
+- The Web client no longer carries a hard-coded duplicate list of Fast-capable models. It queries the Host after model changes, preventing capability drift when catalogs evolve.
+- Transport is no longer command-only. The conversation control reads and displays the actual current value, safely retries failed writes, and preserves the existing reset-to-Auto-on-restart contract.
+- Diagnostics use a loopback-only RPC isolated from authorization. Credentials, account IDs, raw responses, headers, and raw errors never enter browser reports.
+
 ## [0.0.3] - 2026-08-29
 
 ### 中文
@@ -66,20 +96,6 @@ This project follows the Keep a Changelog structure; `0.0.x` is a technical prev
 - Older conversations that saved `Off` or `Minimal` are no longer migrated silently. They switch to the current model default only after the user clicks a repair action that discloses its default-model effect.
 - Fast sends the priority service tier only for supported GPT-5.4, GPT-5.5, and GPT-5.6-family requests and consumes more usage. Enabling or disabling it applies to the next request, and a process restart restores off.
 - The DSH profile smoke now checks the current model-settings title so a UI copy update is not misreported as a plugin-load failure.
-
-## [Unreleased]
-
-### 中文
-
-#### 新增
-
-#### 变更
-
-### English
-
-#### Added
-
-#### Changed
 
 ## [0.0.1] - 2026-08-29
 

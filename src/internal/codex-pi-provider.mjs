@@ -7,6 +7,7 @@ import { stream as streamCodexResponses } from "@earendil-works/pi-ai/api/openai
 import { openaiCodexProvider } from "@earendil-works/pi-ai/providers/openai-codex"
 
 import {
+  codexModelCapabilityDescriptor,
   piThinkingLevelMap,
   supportsCodexFast,
 } from "./codex-model-capabilities.mjs"
@@ -82,8 +83,8 @@ function reasoningOptions(model, reasoning) {
 }
 
 function truthfulCodexModel(model) {
-  const thinkingLevelMap = piThinkingLevelMap(model.id)
-  if (thinkingLevelMap === undefined) {
+  const descriptor = codexModelCapabilityDescriptor(model)
+  if (descriptor.reasoning === undefined) {
     return Object.freeze({
       ...model,
       // A newly published model stays usable with the provider default, but
@@ -94,7 +95,7 @@ function truthfulCodexModel(model) {
   }
   return Object.freeze({
     ...model,
-    thinkingLevelMap,
+    thinkingLevelMap: piThinkingLevelMap(descriptor.id),
   })
 }
 

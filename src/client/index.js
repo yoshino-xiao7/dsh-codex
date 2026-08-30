@@ -8,6 +8,7 @@ window.__ModuleLoader__.load({
 
     const CHANNEL = "/dsh-codex"
     const SESSION_CHANNEL = "/dsh-codex-session"
+    const DIAGNOSTICS_CHANNEL = "/dsh-codex-diagnostics"
     const NS = "settings.codex"
     const CODEX_PROVIDER = "dsh-codex"
     const CODEX_SETTINGS_NS = "dsh-codex"
@@ -100,6 +101,45 @@ window.__ModuleLoader__.load({
       fastUnsupported: "当前模型不支持 Fast（1.5×）",
       fastLoading: "正在读取 Fast 状态",
       fastUnavailable: "暂时无法读取 Fast 状态，点击重试",
+      transportLabel: "传输方式：{transport}",
+      transportLoading: "正在读取传输方式",
+      transportUnavailable: "暂时无法读取传输方式，点击重试",
+      transportMenu: "当前会话的传输方式",
+      transportAuto: "自动",
+      transportAutoHelp: "由 provider 自动选择合适的传输方式",
+      transportSse: "SSE",
+      transportSseHelp: "使用服务器发送事件传输响应",
+      transportWebsocket: "WebSocket",
+      transportWebsocketHelp: "使用实时 WebSocket 连接",
+      transportWebsocketCached: "WebSocket 缓存",
+      transportWebsocketCachedHelp: "复用当前会话的 WebSocket 缓存",
+      transportSessionOnly: "仅应用于当前会话",
+      transportReset: "恢复自动",
+      transportResetLabel: "将当前会话的传输方式恢复为自动",
+      diagnosticsTitle: "连接诊断",
+      diagnosticsCollapsedHelp: "按需检查，不会自动运行",
+      diagnosticsExpandedHelp: "诊断只返回安全状态，不显示凭据或原始错误。",
+      diagnosticsLocal: "检查本机",
+      diagnosticsLocalRunning: "正在检查本机…",
+      diagnosticsLocalHelp: "不联网、不刷新凭据、不发送模型请求。",
+      diagnosticsAccount: "检查账号",
+      diagnosticsAccountRunning: "正在检查账号…",
+      diagnosticsAccountHelp: "读取已有额度，必要时刷新 OAuth；不发送模型请求，也不消耗额度。",
+      diagnosticsCancel: "取消",
+      diagnosticsFailed: "诊断暂时不可用，请重试。",
+      diagnosticsOutcomePass: "检查通过",
+      diagnosticsOutcomeWarning: "检查完成，有提示",
+      diagnosticsOutcomeFail: "检查未通过",
+      diagnosticsOutcomeCancelled: "检查已取消",
+      diagnosticsStatusPass: "通过",
+      diagnosticsStatusWarning: "提示",
+      diagnosticsStatusFail: "未通过",
+      diagnosticsStatusSkipped: "已跳过",
+      diagnosticsCheckRuntime: "运行环境",
+      diagnosticsCheckCredential: "授权凭据",
+      diagnosticsCheckModels: "模型目录",
+      diagnosticsCheckAccountUsage: "账号额度",
+      diagnosticsObservedAt: "检查时间",
       legacyReasoningRepair: "修复并设为新会话默认模型",
       legacyReasoningRepairing: "正在修复…",
       legacyReasoningRepaired: "已修复并设为新会话默认模型",
@@ -191,6 +231,45 @@ window.__ModuleLoader__.load({
       fastUnsupported: "The current model does not support Fast (1.5×)",
       fastLoading: "Reading Fast status",
       fastUnavailable: "Fast status is temporarily unavailable; click to retry",
+      transportLabel: "Transport: {transport}",
+      transportLoading: "Reading transport",
+      transportUnavailable: "Transport is temporarily unavailable; click to retry",
+      transportMenu: "Transport for this conversation",
+      transportAuto: "Auto",
+      transportAutoHelp: "Let the provider select the appropriate transport",
+      transportSse: "SSE",
+      transportSseHelp: "Stream responses with Server-Sent Events",
+      transportWebsocket: "WebSocket",
+      transportWebsocketHelp: "Use a live WebSocket connection",
+      transportWebsocketCached: "Cached WebSocket",
+      transportWebsocketCachedHelp: "Reuse the WebSocket cache for this conversation",
+      transportSessionOnly: "Applies only to this conversation",
+      transportReset: "Reset to Auto",
+      transportResetLabel: "Reset this conversation's transport to Auto",
+      diagnosticsTitle: "Connection diagnostics",
+      diagnosticsCollapsedHelp: "Runs only when requested; never starts automatically",
+      diagnosticsExpandedHelp: "Diagnostics return safe status only, without credentials or raw errors.",
+      diagnosticsLocal: "Check this device",
+      diagnosticsLocalRunning: "Checking this device…",
+      diagnosticsLocalHelp: "No network access, credential refresh, or model request.",
+      diagnosticsAccount: "Check account",
+      diagnosticsAccountRunning: "Checking account…",
+      diagnosticsAccountHelp: "Reads existing usage and refreshes OAuth only when needed; never sends a model request or consumes usage.",
+      diagnosticsCancel: "Cancel",
+      diagnosticsFailed: "Diagnostics are temporarily unavailable. Try again.",
+      diagnosticsOutcomePass: "Checks passed",
+      diagnosticsOutcomeWarning: "Checks completed with notes",
+      diagnosticsOutcomeFail: "Checks did not pass",
+      diagnosticsOutcomeCancelled: "Checks cancelled",
+      diagnosticsStatusPass: "Passed",
+      diagnosticsStatusWarning: "Note",
+      diagnosticsStatusFail: "Failed",
+      diagnosticsStatusSkipped: "Skipped",
+      diagnosticsCheckRuntime: "Runtime",
+      diagnosticsCheckCredential: "Credential",
+      diagnosticsCheckModels: "Model catalog",
+      diagnosticsCheckAccountUsage: "Account usage",
+      diagnosticsObservedAt: "Checked",
       legacyReasoningRepair: "Repair and set as future default",
       legacyReasoningRepairing: "Repairing…",
       legacyReasoningRepaired: "Repaired and set as future default",
@@ -246,6 +325,181 @@ window.__ModuleLoader__.load({
       })
     }
 
+    const DIAGNOSTIC_MODES = new Set(["local", "account"])
+    const DIAGNOSTIC_OUTCOMES = new Set(["pass", "warning", "fail", "cancelled"])
+    const DIAGNOSTIC_CHECK_IDS = Object.freeze({
+      local: Object.freeze(["runtime", "credential", "models"]),
+      account: Object.freeze(["runtime", "credential", "models", "account-usage"]),
+    })
+    const DIAGNOSTIC_CODE_PATTERN = /^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/u
+    const DIAGNOSTIC_CHECK_CONTRACTS = Object.freeze({
+      runtime: Object.freeze({
+        cancelled: diagnosticCheckContract("skipped"),
+        "runtime-ready": diagnosticCheckContract("pass", ["route", "registered"]),
+        "route-unavailable": diagnosticCheckContract("fail", ["route", "registered"]),
+        "runtime-unavailable": diagnosticCheckContract("fail"),
+      }),
+      credential: Object.freeze({
+        cancelled: diagnosticCheckContract("skipped"),
+        "credential-invalid": diagnosticCheckContract("fail", ["configured", "state", "writable"]),
+        "credential-signed-out": diagnosticCheckContract("warning", ["configured", "state", "writable"]),
+        "credential-read-only": diagnosticCheckContract("warning", ["configured", "state", "writable"]),
+        "credential-ready": diagnosticCheckContract("pass", ["configured", "state", "writable"]),
+        "credential-unavailable": diagnosticCheckContract("fail"),
+      }),
+      models: Object.freeze({
+        cancelled: diagnosticCheckContract("skipped"),
+        "models-unavailable": diagnosticCheckContract("fail"),
+        "catalog-empty": diagnosticCheckContract("fail", ["catalogCount", "enabledCount", "selection", "allEnabled"]),
+        "models-disabled": diagnosticCheckContract("warning", ["catalogCount", "enabledCount", "selection", "allEnabled"]),
+        "models-ready": diagnosticCheckContract("pass", ["catalogCount", "enabledCount", "selection", "allEnabled"]),
+      }),
+      "account-usage": Object.freeze({
+        cancelled: diagnosticCheckContract("skipped"),
+        "account-usage-invalid": diagnosticCheckContract("fail"),
+        "account-usage-empty": diagnosticCheckContract("warning", ["rateLimitCount", "primaryWindows", "secondaryWindows"]),
+        "account-usage-ready": diagnosticCheckContract("pass", ["rateLimitCount", "primaryWindows", "secondaryWindows"]),
+        "account-auth-unavailable": diagnosticCheckContract("fail"),
+        "account-network-unavailable": diagnosticCheckContract("fail"),
+        "account-timeout": diagnosticCheckContract("fail"),
+        "account-http-error": diagnosticCheckContract("fail"),
+        "account-response-invalid": diagnosticCheckContract("fail"),
+        "account-usage-unavailable": diagnosticCheckContract("fail"),
+      }),
+    })
+    const DIAGNOSTIC_FACT_SCHEMAS = Object.freeze({
+      runtime: Object.freeze({
+        route: (value) => value === "dsh-codex",
+        registered: (value) => typeof value === "boolean",
+      }),
+      credential: Object.freeze({
+        configured: (value) => typeof value === "boolean",
+        state: (value) => value === "signed-in" || value === "signed-out" || value === "invalid",
+        writable: (value) => typeof value === "boolean",
+      }),
+      models: Object.freeze({
+        catalogCount: diagnosticCount,
+        enabledCount: diagnosticCount,
+        selection: (value) => value === "all" || value === "custom",
+        allEnabled: (value) => typeof value === "boolean",
+      }),
+      "account-usage": Object.freeze({
+        rateLimitCount: diagnosticCount,
+        primaryWindows: diagnosticCount,
+        secondaryWindows: diagnosticCount,
+      }),
+    })
+
+    function invalidDiagnosticsResponse() {
+      const error = new Error("Invalid connection diagnostics response.")
+      error.code = "INVALID_DIAGNOSTICS_RESPONSE"
+      return error
+    }
+
+    function diagnosticCount(value) {
+      return Number.isSafeInteger(value) && value >= 0
+    }
+
+    function diagnosticCheckContract(status, facts) {
+      return Object.freeze({
+        status,
+        facts: facts === undefined ? null : Object.freeze([...facts]),
+      })
+    }
+
+    function safeDiagnosticFacts(checkId, value, expectedKeys) {
+      if (expectedKeys === null) {
+        if (value !== undefined) throw invalidDiagnosticsResponse()
+        return undefined
+      }
+      if (value === null || typeof value !== "object" || Array.isArray(value)) {
+        throw invalidDiagnosticsResponse()
+      }
+      const schema = DIAGNOSTIC_FACT_SCHEMAS[checkId]
+      if (schema === undefined) throw invalidDiagnosticsResponse()
+      const keys = Reflect.ownKeys(value)
+      if (keys.length !== expectedKeys.length
+        || expectedKeys.some((key) => !Object.prototype.hasOwnProperty.call(value, key))) {
+        throw invalidDiagnosticsResponse()
+      }
+      const facts = {}
+      for (const key of expectedKeys) {
+        const fact = value[key]
+        if (typeof schema[key] !== "function" || !schema[key](fact)) throw invalidDiagnosticsResponse()
+        facts[key] = fact
+      }
+      return Object.freeze(facts)
+    }
+
+    function diagnosticsOutcomeFor(checks) {
+      if (checks.some(({ status }) => status === "skipped")) return "cancelled"
+      if (checks.some(({ status }) => status === "fail")) return "fail"
+      if (checks.some(({ status }) => status === "warning")) return "warning"
+      return "pass"
+    }
+
+    function safeDiagnosticsReport(value, expectedMode) {
+      if (value === null || typeof value !== "object" || Array.isArray(value)
+        || value.version !== 1
+        || value.mode !== expectedMode
+        || !DIAGNOSTIC_OUTCOMES.has(value.outcome)
+        || !Number.isSafeInteger(value.observedAt)
+        || value.observedAt < 0
+        || !Array.isArray(value.checks)
+        || value.checks.length !== DIAGNOSTIC_CHECK_IDS[expectedMode].length) {
+        throw invalidDiagnosticsResponse()
+      }
+      const checks = Array.from(value.checks, (check, index) => {
+        const contract = DIAGNOSTIC_CHECK_CONTRACTS[check?.id]?.[check?.code]
+        if (check === null || typeof check !== "object" || Array.isArray(check)
+          || check.id !== DIAGNOSTIC_CHECK_IDS[expectedMode][index]
+          || typeof check.code !== "string"
+          || !DIAGNOSTIC_CODE_PATTERN.test(check.code)
+          || contract === undefined
+          || check.status !== contract.status) {
+          throw invalidDiagnosticsResponse()
+        }
+        const facts = safeDiagnosticFacts(check.id, check.facts, contract.facts)
+        return Object.freeze({
+          id: check.id,
+          status: check.status,
+          code: check.code,
+          ...(facts === undefined ? {} : { facts }),
+        })
+      })
+      if (value.outcome !== diagnosticsOutcomeFor(checks)) throw invalidDiagnosticsResponse()
+      return Object.freeze({
+        version: 1,
+        mode: value.mode,
+        outcome: value.outcome,
+        observedAt: value.observedAt,
+        checks: Object.freeze(checks),
+      })
+    }
+
+    function createConnectionDiagnosticsClient(connection) {
+      return Object.freeze({
+        async run(mode, signal) {
+          if (!DIAGNOSTIC_MODES.has(mode)) throw new TypeError("Unsupported diagnostics mode.")
+          const result = await connection.rpc.call(
+            DIAGNOSTICS_CHANNEL,
+            "run",
+            { mode },
+            signal,
+          )
+          if (!result.ok) {
+            const error = new Error("Connection diagnostics failed.")
+            error.code = typeof result.error?.code === "string"
+              && DIAGNOSTIC_CODE_PATTERN.test(result.error.code)
+              ? result.error.code
+              : "DIAGNOSTICS_FAILED"
+            throw error
+          }
+          return safeDiagnosticsReport(result.value, mode)
+        },
+      })
+    }
+
     function createSessionPreferenceClient(connection) {
       const call = async (endpoint, payload, signal) => {
         const result = await connection.rpc.call(SESSION_CHANNEL, endpoint, payload, signal)
@@ -260,18 +514,38 @@ window.__ModuleLoader__.load({
         forSession(sessionId) {
           return Object.freeze({
             get: (signal) => call("get", { sessionId }, signal),
+            getForModel: (modelId, signal) => call("get", { sessionId, modelId }, signal),
             setFast: (fast, signal) => call("set-fast", { sessionId, fast }, signal),
+            setTransport: (transport, signal) => call("set-transport", {
+              sessionId,
+              transport,
+            }, signal),
           })
         },
       })
     }
 
-    function supportsFastModel(modelId) {
-      return modelId === "gpt-5.4"
-        || modelId === "gpt-5.5"
-        || modelId === "gpt-5.6-luna"
-        || modelId === "gpt-5.6-sol"
-        || modelId === "gpt-5.6-terra"
+    const TRANSPORT_OPTIONS = Object.freeze([
+      Object.freeze({ id: "auto", label: "transportAuto", help: "transportAutoHelp" }),
+      Object.freeze({ id: "sse", label: "transportSse", help: "transportSseHelp" }),
+      Object.freeze({ id: "websocket", label: "transportWebsocket", help: "transportWebsocketHelp" }),
+      Object.freeze({
+        id: "websocket-cached",
+        label: "transportWebsocketCached",
+        help: "transportWebsocketCachedHelp",
+      }),
+    ])
+    const TRANSPORT_IDS = new Set(TRANSPORT_OPTIONS.map(({ id }) => id))
+
+    function readyPreference(value, previous) {
+      return {
+        status: "ready",
+        fast: value?.fast === true,
+        transport: TRANSPORT_IDS.has(value?.transport) ? value.transport : previous.transport,
+        fastSupported: typeof value?.fastSupported === "boolean"
+          ? value.fastSupported
+          : previous.fastSupported,
+      }
     }
 
     function CodexFastToggle({
@@ -282,14 +556,26 @@ window.__ModuleLoader__.load({
       t,
     }) {
       const current = useModelDirectory((state) => state.current ?? null)
-      const [preference, setPreference] = React.useState({ status: "loading", fast: false })
+      const [preference, setPreference] = React.useState({
+        status: "loading",
+        fast: false,
+        transport: "auto",
+        fastSupported: null,
+      })
+      const [transportMenuOpen, setTransportMenuOpen] = React.useState(false)
+      const [activeTransportIndex, setActiveTransportIndex] = React.useState(0)
       const [repair, setRepair] = React.useState({ key: null, status: "idle" })
       const mountedRef = React.useRef(false)
       const generationRef = React.useRef(0)
       const controllerRef = React.useRef(null)
       const repairAttemptRef = React.useRef(null)
+      const transportControlRef = React.useRef(null)
+      const transportButtonRef = React.useRef(null)
+      const transportOptionRefs = React.useRef([])
+      const transportInstanceId = React.useId().replace(/[^a-zA-Z0-9_-]/gu, "")
+      const transportMenuId = `dsh-codex-transport-menu-${transportInstanceId}`
       const isCodex = current?.provider === CODEX_PROVIDER
-      const supported = isCodex && supportsFastModel(current?.model)
+      const supported = isCodex && preference.fastSupported === true
 
       const refreshPreference = React.useCallback(async () => {
         if (!mountedRef.current || !isCodex) return
@@ -297,18 +583,18 @@ window.__ModuleLoader__.load({
         controllerRef.current?.abort()
         const controller = new AbortController()
         controllerRef.current = controller
-        setPreference((value) => ({ status: "loading", fast: value.fast }))
+        setPreference((value) => ({ ...value, status: "loading" }))
         try {
-          const value = await preferenceClient.get(controller.signal)
+          const value = await preferenceClient.getForModel(current.model, controller.signal)
           if (!mountedRef.current || generation !== generationRef.current || controller.signal.aborted) return
-          setPreference({ status: "ready", fast: value?.fast === true })
+          setPreference((previous) => readyPreference(value, previous))
         } catch {
           if (!mountedRef.current || generation !== generationRef.current || controller.signal.aborted) return
-          setPreference((value) => ({ status: "error", fast: value.fast }))
+          setPreference((value) => ({ ...value, status: "error" }))
         } finally {
           if (controllerRef.current === controller) controllerRef.current = null
         }
-      }, [isCodex, preferenceClient])
+      }, [current?.model, isCodex, preferenceClient])
 
       React.useEffect(() => {
         mountedRef.current = true
@@ -320,6 +606,26 @@ window.__ModuleLoader__.load({
           controllerRef.current = null
         }
       }, [isCodex, preferenceClient, refreshPreference])
+
+      React.useEffect(() => {
+        if (!transportMenuOpen) return undefined
+        transportOptionRefs.current[activeTransportIndex]?.focus?.()
+        return undefined
+      }, [activeTransportIndex, transportMenuOpen])
+
+      React.useEffect(() => {
+        if (
+          !transportMenuOpen
+          || typeof document === "undefined"
+          || typeof document.addEventListener !== "function"
+        ) return undefined
+        const dismiss = (event) => {
+          if (transportControlRef.current?.contains?.(event.target) === true) return
+          setTransportMenuOpen(false)
+        }
+        document.addEventListener("pointerdown", dismiss)
+        return () => document.removeEventListener?.("pointerdown", dismiss)
+      }, [transportMenuOpen])
 
       const legacySelection = isCodex
         && (current?.reasoningEffort === "off" || current?.reasoningEffort === "minimal")
@@ -352,44 +658,116 @@ window.__ModuleLoader__.load({
       }
 
       const toggleFast = async () => {
-        if (!mountedRef.current || !supported || session?.removed === true) return
+        if (!mountedRef.current || session?.removed === true) return
         if (preference.status === "error") {
           void refreshPreference()
           return
         }
+        if (!supported) return
         if (preference.status !== "ready") return
         const generation = ++generationRef.current
         controllerRef.current?.abort()
         const controller = new AbortController()
         controllerRef.current = controller
         const nextFast = !preference.fast
-        setPreference({ status: "saving", fast: preference.fast })
+        setPreference((value) => ({ ...value, status: "saving" }))
         try {
           const value = await preferenceClient.setFast(nextFast, controller.signal)
           if (!mountedRef.current || generation !== generationRef.current || controller.signal.aborted) return
-          setPreference({ status: "ready", fast: value?.fast === true })
+          setPreference((previous) => readyPreference(value, previous))
         } catch {
           if (!mountedRef.current || generation !== generationRef.current || controller.signal.aborted) return
-          setPreference({ status: "error", fast: preference.fast })
+          setPreference((value) => ({ ...value, status: "error" }))
         } finally {
           if (controllerRef.current === controller) controllerRef.current = null
         }
       }
 
+      const closeTransportMenu = (returnFocus = false) => {
+        setTransportMenuOpen(false)
+        if (returnFocus) transportButtonRef.current?.focus?.()
+      }
+
+      const openTransportMenu = () => {
+        if (session?.removed === true) return
+        if (preference.status === "error") {
+          void refreshPreference()
+          return
+        }
+        if (preference.status !== "ready") return
+        const selectedIndex = TRANSPORT_OPTIONS.findIndex(({ id }) => id === preference.transport)
+        setActiveTransportIndex(selectedIndex < 0 ? 0 : selectedIndex)
+        setTransportMenuOpen(true)
+      }
+
+      const chooseTransport = async (transport) => {
+        if (
+          !mountedRef.current
+          || !TRANSPORT_IDS.has(transport)
+          || session?.removed === true
+          || preference.status !== "ready"
+        ) return
+        closeTransportMenu(true)
+        if (transport === preference.transport) return
+        const generation = ++generationRef.current
+        controllerRef.current?.abort()
+        const controller = new AbortController()
+        controllerRef.current = controller
+        setPreference((value) => ({ ...value, status: "saving" }))
+        try {
+          const value = await preferenceClient.setTransport(transport, controller.signal)
+          if (!mountedRef.current || generation !== generationRef.current || controller.signal.aborted) return
+          setPreference((previous) => readyPreference(value, previous))
+        } catch {
+          if (!mountedRef.current || generation !== generationRef.current || controller.signal.aborted) return
+          setPreference((value) => ({ ...value, status: "error" }))
+        } finally {
+          if (controllerRef.current === controller) controllerRef.current = null
+        }
+      }
+
+      const handleTransportButtonKeyDown = (event) => {
+        if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return
+        event.preventDefault()
+        openTransportMenu()
+      }
+
+      const handleTransportMenuKeyDown = (event) => {
+        if (event.key === "Escape") {
+          event.preventDefault()
+          closeTransportMenu(true)
+          return
+        }
+        let nextIndex
+        if (event.key === "ArrowDown") {
+          nextIndex = (activeTransportIndex + 1) % TRANSPORT_OPTIONS.length
+        } else if (event.key === "ArrowUp") {
+          nextIndex = (activeTransportIndex - 1 + TRANSPORT_OPTIONS.length) % TRANSPORT_OPTIONS.length
+        } else if (event.key === "Home") {
+          nextIndex = 0
+        } else if (event.key === "End") {
+          nextIndex = TRANSPORT_OPTIONS.length - 1
+        } else {
+          return
+        }
+        event.preventDefault()
+        setActiveTransportIndex(nextIndex)
+      }
+
       if (!isCodex) return null
-      const label = !supported
-        ? t("fastUnsupported")
-        : preference.status === "loading" || preference.status === "saving"
+      const label = preference.status === "loading" || preference.status === "saving"
           ? t("fastLoading")
           : preference.status === "error"
             ? t("fastUnavailable")
-            : preference.fast
-              ? t("fastDisable")
-              : t("fastEnable")
-      const disabled = !supported
-        || session?.removed === true
+            : !supported
+              ? t("fastUnsupported")
+              : preference.fast
+                ? t("fastDisable")
+                : t("fastEnable")
+      const disabled = session?.removed === true
         || preference.status === "loading"
         || preference.status === "saving"
+        || (preference.status === "ready" && !supported)
 
       const fastButton = h("button", {
         type: "button",
@@ -413,7 +791,102 @@ window.__ModuleLoader__.load({
         "aria-hidden": "true",
       }, h("path", { d: "M13 2 4.5 13h7L11 22l8.5-11h-7L13 2Z" })))
 
-      if (!legacySelection || typeof selectModel !== "function") return fastButton
+      const transportName = t(TRANSPORT_OPTIONS.find(({ id }) => id === preference.transport)?.label
+        ?? "transportAuto")
+      const transportLabel = preference.status === "loading" || preference.status === "saving"
+        ? t("transportLoading")
+        : preference.status === "error"
+          ? t("transportUnavailable")
+          : t("transportLabel").replace("{transport}", transportName)
+      const transportDisabled = session?.removed === true
+        || preference.status === "loading"
+        || preference.status === "saving"
+      const transportButton = h("button", {
+        type: "button",
+        ref: transportButtonRef,
+        className: "dshCodexTransportToggle",
+        "data-transport": preference.transport,
+        "aria-label": transportLabel,
+        "aria-haspopup": "menu",
+        "aria-expanded": transportMenuOpen ? "true" : "false",
+        "aria-controls": transportMenuOpen ? transportMenuId : undefined,
+        "aria-busy": preference.status === "loading" || preference.status === "saving" ? "true" : undefined,
+        title: transportLabel,
+        disabled: transportDisabled,
+        onClick: () => transportMenuOpen ? closeTransportMenu() : openTransportMenu(),
+        onKeyDown: handleTransportButtonKeyDown,
+      }, h("svg", {
+        viewBox: "0 0 24 24",
+        width: 16,
+        height: 16,
+        fill: "none",
+        stroke: "currentColor",
+        strokeWidth: 2,
+        strokeLinecap: "round",
+        strokeLinejoin: "round",
+        "aria-hidden": "true",
+      },
+      h("path", { d: "M7 7h11m0 0-3-3m3 3-3 3M17 17H6m0 0 3 3m-3-3 3-3" })))
+
+      const transportMenu = !transportMenuOpen ? null : h("div", {
+        id: transportMenuId,
+        className: "dshCodexTransportMenu",
+        role: "menu",
+        "aria-label": t("transportMenu"),
+        "aria-orientation": "vertical",
+        onKeyDown: handleTransportMenuKeyDown,
+      },
+      ...TRANSPORT_OPTIONS.map((option, index) => h("button", {
+        key: option.id,
+        type: "button",
+        ref: (element) => { transportOptionRefs.current[index] = element },
+        className: "dshCodexTransportOption",
+        role: "menuitemradio",
+        "aria-checked": preference.transport === option.id,
+        "data-selected": preference.transport === option.id ? "true" : undefined,
+        tabIndex: activeTransportIndex === index ? 0 : -1,
+        onMouseEnter: () => setActiveTransportIndex(index),
+        onClick: () => void chooseTransport(option.id),
+      },
+      h("span", { className: "dshCodexTransportOptionCopy" },
+        h("strong", null, t(option.label)),
+        h("span", null, t(option.help))),
+      preference.transport === option.id
+        ? h("svg", {
+            viewBox: "0 0 24 24",
+            width: 16,
+            height: 16,
+            fill: "none",
+            stroke: "currentColor",
+            strokeWidth: 2.2,
+            strokeLinecap: "round",
+            strokeLinejoin: "round",
+            "aria-hidden": "true",
+          }, h("path", { d: "m5 12 4 4L19 6" }))
+        : null)),
+      h("div", { className: "dshCodexTransportMenuFooter", role: "none" },
+        h("span", null, t("transportSessionOnly")),
+        h("button", {
+          type: "button",
+          className: "dshCodexTransportReset",
+          role: "menuitem",
+          disabled: preference.transport === "auto",
+          "aria-label": t("transportResetLabel"),
+          onClick: () => void chooseTransport("auto"),
+        }, t("transportReset"))))
+
+      const transportControl = h("div", {
+        className: "dshCodexTransportControl",
+        ref: transportControlRef,
+        onBlur: (event) => {
+          if (event.currentTarget?.contains?.(event.relatedTarget) === true) return
+          closeTransportMenu()
+        },
+      }, transportButton, transportMenu)
+
+      if (!legacySelection || typeof selectModel !== "function") {
+        return h(React.Fragment, null, fastButton, transportControl)
+      }
       const repairLabel = repairStatus === "saving"
         ? t("legacyReasoningRepairing")
         : repairStatus === "done"
@@ -432,7 +905,8 @@ window.__ModuleLoader__.load({
           disabled: session?.removed === true || repairStatus === "saving" || repairStatus === "done",
           onClick: () => void repairLegacySelection(),
         }, repairLabel),
-        fastButton)
+        fastButton,
+        transportControl)
     }
 
     function resultValue(response) {
@@ -1231,6 +1705,180 @@ window.__ModuleLoader__.load({
       return "failed"
     }
 
+    function diagnosticsOutcomeCopyKey(outcome) {
+      if (outcome === "warning") return "diagnosticsOutcomeWarning"
+      if (outcome === "fail") return "diagnosticsOutcomeFail"
+      if (outcome === "cancelled") return "diagnosticsOutcomeCancelled"
+      return "diagnosticsOutcomePass"
+    }
+
+    function diagnosticsStatusCopyKey(status) {
+      if (status === "warning") return "diagnosticsStatusWarning"
+      if (status === "fail") return "diagnosticsStatusFail"
+      if (status === "skipped") return "diagnosticsStatusSkipped"
+      return "diagnosticsStatusPass"
+    }
+
+    function diagnosticsCheckLabel(checkId, t) {
+      if (checkId === "runtime") return t("diagnosticsCheckRuntime")
+      if (checkId === "credential") return t("diagnosticsCheckCredential")
+      if (checkId === "models") return t("diagnosticsCheckModels")
+      if (checkId === "account-usage") return t("diagnosticsCheckAccountUsage")
+      return checkId
+    }
+
+    function diagnosticsChevron() {
+      return h("svg", {
+        viewBox: "0 0 16 16",
+        width: 16,
+        height: 16,
+        fill: "none",
+        "aria-hidden": "true",
+      }, h("path", {
+        d: "m4 6 4 4 4-4",
+        stroke: "currentColor",
+        strokeWidth: 1.5,
+        strokeLinecap: "round",
+        strokeLinejoin: "round",
+      }))
+    }
+
+    function ConnectionDiagnosticsSettings({ client, t }) {
+      const [expanded, setExpanded] = React.useState(false)
+      const [state, setState] = React.useState({ kind: "idle" })
+      const instanceId = React.useId().replace(/[^a-zA-Z0-9_-]/gu, "")
+      const contentId = `dsh-codex-diagnostics-${instanceId}`
+      const mountedRef = React.useRef(false)
+      const generationRef = React.useRef(0)
+      const controllerRef = React.useRef(null)
+
+      React.useEffect(() => {
+        mountedRef.current = true
+        return () => {
+          mountedRef.current = false
+          generationRef.current += 1
+          controllerRef.current?.abort()
+          controllerRef.current = null
+        }
+      }, [])
+
+      const run = async (mode) => {
+        if (!mountedRef.current || state.kind === "running" || !DIAGNOSTIC_MODES.has(mode)) return
+        const generation = ++generationRef.current
+        controllerRef.current?.abort()
+        const controller = new AbortController()
+        controllerRef.current = controller
+        setState({ kind: "running", mode })
+        try {
+          const report = await client.run(mode, controller.signal)
+          if (!mountedRef.current
+            || generation !== generationRef.current
+            || controller.signal.aborted) return
+          setState({ kind: "ready", report })
+        } catch {
+          if (!mountedRef.current
+            || generation !== generationRef.current
+            || controller.signal.aborted) return
+          setState({ kind: "error", mode })
+        } finally {
+          if (generation === generationRef.current && controllerRef.current === controller) {
+            controllerRef.current = null
+          }
+        }
+      }
+
+      const cancel = () => {
+        if (!mountedRef.current || state.kind !== "running") return
+        generationRef.current += 1
+        controllerRef.current?.abort()
+        controllerRef.current = null
+        setState({ kind: "cancelled", mode: state.mode })
+      }
+
+      let result = null
+      if (state.kind === "ready") {
+        const report = state.report
+        const observedDate = new Date(report.observedAt)
+        const observedLabel = Number.isNaN(observedDate.valueOf())
+          ? String(report.observedAt)
+          : observedDate.toLocaleString(t("locale"))
+        result = h("div", {
+          className: "dshCodexDiagnosticsResult",
+          "data-outcome": report.outcome,
+          role: "status",
+          "aria-live": "polite",
+        },
+        h("div", { className: "dshCodexDiagnosticsResultHeader" },
+          h("strong", null, t(diagnosticsOutcomeCopyKey(report.outcome))),
+          h("span", null,
+            `${t("diagnosticsObservedAt")} `,
+            h("time", {
+              dateTime: Number.isNaN(observedDate.valueOf()) ? undefined : observedDate.toISOString(),
+            }, observedLabel))),
+        h("ul", { className: "dshCodexDiagnosticsChecks" },
+          ...report.checks.map((check) => {
+            const facts = check.facts === undefined
+              ? []
+              : Object.entries(check.facts).map(([key, value]) => `${key}=${String(value)}`)
+            return h("li", { key: check.id, "data-status": check.status },
+              h("span", { className: "dshCodexDiagnosticsCheckStatus" }, t(diagnosticsStatusCopyKey(check.status))),
+              h("strong", null, diagnosticsCheckLabel(check.id, t)),
+              h("code", null, check.code),
+              facts.length === 0
+                ? null
+                : h("span", { className: "dshCodexDiagnosticsFacts" }, facts.join(" · ")))
+          })))
+      } else if (state.kind === "error") {
+        result = h("p", { className: "dshCodexError", role: "alert" }, t("diagnosticsFailed"))
+      } else if (state.kind === "cancelled") {
+        result = h("p", { className: "dshCodexMuted", role: "status" }, t("diagnosticsOutcomeCancelled"))
+      }
+
+      const runningMode = state.kind === "running" ? state.mode : null
+      return h("section", {
+        className: "dshCodexDiagnostics",
+        "data-expanded": expanded ? "true" : undefined,
+      },
+      h("button", {
+        type: "button",
+        className: "dshCodexDiagnosticsToggle",
+        "aria-expanded": expanded ? "true" : "false",
+        "aria-controls": contentId,
+        onClick: () => setExpanded((current) => !current),
+      },
+      h("span", { className: "dshCodexDiagnosticsToggleCopy" },
+        h("strong", null, t("diagnosticsTitle")),
+        h("span", null, t("diagnosticsCollapsedHelp"))),
+      diagnosticsChevron()),
+      !expanded ? null : h("div", { id: contentId, className: "dshCodexDiagnosticsBody" },
+        h("p", { className: "dshCodexMuted" }, t("diagnosticsExpandedHelp")),
+        h("div", { className: "dshCodexDiagnosticsModes" },
+          h("div", { className: "dshCodexDiagnosticsMode" },
+            h("button", {
+              type: "button",
+              className: "dshCodexButton",
+              disabled: runningMode !== null,
+              "aria-busy": runningMode === "local" ? "true" : undefined,
+              onClick: () => void run("local"),
+            }, runningMode === "local" ? t("diagnosticsLocalRunning") : t("diagnosticsLocal")),
+            h("span", null, t("diagnosticsLocalHelp"))),
+          h("div", { className: "dshCodexDiagnosticsMode" },
+            h("button", {
+              type: "button",
+              className: "dshCodexButton",
+              disabled: runningMode !== null,
+              "aria-busy": runningMode === "account" ? "true" : undefined,
+              onClick: () => void run("account"),
+            }, runningMode === "account" ? t("diagnosticsAccountRunning") : t("diagnosticsAccount")),
+            h("span", null, t("diagnosticsAccountHelp")))),
+        runningMode === null ? null : h("button", {
+          type: "button",
+          className: "dshCodexDiagnosticsCancel",
+          onClick: cancel,
+        }, t("diagnosticsCancel")),
+        result))
+    }
+
     function ModelEnablementSettings({ client, t }) {
       const [snapshot, setSnapshot] = React.useState(client.available ? { kind: "loading" } : { kind: "unavailable" })
       const [selectedIds, setSelectedIds] = React.useState([])
@@ -1433,12 +2081,13 @@ window.__ModuleLoader__.load({
         content)
     }
 
-    function CodexSettings({ client, modelClient, t }) {
+    function CodexSettings({ client, diagnosticsClient, modelClient, t }) {
       return h("div", { className: "dshCodexPage" },
         h("header", { className: "dshCodexHero" },
           h("h2", null, t("title")),
           h("p", null, t("description"))),
         h(AuthorizationSettings, { client, t }),
+        h(ConnectionDiagnosticsSettings, { client: diagnosticsClient, t }),
         h(ModelEnablementSettings, { client: modelClient, t }))
     }
 
@@ -1450,6 +2099,7 @@ window.__ModuleLoader__.load({
       ctx.effect(() => ctx.locale.register(NS, { zh, en }), "dsh-codex: client dictionaries")
       const t = ctx.locale.bind(NS)
       const client = createAuthorizationClient(ctx.connection)
+      const diagnosticsClient = createConnectionDiagnosticsClient(ctx.connection)
       const sessionPreferenceClient = createSessionPreferenceClient(ctx.connection)
       const modelClient = createModelEnablementClient(ctx.connection, ctx.settingsScope?.describe?.())
       ctx.slots.inject("settings.section", () => ctx.slots.register({
@@ -1458,7 +2108,7 @@ window.__ModuleLoader__.load({
         order: 15,
         label: () => t("nav"),
         locale: NS,
-        inject: () => ({ client, modelClient, t }),
+        inject: () => ({ client, diagnosticsClient, modelClient, t }),
       }, CodexSettings))
       ctx.inject?.(["slots", "modelDirectories"], (scope) => {
         scope.slots.inject("conversation.input.right", () => scope.slots.register({
@@ -1594,6 +2244,38 @@ window.__ModuleLoader__.load({
         ".dshCodexHeader>div{min-width:0}",
         ".dshCodexHeader h3,.dshCodexHeader p,.dshCodexNotices p,.dshCodexQuota p{margin:0}",
         ".dshCodexHeader h3{font-size:16px;font-weight:500;line-height:24px}",
+        ".dshCodexDiagnostics{display:flex;width:100%;min-width:0;flex-direction:column;overflow:hidden;border:1px solid var(--dsw-alias-border-l2);border-radius:12px;background:var(--dsw-alias-bg-module-platform,var(--dsw-alias-bg-layer-3));color:var(--dsw-alias-label-primary)}",
+        ".dshCodexDiagnosticsToggle{display:flex;width:100%;min-width:0;align-items:center;justify-content:space-between;gap:12px;border:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer;padding:10px 14px}",
+        ".dshCodexDiagnosticsToggle:hover{background:var(--dsw-alias-interactive-bg-hover,var(--dsw-alias-bg-layer-2))}",
+        ".dshCodexDiagnosticsToggle:focus-visible,.dshCodexDiagnosticsCancel:focus-visible{outline:2px solid var(--dsw-alias-brand-primary,var(--dsw-alias-border-l3));outline-offset:-2px}",
+        ".dshCodexDiagnosticsToggle>svg{flex:none;color:var(--dsw-alias-label-tertiary);transition:transform .15s ease}",
+        ".dshCodexDiagnostics[data-expanded=true] .dshCodexDiagnosticsToggle>svg{transform:rotate(180deg)}",
+        ".dshCodexDiagnosticsToggleCopy{display:flex;min-width:0;flex:1;flex-wrap:wrap;align-items:baseline;gap:1px 10px}",
+        ".dshCodexDiagnosticsToggleCopy strong{font-size:14px;font-weight:500;line-height:22px}",
+        ".dshCodexDiagnosticsToggleCopy>span{color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:18px}",
+        ".dshCodexDiagnosticsBody{display:flex;min-width:0;flex-direction:column;gap:10px;border-top:1px solid var(--dsw-alias-border-l2);padding:12px 14px 14px}",
+        ".dshCodexDiagnosticsBody>p{margin:0}",
+        ".dshCodexDiagnosticsModes{display:grid;min-width:0;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}",
+        ".dshCodexDiagnosticsMode{display:flex;min-width:0;align-items:flex-start;gap:9px}",
+        ".dshCodexDiagnosticsMode .dshCodexButton{min-width:104px;flex:none;padding:6px 10px;font-size:12px;line-height:18px}",
+        ".dshCodexDiagnosticsMode>span{color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:18px}",
+        ".dshCodexDiagnosticsCancel{align-self:flex-start;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-state-business-primary);font:inherit;font-size:12px;line-height:18px;cursor:pointer;padding:2px 4px}",
+        ".dshCodexDiagnosticsCancel:hover{background:var(--dsw-alias-interactive-bg-hover,var(--dsw-alias-bg-layer-2))}",
+        ".dshCodexDiagnosticsResult{display:flex;min-width:0;flex-direction:column;gap:8px;border-top:1px solid var(--dsw-alias-border-l2);padding-top:10px}",
+        ".dshCodexDiagnosticsResultHeader{display:flex;min-width:0;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:4px 12px;font-size:12px;line-height:18px}",
+        ".dshCodexDiagnosticsResultHeader strong{font-weight:500}",
+        ".dshCodexDiagnosticsResult[data-outcome=pass] .dshCodexDiagnosticsResultHeader strong{color:var(--dsw-alias-state-success-primary)}",
+        ".dshCodexDiagnosticsResult[data-outcome=warning] .dshCodexDiagnosticsResultHeader strong{color:var(--dsw-alias-state-warning-primary,var(--dsw-alias-label-secondary))}",
+        ".dshCodexDiagnosticsResult[data-outcome=fail] .dshCodexDiagnosticsResultHeader strong{color:var(--dsw-alias-state-error-primary)}",
+        ".dshCodexDiagnosticsResultHeader>span{color:var(--dsw-alias-label-tertiary)}",
+        ".dshCodexDiagnosticsChecks{display:grid;min-width:0;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin:0;padding:0;list-style:none}",
+        ".dshCodexDiagnosticsChecks li{display:flex;min-width:0;flex-wrap:wrap;align-items:baseline;gap:3px 7px;border-radius:8px;background:var(--dsw-alias-bg-layer-1);padding:7px 9px;font-size:12px;line-height:18px}",
+        ".dshCodexDiagnosticsChecks strong{font-weight:500}",
+        ".dshCodexDiagnosticsChecks code,.dshCodexDiagnosticsFacts{min-width:0;overflow-wrap:anywhere;color:var(--dsw-alias-label-tertiary);font:inherit}",
+        ".dshCodexDiagnosticsFacts{flex-basis:100%}",
+        ".dshCodexDiagnosticsCheckStatus{border-radius:999px;background:var(--dsw-alias-bg-layer-2,var(--dsw-alias-bg-module-platform));color:var(--dsw-alias-label-secondary);padding:0 6px}",
+        ".dshCodexDiagnosticsChecks li[data-status=pass] .dshCodexDiagnosticsCheckStatus{color:var(--dsw-alias-state-success-primary)}",
+        ".dshCodexDiagnosticsChecks li[data-status=fail] .dshCodexDiagnosticsCheckStatus{color:var(--dsw-alias-state-error-primary)}",
         ".dshCodexAuthToolbar{display:flex;min-width:0;align-items:center;justify-content:space-between;gap:18px}",
         ".dshCodexStatus{display:flex;min-width:0;align-items:center;gap:10px;font-size:14px;line-height:22px}",
         ".dshCodexStatus strong{font-weight:500;white-space:nowrap}",
@@ -1642,6 +2324,24 @@ window.__ModuleLoader__.load({
         ".dshCodexFastToggle[data-fast=true]{background:var(--dsw-alias-state-business-secondary,var(--dsw-alias-bg-layer-2));color:var(--dsw-alias-state-business-primary)}",
         ".dshCodexFastToggle:focus-visible{outline:2px solid var(--dsw-alias-brand-primary,var(--dsw-alias-border-l3));outline-offset:2px}",
         ".dshCodexFastToggle:disabled{cursor:not-allowed;opacity:.45}",
+        ".dshCodexTransportControl{position:relative;display:inline-flex;width:28px;height:28px;flex:none}",
+        ".dshCodexTransportToggle{box-sizing:border-box;display:inline-flex;width:28px;height:28px;flex:none;align-items:center;justify-content:center;border:0;border-radius:999px;background:transparent;color:var(--dsw-alias-label-tertiary);font:inherit;cursor:pointer;padding:0;transition:background-color .15s ease,color .15s ease}",
+        ".dshCodexTransportToggle:hover:not(:disabled),.dshCodexTransportToggle[aria-expanded=true]{background:var(--dsw-alias-interactive-bg-hover,var(--dsw-alias-bg-layer-2));color:var(--dsw-alias-label-primary)}",
+        ".dshCodexTransportToggle[data-transport]:not([data-transport=auto]){color:var(--dsw-alias-state-business-primary)}",
+        ".dshCodexTransportToggle:focus-visible,.dshCodexTransportOption:focus-visible,.dshCodexTransportReset:focus-visible{outline:2px solid var(--dsw-alias-brand-primary,var(--dsw-alias-border-l3));outline-offset:2px}",
+        ".dshCodexTransportToggle:disabled{cursor:not-allowed;opacity:.45}",
+        ".dshCodexTransportMenu{position:absolute;right:0;bottom:calc(100% + 8px);z-index:40;display:flex;width:280px;max-width:calc(100vw - 32px);flex-direction:column;gap:4px;border:1px solid var(--dsw-alias-border-l2);border-radius:12px;background:var(--dsw-alias-bg-layer-1);box-shadow:0 10px 28px rgb(0 0 0 / .14);padding:6px;color:var(--dsw-alias-label-primary);font:inherit}",
+        ".dshCodexTransportOption{display:flex;width:100%;min-width:0;align-items:center;justify-content:space-between;gap:12px;border:0;border-radius:8px;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer;padding:8px 9px}",
+        ".dshCodexTransportOption:hover,.dshCodexTransportOption[data-selected=true]{background:var(--dsw-alias-interactive-bg-hover,var(--dsw-alias-bg-layer-2))}",
+        ".dshCodexTransportOption[data-selected=true]{color:var(--dsw-alias-state-business-primary)}",
+        ".dshCodexTransportOption>svg{flex:none}",
+        ".dshCodexTransportOptionCopy{display:flex;min-width:0;flex:1;flex-direction:column;gap:1px}",
+        ".dshCodexTransportOptionCopy strong{font-size:13px;font-weight:500;line-height:20px}",
+        ".dshCodexTransportOptionCopy>span{color:var(--dsw-alias-label-tertiary);font-size:11px;line-height:17px}",
+        ".dshCodexTransportMenuFooter{display:flex;min-width:0;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid var(--dsw-alias-border-l2);margin-top:2px;padding:7px 8px 2px;color:var(--dsw-alias-label-tertiary);font-size:11px;line-height:17px}",
+        ".dshCodexTransportReset{flex:none;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-state-business-primary);font:inherit;font-size:11px;line-height:17px;cursor:pointer;padding:2px 4px}",
+        ".dshCodexTransportReset:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover,var(--dsw-alias-bg-layer-2))}",
+        ".dshCodexTransportReset:disabled{cursor:not-allowed;color:var(--dsw-alias-label-tertiary);opacity:.55}",
         ".dshCodexLegacyRepair{box-sizing:border-box;display:inline-flex;min-width:0;height:28px;flex:none;align-items:center;border:1px solid var(--dsw-alias-border-l2);border-radius:14px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-state-warning-primary,var(--dsw-alias-label-secondary));font:inherit;font-size:12px;line-height:18px;cursor:pointer;padding:0 10px;white-space:nowrap}",
         ".dshCodexLegacyRepair:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover,var(--dsw-alias-bg-layer-2))}",
         ".dshCodexLegacyRepair:focus-visible{outline:2px solid var(--dsw-alias-brand-primary,var(--dsw-alias-border-l3));outline-offset:2px}",
@@ -1675,10 +2375,10 @@ window.__ModuleLoader__.load({
         ".dshCodexPrompt input,.dshCodexPrompt select{box-sizing:border-box;width:100%;min-width:0;height:38px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit;padding:0 10px}",
         ".dshCodexError{margin:0;color:var(--dsw-alias-state-error-primary);font-size:12px;line-height:18px}",
         ".dshCodexSuccess{margin:0;color:var(--dsw-alias-state-success-primary);font-size:12px;line-height:18px}",
-        "@media(prefers-reduced-motion:reduce){.dshCodexRefreshButton[data-loading=true] .dshCodexRefreshIcon{animation:none}}",
-        "@media(max-width:760px){.dshCodexQuotaWindows,.dshCodexModelList{grid-template-columns:1fr}.dshCodexModelActions{justify-content:flex-start}}",
+        "@media(prefers-reduced-motion:reduce){.dshCodexRefreshButton[data-loading=true] .dshCodexRefreshIcon{animation:none}.dshCodexDiagnosticsToggle>svg{transition:none}}",
+        "@media(max-width:760px){.dshCodexQuotaWindows,.dshCodexModelList,.dshCodexDiagnosticsModes,.dshCodexDiagnosticsChecks{grid-template-columns:1fr}.dshCodexModelActions{justify-content:flex-start}}",
         "@media(max-width:640px){.dshCodexAuthToolbar,.dshCodexHeader{align-items:stretch;flex-direction:column}.dshCodexAuthActions{margin-left:0;justify-content:flex-start}}",
-        "@media(max-width:480px){.dshCodexPage{gap:10px;padding:0 0 16px}.dshCodexCard{border-radius:14px;padding:16px}.dshCodexActions{align-items:stretch;flex-direction:column}.dshCodexButton{width:100%}.dshCodexQuotaHeader .dshCodexRefreshButton{width:auto}.dshCodexQuotaWindowHeader{gap:8px}}",
+        "@media(max-width:480px){.dshCodexPage{gap:10px;padding:0 0 16px}.dshCodexCard{border-radius:14px;padding:16px}.dshCodexActions{align-items:stretch;flex-direction:column}.dshCodexButton{width:100%}.dshCodexQuotaHeader .dshCodexRefreshButton{width:auto}.dshCodexQuotaWindowHeader{gap:8px}.dshCodexDiagnosticsMode{flex-direction:column}.dshCodexDiagnosticsMode .dshCodexButton{width:100%;min-width:0}.dshCodexDiagnosticsMode>span{max-width:100%;overflow-wrap:anywhere}}",
       ].join("")
       const references = style[STYLE_REF_KEY]
       style[STYLE_REF_KEY] = Number.isSafeInteger(references) && references > 0
@@ -1702,12 +2402,15 @@ window.__ModuleLoader__.load({
     exports.AuthorizationSettings = AuthorizationSettings
     exports.CHANNEL = CHANNEL
     exports.CODEX_PROVIDER = CODEX_PROVIDER
+    exports.ConnectionDiagnosticsSettings = ConnectionDiagnosticsSettings
     exports.CodexFastToggle = CodexFastToggle
     exports.CodexSettings = CodexSettings
+    exports.DIAGNOSTICS_CHANNEL = DIAGNOSTICS_CHANNEL
     exports.ModelEnablementSettings = ModelEnablementSettings
     exports.NS = NS
     exports.apply = apply
     exports.createAuthorizationClient = createAuthorizationClient
+    exports.createConnectionDiagnosticsClient = createConnectionDiagnosticsClient
     exports.createModelEnablementClient = createModelEnablementClient
     exports.createSessionPreferenceClient = createSessionPreferenceClient
     exports.formatResetDistance = formatResetDistance

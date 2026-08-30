@@ -68,9 +68,11 @@ The selector no longer shows generic `Default`, `Off`, or `Minimal` entries that
 
 If an older conversation still stores `Off` or `Minimal`, a **Repair old reasoning level** action appears beside the composer. Merely opening the conversation never rewrites the selection. Clicking the action switches to that model's current default. It uses the same persistence semantics as the Harness model selector, so the model also becomes the default for future conversations.
 
-## Per-session Fast preference
+## Per-session Fast and Transport preferences
 
-The lightning button to the left of the conversation model selector and `/codex set fast on|off` update the same current-session preference. On GPT-5.4, GPT-5.5, GPT-5.6 Luna, Sol, and Terra, enabling it uses the official Fast priority service tier starting with the next request; disabling it restores standard speed starting with the next request. Fast targets 1.5× speed and consumes more usage. GPT-5.3 Codex Spark and GPT-5.4 mini never receive the Fast service tier.
+The lightning button to the left of the conversation model selector and `/codex set fast on|off` update the same current-session Fast preference. On GPT-5.4, GPT-5.5, GPT-5.6 Luna, Sol, and Terra, enabling it uses the official Fast priority service tier starting with the next request; disabling it restores standard speed starting with the next request. Fast targets 1.5× speed and consumes more usage. GPT-5.3 Codex Spark and GPT-5.4 mini never receive the Fast service tier.
+
+The adjacent Transport button and `/codex set transport auto|sse|websocket|websocket-cached` share the current-conversation transport preference. The graphical menu displays the actual current value and can reset to Auto. `auto` lets the Provider select a transport; the other three choices request their named transport explicitly.
 
 Fast state belongs only to the current session in the current process and returns to off after a process restart. Transport preferences are likewise not persisted. An in-flight request is not changed by a toggle, and a failed Fast request is not automatically replayed on a lower tier.
 
@@ -80,4 +82,4 @@ Fast state belongs only to the current session in the current process and return
 - Type mismatches, unknown enum values, ordinary numbers outside the allowed ranges, fractional image limits, and unknown or duplicate model IDs are rejected during plugin load or settings save. A rejected update does not replace the last valid configuration.
 - Use only the finite JSON/YAML numbers listed above. `NaN`, infinity, and undocumented fields are outside the supported configuration interface.
 - A configuration update takes effect on the next adapter operation. An operation already in progress continues with the immutable configuration snapshot it captured at start.
-- Fast and transport preferences are temporary state for the current session in the current process, not bundle configuration keys. `/codex` can change them, and the lightning button to the left of the model selector can also toggle Fast.
+- Fast and transport preferences are temporary state for the current session in the current process, not bundle configuration keys. `/codex` can change them, and the lightning button plus adjacent Transport menu provide the same controls graphically.

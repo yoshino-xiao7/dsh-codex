@@ -2,7 +2,9 @@
 
 [简体中文](compatibility.md) | [English](compatibility.en.md)
 
-Last updated: 2026-08-29.
+Last updated: 2026-08-30.
+
+`0.0.4` is currently an unpublished development version. The table below continues to record evidence for the formally published `0.0.3`; development-branch tests are neither a `0.0.4` candidate nor release acceptance. The maintainer has completed real-device use without reporting an issue, but the repository does not contain individually recorded evidence for all 13 fixed sanitized assertions, so the acceptance JSON remains truthful to its existing evidence.
 
 | Component or environment | `0.0.3` candidate evidence | Status |
 | --- | --- | --- |
@@ -21,6 +23,8 @@ Last updated: 2026-08-29.
 | auto / SSE / WebSocket / cached | Transport mapping and session isolation pass in automation | One live request through each transport is pending |
 | Fast / priority tier | Verified that only an explicit per-session choice changes `service_tier` | Account entitlement and live network pending |
 | npm / GitHub Release | The strict workflow verifies the candidate, Registry readback, provenance, signatures, and Release assets; artifacts are attached to [`v0.0.3`](https://github.com/yoshino-xiao7/dsh-codex/releases/tag/v0.0.3) | Formal publication is performed by the protected workflow |
+
+The `0.0.4` development branch adds three locally verifiable boundaries: one Host model-capability projection shared by the Provider, route, and per-conversation Fast query; a graphical selector for all four Transport choices; and connection diagnostics with a fully offline local check plus an account check limited to reading usage. The diagnostic module has no stream seam and cannot send a model request, so these tests do not replace live account acceptance for text, reasoning, images, tools, Fast, or individual transports.
 
 The `0.0.x` line is a technical preview and declares compatibility only with the exact DSH release candidate above. Linux, macOS, and Windows CI/profile smoke for `0.0.3` reached `3/3`. The accepted commit, exact Node versions, and job links are recorded in the [acceptance record](releases/v0.0.3.acceptance.json), with maintainer approval. Live OAuth, conversation, image, transport, and Fast network acceptance starts in a fresh `0/13 pending` record and will be completed individually post-release. These incomplete checks must remain visible and must never be presented as verified capabilities. Usage-window and model-setting behavior was verified independently in the local Chinese and English settings page and is not one of these 13 checks that consume a model request or require a complete interaction round trip.
 

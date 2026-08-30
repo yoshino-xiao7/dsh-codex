@@ -1,4 +1,5 @@
 export declare const CHANNEL: "/dsh-codex"
+export declare const DIAGNOSTICS_CHANNEL: "/dsh-codex-diagnostics"
 export declare const CODEX_PROVIDER: "dsh-codex"
 export declare const NS: "settings.codex"
 export declare const inject: readonly ["slots", "locale", "connection", "settingsScope"]
@@ -66,6 +67,29 @@ export interface CodexAccountUsage {
   rateLimits: readonly CodexUsageRateLimit[]
 }
 
+export type CodexDiagnosticMode = "local" | "account"
+export type CodexDiagnosticOutcome = "pass" | "warning" | "fail" | "cancelled"
+export type CodexDiagnosticStatus = "pass" | "warning" | "fail" | "skipped"
+
+export interface CodexDiagnosticCheck {
+  readonly id: string
+  readonly status: CodexDiagnosticStatus
+  readonly code: string
+  readonly facts?: Readonly<Record<string, boolean | number | string>>
+}
+
+export interface CodexDiagnosticsReport {
+  readonly version: 1
+  readonly mode: CodexDiagnosticMode
+  readonly outcome: CodexDiagnosticOutcome
+  readonly observedAt: number
+  readonly checks: readonly CodexDiagnosticCheck[]
+}
+
+export interface ConnectionDiagnosticsClient {
+  run(mode: CodexDiagnosticMode, signal?: AbortSignal): Promise<CodexDiagnosticsReport>
+}
+
 export interface AuthorizationClient {
   describe(signal?: AbortSignal): Promise<AuthorizationStatus>
   watch(attemptId: string, after: number, signal?: AbortSignal): Promise<{
@@ -87,11 +111,21 @@ export interface AuthorizationClient {
 
 export interface CodexSessionPreference {
   fast: boolean
+  transport: "auto" | "sse" | "websocket" | "websocket-cached"
+}
+
+export interface CodexSessionModelPreference extends CodexSessionPreference {
+  fastSupported: boolean
 }
 
 export interface SessionPreferenceClient {
   get(signal?: AbortSignal): Promise<CodexSessionPreference>
+  getForModel(modelId: string, signal?: AbortSignal): Promise<CodexSessionModelPreference>
   setFast(fast: boolean, signal?: AbortSignal): Promise<CodexSessionPreference>
+  setTransport(
+    transport: CodexSessionPreference["transport"],
+    signal?: AbortSignal,
+  ): Promise<CodexSessionPreference>
 }
 
 export interface SessionPreferenceClientFactory {
@@ -180,6 +214,9 @@ export interface RpcConnection {
 }
 
 export declare function createAuthorizationClient(connection: RpcConnection): AuthorizationClient
+export declare function createConnectionDiagnosticsClient(
+  connection: RpcConnection,
+): ConnectionDiagnosticsClient
 export declare function createSessionPreferenceClient(
   connection: RpcConnection,
 ): SessionPreferenceClientFactory
@@ -200,6 +237,10 @@ export declare function AuthorizationSettings(props: {
   client: AuthorizationClient
   t(key: string): string
 }): unknown
+export declare function ConnectionDiagnosticsSettings(props: {
+  client: ConnectionDiagnosticsClient
+  t(key: string): string
+}): unknown
 export declare function CodexFastToggle(props: {
   session?: { removed?: boolean }
   useModelDirectory: UseCodexModelDirectory
@@ -213,6 +254,7 @@ export declare function ModelEnablementSettings(props: {
 }): unknown
 export declare function CodexSettings(props: {
   client: AuthorizationClient
+  diagnosticsClient: ConnectionDiagnosticsClient
   modelClient: ModelEnablementClient
   t(key: string): string
 }): unknown

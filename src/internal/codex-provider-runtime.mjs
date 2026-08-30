@@ -9,7 +9,9 @@ import Schema from "@deepseek-ai/schemastery"
 
 import { registerCodexAuthorizationFlow } from "./codex-authorization.mjs"
 import { createCodexAccountUsageReader } from "./codex-account-usage.mjs"
+import { createCodexConnectionDiagnostics } from "./codex-connection-diagnostics.mjs"
 import {
+  CODEX_CREDENTIAL_KEY,
   CODEX_PROVIDER_ID,
   createCodexCredentialStore,
 } from "./codex-credential-store.mjs"
@@ -234,8 +236,41 @@ export function installCodexProviderRuntime(ctx, entryConfig = {}, options = {})
     },
   })
 
+  const connectionDiagnostics = createCodexConnectionDiagnostics({
+    accountUsageReader,
+    getRuntimeSnapshot() {
+      const catalog = provider.getModels()
+      const configured = source().models
+      return {
+        route: CODEX_ROUTE_ID,
+        routeRegistered: true,
+        catalog,
+        enabledModels: configured === undefined ? catalog : configured,
+        selection: configured === undefined ? "all" : "custom",
+      }
+    },
+    async describeCredential() {
+      const description = await ctx.credentials.describeRecord(CODEX_CREDENTIAL_KEY)
+      const configured = description?.configured === true
+      const writable = description?.writable === true
+      if (!configured) return { configured, state: "signed-out", writable }
+      if (description?.kind !== "grant") return { configured, state: "invalid", writable }
+      try {
+        const credential = await credentialStore.read(CODEX_PROVIDER_ID)
+        return {
+          configured,
+          state: credential === undefined ? "signed-out" : "signed-in",
+          writable,
+        }
+      } catch {
+        return { configured, state: "invalid", writable }
+      }
+    },
+  })
+
   return Object.freeze({
     accountUsageReader,
+    connectionDiagnostics,
     getConfig: () => source(),
   })
 }

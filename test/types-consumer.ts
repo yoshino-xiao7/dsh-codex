@@ -10,15 +10,18 @@ import {
 import type { Config as HostConfig } from "dsh-codex-community"
 import {
   AuthorizationSettings,
+  ConnectionDiagnosticsSettings,
   CodexFastToggle,
   CodexSettings,
   createAuthorizationClient,
+  createConnectionDiagnosticsClient,
   createModelEnablementClient,
   createSessionPreferenceClient,
 } from "dsh-codex-community/client"
 import type {
   CodexAccountUsage,
   AuthorizationClient,
+  ConnectionDiagnosticsClient,
   RpcConnection,
   SessionPreferenceClient,
   UseCodexModelDirectory,
@@ -43,17 +46,23 @@ applyHost(ctx, config)
 ConfigSchema(config)
 
 const client: AuthorizationClient = createAuthorizationClient(connection)
+const diagnosticsClient: ConnectionDiagnosticsClient = createConnectionDiagnosticsClient(connection)
 const modelClient = createModelEnablementClient(connection)
 void client.describe()
+void diagnosticsClient.run("local")
+void diagnosticsClient.run("account")
 const accountUsage: Promise<CodexAccountUsage> = client.usage()
 const sessionPreferences = createSessionPreferenceClient(connection)
 const sessionPreference: SessionPreferenceClient = sessionPreferences.forSession("session-1")
 void sessionPreference.get()
+void sessionPreference.getForModel("gpt-5.6-sol")
 void sessionPreference.setFast(true)
+void sessionPreference.setTransport("websocket-cached")
 const useModelDirectory: UseCodexModelDirectory = (selector) => selector({
   current: { provider: "dsh-codex", model: "gpt-5.6-sol" },
 })
 AuthorizationSettings({ client, t: (key) => key })
+ConnectionDiagnosticsSettings({ client: diagnosticsClient, t: (key) => key })
 CodexFastToggle({
   session: { removed: false },
   useModelDirectory,
@@ -61,7 +70,7 @@ CodexFastToggle({
   selectModel: async () => undefined,
   t: (key) => key,
 })
-CodexSettings({ client, modelClient, t: (key) => key })
+CodexSettings({ client, diagnosticsClient, modelClient, t: (key) => key })
 
 const facts = inspectCodexFailure(failure)
 const quota = createQuotaObserver({ staleMs: 300_000 })

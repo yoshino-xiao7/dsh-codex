@@ -9,6 +9,8 @@ This plugin registers the Codex route, settings namespace, OAuth flow, session p
 ```text
 DSH Web settings ── loopback RPC ── AuthorizationBridge
         │                                  │
+        ├── on-demand checks ───── ConnectionDiagnostics
+        │                                  │
         │ page entry / manual refresh      │
         ▼                                  ▼
 AccountUsageReader ─────────────── CodexCredentialStore
@@ -18,7 +20,7 @@ Codex Web usage endpoint           ChatGPT OAuth grant
 
 Harness Agent Loop
         │
-        ├── SessionPreferences ── lightning button, Fast / transport
+        ├── SessionPreferences ── Fast button, Transport menu
         │
         ▼
 StreamResilience ── CodexRouteAdapter (`dsh-codex`)
@@ -55,9 +57,15 @@ Whenever the settings page mounts or the user clicks Refresh, the Host-side `Acc
 
 This endpoint is treated as a Web-backend compatibility boundary, not as a stable plugin public API. Requests have timeout, response-size, and numeric-range limits. A network failure, authentication failure, or schema change is never rendered as zero remaining usage and does not erase the latest verified reading. When no live reading can be retained, the page safely falls back to recent-request `QuotaObserver` state or “unknown” instead of inferring usage.
 
+## ConnectionDiagnostics
+
+Connection diagnostics use a dedicated `/dsh-codex-diagnostics` loopback RPC instead of expanding the authorization RPC. Settings keeps the surface collapsed and never runs it automatically. `local` reads only process-local route state, the model catalog, enabled counts, and local credential metadata; it performs no network access or OAuth refresh and owns no stream seam. `account` performs the same local checks and calls the existing `AccountUsageReader` exactly once. That reader may refresh OAuth under its normal contract, but it never sends a model request or consumes model usage.
+
+The browser report is fixed to a version, mode, overall outcome, observation time, and check array. A check contains only fixed IDs, fixed status codes, and bounded boolean, numeric, or enumerated facts. Tokens, complete grants, account IDs, raw responses, headers, arbitrary exception messages, and Provider objects never cross the boundary. An active model-request diagnostic is outside the `0.0.4` scope, avoiding real request side effects and false positives from stream recovery.
+
 ## SessionPreferences
 
-The lightning button to the left of the model selector and `/codex` update the same current-session state:
+The lightning button to the left of the model selector, the adjacent Transport menu, and `/codex` update the same current-session state:
 
 - the lightning button or `fast on|off` controls whether the Fast priority service tier is requested and defaults to off;
 - `transport` accepts `auto`, `sse`, `websocket`, or `websocket-cached` and defaults to `auto`;
@@ -74,6 +82,8 @@ This plugin's settings page uses `llm.discoverModels` to display requestable mod
 The settings page requires at least one selected model. Selecting all removes the `models` override only when entries have no custom fields, allowing the directory to follow pi-ai version updates. Partial selections, extra fields, and custom parameters retain explicit configuration. Catalog filtering affects discovery only; exact hidden models remain resolvable, so older sessions are not invalidated merely because a model is hidden.
 
 Model names, context windows, and input capabilities come from the installed provider catalog and are not presented as a dynamic account directory. `CodexRouteAdapter` projects reasoning controls from the verified subscription-Codex model catalog: it removes generic `Default`, `Off`, and `Minimal` entries, supplies each model's default, and exposes only Low through Max, which the Provider request layer can represent truthfully. Codex `Ultra` combines the highest plain reasoning level with proactive task delegation and is therefore an Agent orchestration mode. This plugin neither sends a fabricated `ultra` wire value nor silently degrades it to `Max`. Unknown models receive no inferred controls, and the route boundary rejects direct injection of an unverified effort.
+
+`codexModelCapabilityDescriptor` is the single Host projection for catalog fields and verified controls. It allowlists only model ID, name, context, maximum output, input modalities, reasoning levels, and Fast support, then returns an immutable snapshot. The Provider, route adapter, and per-conversation Fast query reuse the same source; the Web client no longer keeps a model-ID-based Fast table. Unknown models remain usable through the catalog but receive no inferred reasoning or Fast capability.
 
 ## ImagePolicy
 
@@ -112,4 +122,4 @@ This plugin's external route is `dsh-codex`, and its credential key is `dsh-code
 
 - Session compaction uses DSH's built-in automatic compaction and `/compact`; this plugin does not rewrite the compaction protocol.
 - Web search uses DSH tools and their corresponding credentials; it does not reuse ChatGPT OAuth.
-- Image generation or editing requires a separate model, credentials, and billing boundary and is not provided by `0.0.1`.
+- Image generation or editing requires a separate model, credentials, and billing boundary and is not currently provided by this plugin.

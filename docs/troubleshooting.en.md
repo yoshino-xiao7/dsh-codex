@@ -4,9 +4,9 @@
 
 ## `Image request maxPixels must be a positive integer.`
 
-The `0.0.1` bundle explicitly sets `requestImagePixelBudget: 4194304`, and the suite passes a real PNG through the DSH attachment seam. If the error remains:
+The current implementation explicitly sets `requestImagePixelBudget: 4194304`, and the suite passes a real PNG through the DSH attachment seam. If the error remains:
 
-1. confirm the exact `dsh-codex-community@0.0.1` artifact is running;
+1. confirm that the exact installed artifact is running. The current stable version is `dsh-codex-community@0.0.3`; do not mix files from another version into the same profile;
 2. confirm that the profile's `dsh-codex` configuration contains all three image budgets;
 3. check settings for zero, negative, fractional, or another explicitly invalid image field; omitted and `null` values receive safe defaults;
 4. run `npm test -- --test-name-pattern=maxPixels` or the complete `pnpm test`;
@@ -42,6 +42,15 @@ pi-ai may return only a generalized ChatGPT usage-limit message after discarding
 First confirm that GPT-5.4, GPT-5.5, GPT-5.6 Luna, Sol, or Terra is selected. The lightning button is unavailable for GPT-5.3 Codex Spark, GPT-5.4 mini, and unknown models; those models never receive the Fast service tier. Click the lightning button to the left of the model selector, or run `/codex status` and `/codex set fast on|off`, to inspect and change the current-session state. The toggle applies to the next request and returns to off after a process restart.
 
 Fast uses the official priority service tier, targets 1.5× speed, and consumes more usage. The plugin does not replay a failed request automatically on a lower tier. After disabling Fast, the user decides whether to send the request again.
+
+## Using connection diagnostics
+
+Open **Settings → OpenAI Codex → Connection diagnostics**. The section is collapsed by default and never runs automatically:
+
+- **Check this device** reads only the local route, model catalog, enabled count, and credential metadata. It performs no network access or OAuth refresh and sends no model request.
+- **Check account** reads usage once after the local checks. It may refresh OAuth under the existing credential contract when needed, but it sends no model request and consumes no model usage.
+
+Diagnostics show only fixed checks, status codes, and bounded facts. They never display tokens, account IDs, raw responses, or raw errors. They can separate local configuration problems from account-usage-read problems, but they do not prove that live text, image, tool, Fast, or a selected Transport request works; those still require a user-initiated request.
 
 ## Models or reasoning levels differ from expectations
 
