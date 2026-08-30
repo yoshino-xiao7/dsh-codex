@@ -4,7 +4,7 @@
 
 A Codex plugin for DeepSeek Harness with ChatGPT OAuth sign-in, Codex models, image input, and reliable streaming responses.
 
-> Current version: `0.0.3` technical preview, published under npm `latest` with a full GitHub Release. npm package: `dsh-codex-community`.
+> Current source candidate: `0.0.4` technical preview. npm `latest` and the latest full GitHub Release remain `0.0.3`. npm package: `dsh-codex-community`.
 
 ## Features
 
@@ -30,7 +30,7 @@ A Codex plugin for DeepSeek Harness with ChatGPT OAuth sign-in, Codex models, im
 Install an exact version:
 
 ```sh
-dsh plugin --profile web add dsh-codex-community@0.0.3
+dsh plugin --profile web add dsh-codex-community@0.0.4
 dsh web
 ```
 
@@ -58,7 +58,7 @@ Fast and transport preferences are kept only for the current session in the curr
 Update:
 
 ```sh
-dsh plugin --profile web update dsh-codex-community@0.0.3
+dsh plugin --profile web update dsh-codex-community@0.0.4
 dsh web
 ```
 
@@ -81,8 +81,8 @@ See [Troubleshooting](docs/troubleshooting.en.md) for diagnostic steps.
 ## Support boundaries
 
 - The `0.0.x` line does not promise a stable API; pin the exact version.
-- Linux, macOS, and Windows CI/profile smoke for `0.0.3` reached `3/3`; the accepted commit and platform evidence are in the [acceptance record](docs/releases/v0.0.3.acceptance.json).
-- Live OAuth, conversation, image, transport, and Fast network acceptance for `0.0.3` starts in a fresh record at `0/13 pending`. These unverified capabilities remain clearly disclosed and will be completed individually after publication.
+- Linux, macOS, and Windows CI/profile smoke for `0.0.4` will be recorded in the [acceptance record](docs/releases/v0.0.4.acceptance.json); evidence from an older release must not be reused.
+- Live OAuth, conversation, image, transport, and Fast network acceptance for `0.0.4` starts in a fresh record at `0/13 pending`. These unverified capabilities remain clearly disclosed and will be completed individually after publication.
 - The settings page reads usage through the Web-backend compatibility endpoint used by the official Codex client. If that endpoint is unavailable or malformed, the page retains the latest safe reading and falls back to request observation or an unknown state instead of presenting the error as zero remaining usage.
 - Model names, context windows, and maximum outputs come from the installed provider catalog. The reasoning picker exposes only subscription-Codex levels through Max that the Provider can fully implement, plus each model's verified default. Generic `Default`, `Off`, and `Minimal` entries are hidden, and agent-level `Ultra` is not disguised as a plain reasoning effort.
 - Fast is limited to GPT-5.4, GPT-5.5, GPT-5.6 Luna, Sol, and Terra and consumes more usage. Other models never receive the Fast service tier.
