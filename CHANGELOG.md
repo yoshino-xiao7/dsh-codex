@@ -3,30 +3,6 @@
 本项目遵循 Keep a Changelog 的结构；`0.0.x` 为技术预览。
 This project follows the Keep a Changelog structure; `0.0.x` is a technical preview.
 
-## [0.0.4] - Unreleased
-
-### 中文
-
-#### 新增
-
-- 当前会话选择 `dsh-codex` Provider 时，侧栏显示独立的五小时与每周剩余额度及各自重置时间。
-- 额度卡支持点击刷新、窄侧栏紧凑显示和完整无障碍标签；切换到其他 Provider 后不渲染。
-
-#### 修复
-
-- 复用既有 loopback usage RPC 与严格投影，不向浏览器暴露 OAuth 凭据或原始账户响应。
-
-### English
-
-#### Added
-
-- The sidebar now shows separate five-hour and weekly remaining limits with their reset times while the current conversation selects the `dsh-codex` Provider.
-- The quota card supports manual refresh, a compact rail presentation, and complete accessible labels, and does not render for other Providers.
-
-#### Fixed
-
-- Reuses the existing loopback usage RPC and strict projection so OAuth credentials and raw account responses never reach the browser.
-
 ## [0.0.3] - 2026-08-29
 
 ### 中文

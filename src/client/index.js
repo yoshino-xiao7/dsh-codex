@@ -75,7 +75,6 @@ window.__ModuleLoader__.load({
       quotaObservedAt: "观测时间",
       quotaResetAt: "观测到的重置时间",
       quotaNoReset: "未获得通过校验的重置时间；状态会在有限时间后自动回到未知。",
-      sidebarQuota: "Codex 使用额度",
       modelsTitle: "当前安装的 Codex 模型",
       modelsDescription: "选择在模型选择器中显示的 Codex 模型。名称、上下文和最大输出来自当前安装的 provider catalog；隐藏模型不影响已有会话。",
       modelsContextWindow: "上下文",
@@ -167,7 +166,6 @@ window.__ModuleLoader__.load({
       quotaObservedAt: "Observed at",
       quotaResetAt: "Observed reset time",
       quotaNoReset: "No reset time passed validation; this state automatically returns to unknown after a bounded interval.",
-      sidebarQuota: "Codex usage quota",
       modelsTitle: "Codex models in this installation",
       modelsDescription: "Choose which Codex models appear in the model selector. Names, context windows, and maximum output values come from the installed provider catalog; hidden models do not affect existing conversations.",
       modelsContextWindow: "Context",
@@ -1444,74 +1442,7 @@ window.__ModuleLoader__.load({
         h(ModelEnablementSettings, { client: modelClient, t }))
     }
 
-    function useCurrentProvider(ctx) {
-      const [provider, setProvider] = React.useState()
-      React.useEffect(() => {
-        let stopDirectory = () => {}
-        let active = true
-        const bind = () => {
-          stopDirectory(); stopDirectory = () => {}
-          const sessionId = ctx.sessions.list.getSnapshot().current
-          if (sessionId === undefined) return
-          let directory
-          try { directory = ctx.modelDirectories.directoryFor(sessionId) } catch { return }
-          const publish = () => {
-            const selected = directory.store.getSnapshot().current?.provider
-            if (active && selected !== undefined) setProvider(selected)
-          }
-          publish()
-          stopDirectory = directory.store.subscribe(publish)
-          if (directory.store.getSnapshot().current === null) void directory.load().catch(() => {})
-        }
-        const stopSessions = ctx.sessions.list.subscribe(bind)
-        bind()
-        return () => { active = false; stopSessions(); stopDirectory() }
-      }, [ctx])
-      return provider
-    }
-
-    function quotaWindows(usage) {
-      const windows = usage?.rateLimits?.flatMap((limit) => [limit.primary, limit.secondary]).filter(Boolean) ?? []
-      return {
-        fiveHour: windows.find((window) => window.windowDurationMins === 300),
-        weekly: windows.find((window) => window.windowDurationMins === 10_080),
-      }
-    }
-
-    function CodexSidebarQuota({ wide, ctx, client, t }) {
-      const provider = useCurrentProvider(ctx)
-      const [usage, setUsage] = React.useState()
-      const [busy, setBusy] = React.useState(false)
-      const refresh = React.useCallback(async () => {
-        setBusy(true)
-        try { setUsage(safeAccountUsage(await client.usage())) } catch { setUsage(undefined) }
-        finally { setBusy(false) }
-      }, [client])
-      React.useEffect(() => { if (provider === CODEX_PROVIDER) void refresh() }, [provider, refresh])
-      if (provider !== CODEX_PROVIDER) return null
-      const { fiveHour, weekly } = quotaWindows(usage)
-      const row = (window, label) => {
-        const remaining = window === undefined ? "—" : `${percentText(100 - window.usedPercent)}%`
-        const reset = window === undefined ? t("quotaUnknown") : formatResetDistance(window.resetsAt, t)
-        return { label, remaining, reset }
-      }
-      const five = row(fiveHour, t("quotaFiveHour"))
-      const week = row(weekly, t("quotaWeekly"))
-      const aria = `${five.label} ${five.remaining}, ${five.reset}; ${week.label} ${week.remaining}, ${week.reset}`
-      return h("button", {
-        type: "button", disabled: busy, onClick: () => void refresh(),
-        className: wide ? "dshCodexSidebarQuota" : "dshCodexSidebarQuotaRail", "aria-label": aria,
-      }, wide
-        ? h(React.Fragment, null,
-          h("span", { className: "dshCodexSidebarQuotaMark", "aria-hidden": "true" }, "C"),
-          h("span", { className: "dshCodexSidebarQuotaCopy" },
-            h("span", null, `${five.label} ${five.remaining}`, h("small", null, five.reset)),
-            h("span", null, `${week.label} ${week.remaining}`, h("small", null, week.reset))),
-          h("span", { "aria-hidden": "true" }, busy ? "…" : "↻"))
-        : h("span", null, `5h ${five.remaining}`))
-    }
-
-    const inject = ["slots", "locale", "connection", "settingsScope", "sessions", "modelDirectories"]
+    const inject = ["slots", "locale", "connection", "settingsScope"]
 
     function apply(ctx) {
       ctx.effect(installStyle, "dsh-codex: client styles")
@@ -1529,10 +1460,6 @@ window.__ModuleLoader__.load({
         locale: NS,
         inject: () => ({ client, modelClient, t }),
       }, CodexSettings))
-      ctx.slots.inject("sidebar.footer.action", () => ctx.slots.register({
-        name: "sidebar.footer.action", id: "codex-account-quota", order: 35, label: t("sidebarQuota"),
-        inject: () => ({ ctx, client, t }),
-      }, CodexSidebarQuota))
       ctx.inject?.(["slots", "modelDirectories"], (scope) => {
         scope.slots.inject("conversation.input.right", () => scope.slots.register({
           name: "conversation.input.right",
@@ -1743,7 +1670,6 @@ window.__ModuleLoader__.load({
         ".dshCodexNotices a{display:inline-block;max-width:100%;margin-top:8px;color:var(--dsw-alias-state-business-primary)}",
         ".dshCodexCode{display:flex;min-width:0;flex-wrap:wrap;align-items:center;gap:8px;margin-top:8px;color:var(--dsw-alias-label-secondary);font-size:12px}",
         ".dshCodexCode code{min-width:0;max-width:100%;overflow-wrap:anywhere;word-break:break-all;color:var(--dsw-alias-label-primary);font-family:inherit;font-size:14px;line-height:22px;user-select:all}",
-        ".dshCodexSidebarQuota{display:grid;width:100%;min-height:58px;margin:3px 0;padding:4px 3px;border:0;border-radius:8px;grid-template-columns:22px minmax(0,1fr) 16px;align-items:center;gap:10px;color:inherit;background:transparent;cursor:pointer;font:inherit;text-align:left}.dshCodexSidebarQuota:hover,.dshCodexSidebarQuotaRail:hover{background:var(--dsw-alias-interactive-bg-hover)}.dshCodexSidebarQuotaMark{font-weight:700;text-align:center}.dshCodexSidebarQuotaCopy{display:grid;min-width:0;gap:2px}.dshCodexSidebarQuotaCopy>span{display:flex;min-width:0;justify-content:space-between;gap:6px;font-size:11px}.dshCodexSidebarQuotaCopy small{overflow:hidden;color:var(--dsw-alias-label-tertiary);text-overflow:ellipsis;white-space:nowrap}.dshCodexSidebarQuotaRail{display:grid;width:36px;height:36px;margin:4px auto;border:0;border-radius:8px;place-items:center;color:inherit;background:transparent;cursor:pointer;font-size:9px;font-weight:700}",
         ".dshCodexPrompt{display:flex;flex-direction:column;gap:12px}",
         ".dshCodexPrompt label{display:flex;min-width:0;flex-direction:column;gap:8px}",
         ".dshCodexPrompt input,.dshCodexPrompt select{box-sizing:border-box;width:100%;min-width:0;height:38px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit;padding:0 10px}",
