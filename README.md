@@ -4,7 +4,7 @@
 
 面向 DeepSeek Harness 的 Codex 插件，提供 ChatGPT OAuth 登录、Codex 模型、图片输入和可靠的流式回复。
 
-> 当前版本：`1.0.0` 正式版（发布准备中，尚未发布）。npm 包名：`dsh-codex-community`；当前已发布版本仍为 `0.0.4`。
+> 当前版本：`1.0.0` 正式版，通过 npm `latest` 与正式 GitHub Release 发布。npm 包名：`dsh-codex-community`。
 
 ## 功能
 
@@ -32,7 +32,7 @@
 
 ## 安装
 
-`1.0.0` 尚未发布。开发完成并通过发布门禁后，请固定安装精确版本：
+请固定安装精确版本：
 
 ```sh
 dsh plugin --profile web add dsh-codex-community@1.0.0
@@ -88,7 +88,7 @@ dsh web
 
 ## 支持边界
 
-- `1.0.0` 仍在开发且尚未发布；Linux、macOS、Windows CI/profile smoke 与本版本真实账号验收均为待完成，状态见[验收草稿](docs/releases/v1.0.0.acceptance.json)；
+- `1.0.0` 的完整检查与 Linux、macOS、Windows CI/profile smoke 已按本版本候选 `3/3` 通过并获维护者批准；发布后真实账号验证从 `0/13` 开始，状态见[验收记录](docs/releases/v1.0.0.acceptance.json)；
 - `0.0.4` 的历史发布证据继续保留，但不会继承为 `1.0.0` 的验收结果；
 - 设置页额度通过官方 Codex 客户端使用的 Web 后端兼容接口读取；接口不可用或返回异常时保留最近的安全读数，并降级为请求观测或未知状态，不把错误伪装成零余额；
 - 模型名称、上下文、最大输出和可选的 Low 至 Max 推理档位来自当前安装 provider catalog 的实际语义；插件不会虚构或标注 catalog 未提供的默认档位，无显式 effort 时由当前 Provider 或服务端采用其默认行为。选择器不展示通用的 `Default`、`Off`、`Minimal`，也不把需要主动任务委派的 `Ultra` 伪装成普通推理档位；
