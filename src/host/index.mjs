@@ -5,6 +5,7 @@ import {
 } from "../internal/authorization-bridge.mjs"
 import { createAuthorizationCommitTracker } from "../internal/authorization-commit-tracker.mjs"
 import { registerCodexDiagnosticsRpc } from "../internal/codex-connection-diagnostics.mjs"
+import { registerCodexModelCapabilityRpc } from "../internal/codex-model-capability-bridge.mjs"
 import {
   Config,
   installCodexProviderRuntime,
@@ -78,7 +79,8 @@ export function apply(ctx, config = {}) {
       commitTracker: authorizationCommitTracker,
       quotaObserver,
     })
-    registerSessionPreferenceRpc(connectionCtx, sessionPreferences)
+    registerSessionPreferenceRpc(connectionCtx, sessionPreferences, sessionResources)
+    registerCodexModelCapabilityRpc(connectionCtx, runtime.getModelCapabilities)
     registerCodexDiagnosticsRpc(connectionCtx, runtime.connectionDiagnostics)
   })
   ctx.inject(["commands"], (commandCtx) => {
@@ -86,7 +88,9 @@ export function apply(ctx, config = {}) {
       resetSession: (sessionId) => sessionResources.reset(sessionId),
     })
     registerCodexLoginCommand(commandCtx, { commitTracker: authorizationCommitTracker })
-    registerCodexUsageCommand(commandCtx, quotaObserver)
+    registerCodexUsageCommand(commandCtx, quotaObserver, {
+      accountUsageReader: runtime.accountUsageReader,
+    })
   })
   ctx.inject(["tools", "attachments"], (imageCtx) => {
     const middleware = createReadImageUrlMiddleware(imageCtx)

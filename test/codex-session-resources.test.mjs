@@ -10,6 +10,7 @@ import { openaiCodexProvider } from "@earendil-works/pi-ai/providers/openai-code
 
 import { createCodexPiProvider } from "../src/internal/codex-pi-provider.mjs"
 import {
+  codexTransportHealth,
   codexTransportSessionId,
   createCodexSessionResourceManager,
 } from "../src/internal/codex-session-resources.mjs"
@@ -23,6 +24,59 @@ test("transport session ids are plugin-namespaced while preference ids stay unch
   assert.equal(manager.transportSessionId("session-a"), "dsh-codex:session-a")
 
   manager.dispose()
+})
+
+test("transport health exposes only safe counters and never raw debug details", async () => {
+  const sessionId = "session-health-probe"
+  const transportSessionId = codexTransportSessionId(sessionId)
+  const previousFetch = globalThis.fetch
+  const previousWebSocket = globalThis.WebSocket
+  const manager = createCodexSessionResourceManager()
+  const provider = createCodexPiProvider({
+    resolveTransportSessionId: (rawSessionId) => manager.transportSessionId(rawSessionId),
+  })
+  globalThis.WebSocket = FakeWebSocket
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    error: { code: "server_error", message: "sensitive websocket probe" },
+  }), {
+    status: 500,
+    headers: { "content-type": "application/json" },
+  })
+
+  try {
+    assert.deepEqual(manager.transportHealth(sessionId), { status: "idle" })
+    await failOneWebSocketRequest(sessionId, provider)
+    const health = manager.transportHealth(sessionId)
+    assert.equal(health.status, "observed")
+    // pi-ai records a connection failure before a response.create request is sent.
+    assert.equal(health.requests, 0)
+    assert.equal(health.websocketFailures, 1)
+    assert.equal(health.sseFallbacks, 1)
+    assert.equal(health.websocketFallbackActive, true)
+    assert.deepEqual(health, codexTransportHealth(sessionId))
+    assert.deepEqual(Object.keys(health).sort(), [
+      "cachedContextRequests",
+      "connectionsCreated",
+      "connectionsReused",
+      "deltaRequests",
+      "fullContextRequests",
+      "requests",
+      "sseFallbacks",
+      "status",
+      "websocketFailures",
+      "websocketFallbackActive",
+    ].sort())
+    assert.equal(JSON.stringify(health).includes("sensitive"), false)
+    assert.equal(JSON.stringify(health).includes("lastPreviousResponseId"), false)
+    assert.equal(JSON.stringify(health).includes("lastWebSocketError"), false)
+  } finally {
+    manager.dispose()
+    closeOpenAICodexWebSocketSessions(transportSessionId)
+    resetOpenAICodexWebSocketDebugStats(transportSessionId)
+    globalThis.fetch = previousFetch
+    if (previousWebSocket === undefined) delete globalThis.WebSocket
+    else globalThis.WebSocket = previousWebSocket
+  }
 })
 
 test("reset closes and clears public pi-ai WebSocket state for one session", async () => {

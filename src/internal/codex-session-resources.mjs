@@ -1,5 +1,6 @@
 import {
   closeOpenAICodexWebSocketSessions,
+  getOpenAICodexWebSocketDebugStats,
   resetOpenAICodexWebSocketDebugStats,
 } from "@earendil-works/pi-ai/api/openai-codex-responses"
 
@@ -22,6 +23,34 @@ function clearTransportSession(sessionId) {
   }
 }
 
+function safeTransportCount(value) {
+  return Number.isSafeInteger(value) && value >= 0 ? value : 0
+}
+
+/**
+ * Project pi-ai's process-local debug counters onto a small, content-free
+ * transport health contract. Response ids, input sizes, and raw errors never
+ * cross this seam.
+ */
+export function codexTransportHealth(sessionId) {
+  const resolved = codexTransportSessionId(sessionId)
+  if (resolved === undefined) return undefined
+  const stats = getOpenAICodexWebSocketDebugStats(resolved)
+  if (stats === undefined) return Object.freeze({ status: "idle" })
+  return Object.freeze({
+    status: "observed",
+    requests: safeTransportCount(stats.requests),
+    connectionsCreated: safeTransportCount(stats.connectionsCreated),
+    connectionsReused: safeTransportCount(stats.connectionsReused),
+    cachedContextRequests: safeTransportCount(stats.cachedContextRequests),
+    fullContextRequests: safeTransportCount(stats.fullContextRequests),
+    deltaRequests: safeTransportCount(stats.deltaRequests),
+    websocketFailures: safeTransportCount(stats.websocketFailures),
+    sseFallbacks: safeTransportCount(stats.sseFallbacks),
+    websocketFallbackActive: stats.websocketFallbackActive === true,
+  })
+}
+
 /** Own only the public pi-ai transport state created by this plugin instance. */
 export function createCodexSessionResourceManager() {
   let disposed = false
@@ -34,6 +63,11 @@ export function createCodexSessionResourceManager() {
       if (disposed) throw new Error("Codex session resources are disposed")
       owned.add(resolved)
       return resolved
+    },
+
+    transportHealth(sessionId) {
+      if (disposed) throw new Error("Codex session resources are disposed")
+      return codexTransportHealth(sessionId)
     },
 
     reset(sessionId) {

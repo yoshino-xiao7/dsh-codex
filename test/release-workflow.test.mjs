@@ -551,16 +551,18 @@ test("publication is safely repeatable and verifies every GitHub Release asset b
   assert.match(source, /if: steps\.registry\.outputs\.state == 'absent'/u)
   assert.match(source, /gh release edit/u)
   assert.match(source, /gh release create/u)
+  assert.equal((source.match(/--prerelease=false/gu) ?? []).length, 2)
   assert.match(source, /process\.stdout\.write\("published"\)/u)
   assert.match(source, /overwrite: true/u)
   assert.match(source, /if \[ "\$release_state" != "published" \]; then[\s\S]*?gh release upload/u)
-  assert.match(source, /gh release view "\$tag" --json assets,body,isDraft,name,tagName/u)
+  assert.match(source, /gh release view "\$tag" --json assets,body,isDraft,isPrerelease,name,tagName/u)
   assert.match(source, /normalize\(release\.body\) !== normalize\(notes\)/u)
   assert.match(source, /release\.tagName !== `v\$\{process\.env\.EXPECTED_VERSION\}`/u)
   assert.match(
     source,
     /release\.isDraft !== \(process\.env\.EXPECTED_DRAFT === "true"\)/u,
   )
+  assert.match(source, /release\.isPrerelease !== false/u)
   assert.match(source, /gh release download "\$tag" --dir "\$download_dir"/u)
   assert.match(source, /cmp "\$asset" "\$download_dir\/\$\(basename "\$asset"\)"/u)
   const publishOffset = source.indexOf('gh release edit "$tag" --draft=false')
@@ -586,7 +588,7 @@ test("draft recovery verifies its target and any existing tag before publication
   const beforePublication = source.slice(0, publishOffset)
   assert.match(
     beforePublication,
-    /gh release view "\$tag" --json isDraft,tagName,targetCommitish > release\/prepublish-release\.json/u,
+    /gh release view "\$tag" --json isDraft,isPrerelease,tagName,targetCommitish > release\/prepublish-release\.json/u,
   )
   assert.match(beforePublication, /release\.isDraft !== true/u)
   assert.match(
@@ -654,6 +656,8 @@ test("strict release verification covers every packed publication-state document
   assert.match(source, /publicationStatePaths/u)
   assert.match(source, /findUnexpectedPostAcceptanceChanges/u)
   assert.match(source, /assertPublicationAcceptanceRecord/u)
+  assert.match(source, /当前版本：\\`\$\{version\}\\` 正式版/u)
+  assert.match(source, /Current version: \\`\$\{version\}\\` stable release/u)
   assert.doesNotMatch(source, /assertNoPublishPlaceholders/u)
   assert.match(source, /test\/fixtures\/dsh-runtime\/package\.json/u)
   assert.match(source, /test\/fixtures\/dsh-runtime\/pnpm-lock\.yaml/u)

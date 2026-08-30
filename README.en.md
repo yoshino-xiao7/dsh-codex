@@ -4,7 +4,7 @@
 
 A Codex plugin for DeepSeek Harness with ChatGPT OAuth sign-in, Codex models, image input, and reliable streaming responses.
 
-> Current version: `0.0.4` technical preview, published under npm `latest` with a full GitHub Release. npm package: `dsh-codex-community`.
+> Current version: `1.0.0` stable release (in release preparation and not yet published). npm package: `dsh-codex-community`; the currently published version remains `0.0.4`.
 
 ## Features
 
@@ -15,12 +15,15 @@ A Codex plugin for DeepSeek Harness with ChatGPT OAuth sign-in, Codex models, im
 - provide valid pixel and byte budgets for request images, preventing invalid `maxPixels` values;
 - classify `AccountQuotaExceeded` as non-retryable account quota and show a sanitized reset time;
 - preserve safe partial text after a stream failure, while incomplete tool calls stop without replaying the request;
-- read the real five-hour and weekly usage limits whenever the settings page opens or is refreshed manually, with a safe fallback and no OAuth credentials exposed to the Web page;
-- present remaining usage in compact cards: five-hour limits show the exact reset time, while weekly limits show the exact time within 24 hours and otherwise use relative days;
+- actively refresh real five-hour and weekly limits when settings opens, the page becomes visible again, or a usage-window reset boundary is reached, with immediate refresh through the button or `/codex-usage refresh`; the weekly under-24-hour threshold changes local time display only;
+- present one consistent remaining-usage meaning in compact cards, including the safe plan type and reset time; five-hour limits always use exact time and weekly limits do so inside 24 hours;
 - list selected models first in settings and collapse unselected models by default, with compact `K` labels taken from the current provider catalog for context and maximum output;
 - use the lightning button to the left of the model selector for official Fast (1.5×), and use the adjacent graphical button or `/codex` to select Auto, SSE, WebSocket, or cached WebSocket transport for the current conversation;
-- read catalog fields, verified reasoning levels, and Fast support through one Host capability interface instead of maintaining a second model table in the Web client;
-- run an on-demand local or account check from collapsed connection diagnostics. The local check is fully offline; the account check reads usage and refreshes OAuth only when needed. Neither sends a model request or consumes model usage.
+- read input modalities, selectable reasoning efforts actually exposed by the installed provider catalog, and Fast support through an independent local loopback-only read-only Host RPC, merge them with Harness's generic catalog, and omit badges for unavailable or unknown capabilities instead of inferring them;
+- choose current-session reply verbosity (low, medium, or high) and reasoning-summary style (auto, concise, detailed, or off), effective on the next request;
+- copy the OAuth sign-in link and verification code separately; copying occurs only after an explicit user click and does not log short-lived credentials;
+- run an on-demand local or account check from collapsed connection diagnostics and copy a sanitized report containing only fixed statuses and bounded facts;
+- inspect sanitized per-conversation transport health, including request count, connection reuse, delta context, and SSE fallbacks.
 
 ## Requirements
 
@@ -29,10 +32,10 @@ A Codex plugin for DeepSeek Harness with ChatGPT OAuth sign-in, Codex models, im
 
 ## Installation
 
-Install an exact version:
+`1.0.0` is not published yet. After development and release gates complete, install the exact version:
 
 ```sh
-dsh plugin --profile web add dsh-codex-community@0.0.4
+dsh plugin --profile web add dsh-codex-community@1.0.0
 dsh web
 ```
 
@@ -48,19 +51,22 @@ Available commands:
 /codex-login status
 /codex-login cancel
 /codex-login logout
-/codex-usage
+/codex-usage status
+/codex-usage refresh
 /codex status
 /codex reset
 /codex set fast on|off
 /codex set transport auto|sse|websocket|websocket-cached
+/codex set verbosity low|medium|high
+/codex set summary auto|concise|detailed|off
 ```
 
-Fast and transport preferences are kept only for the current session in the current process; they are not persisted and return to their defaults after a process restart. For GPT-5.4, GPT-5.5, GPT-5.6 Luna, Sol, and Terra, Fast uses the official priority service tier starting with the next request, targets 1.5× speed, and consumes more usage. Turning it off restores standard speed on the next request. A failed request is not automatically replayed on a lower tier.
+Fast, transport, reply verbosity, and reasoning-summary preferences live only in the current session and process. Restart restores off, Auto, low verbosity, and automatic summary respectively. Every change applies to the next request. For GPT-5.4, GPT-5.5, GPT-5.6 Luna, Sol, and Terra, Fast uses the official priority service tier, targets 1.5× speed, and consumes more usage. A failed request is not replayed automatically on a lower tier.
 
 Update:
 
 ```sh
-dsh plugin --profile web update dsh-codex-community@0.0.4
+dsh plugin --profile web update dsh-codex-community@1.0.0
 dsh web
 ```
 
@@ -82,11 +88,10 @@ See [Troubleshooting](docs/troubleshooting.en.md) for diagnostic steps.
 
 ## Support boundaries
 
-- The `0.0.x` line does not promise a stable API; pin the exact version.
-- Linux, macOS, and Windows CI/profile smoke for `0.0.4` reached `3/3`; the accepted commit and platform evidence are in the [acceptance record](docs/releases/v0.0.4.acceptance.json).
-- Live OAuth, conversation, image, transport, and Fast network acceptance for `0.0.4` starts in a fresh record at `0/13 pending`. These unverified capabilities remain clearly disclosed and will be completed individually post-release.
+- `1.0.0` remains in development and is not published. Its Linux, macOS, and Windows CI/profile smoke plus live-account acceptance are all pending in the [acceptance draft](docs/releases/v1.0.0.acceptance.json).
+- Historical `0.0.4` release evidence remains available but is not inherited as `1.0.0` acceptance.
 - The settings page reads usage through the Web-backend compatibility endpoint used by the official Codex client. If that endpoint is unavailable or malformed, the page retains the latest safe reading and falls back to request observation or an unknown state instead of presenting the error as zero remaining usage.
-- Model names, context windows, and maximum outputs come from the installed provider catalog. The reasoning picker exposes only subscription-Codex levels through Max that the Provider can fully implement, plus each model's verified default. Generic `Default`, `Off`, and `Minimal` entries are hidden, and agent-level `Ultra` is not disguised as a plain reasoning effort.
+- Model names, context windows, maximum outputs, and selectable Low-through-Max reasoning efforts follow the actual semantics of the installed provider catalog. The plugin neither invents nor labels a default effort that the catalog does not provide; when no effort is explicit, the current Provider or service applies its default behavior. Generic `Default`, `Off`, and `Minimal` entries are hidden, and agent-level `Ultra` is not disguised as a plain reasoning effort.
 - Fast is limited to GPT-5.4, GPT-5.5, GPT-5.6 Luna, Sol, and Terra and consumes more usage. Other models never receive the Fast service tier.
 - Connection diagnostics do not perform an active model request. The local check is offline and the account check uses only the existing usage-reader boundary, so neither replaces live conversation, image, tool, or per-transport acceptance.
 - Image generation and editing are not provided.

@@ -1,5 +1,7 @@
-const USAGE = "用法：/codex [status|reset|set fast on|off|set transport auto|sse|websocket|websocket-cached] / Usage: /codex [status|reset|set fast on|off|set transport auto|sse|websocket|websocket-cached]"
+const USAGE = "用法：/codex [status|reset|set fast on|off|set transport auto|sse|websocket|websocket-cached|set verbosity low|medium|high|set summary auto|concise|detailed|off] / Usage: /codex [status|reset|set fast on|off|set transport auto|sse|websocket|websocket-cached|set verbosity low|medium|high|set summary auto|concise|detailed|off]"
 const TRANSPORTS = new Set(["auto", "sse", "websocket", "websocket-cached"])
+const TEXT_VERBOSITIES = new Set(["low", "medium", "high"])
+const REASONING_SUMMARIES = new Set(["auto", "concise", "detailed", "off"])
 
 /** Register the TUI/Web command surface for process-local session preferences. */
 export function registerCodexSessionCommand(ctx, preferences, options = {}) {
@@ -8,7 +10,7 @@ export function registerCodexSessionCommand(ctx, preferences, options = {}) {
   return ctx.commands.register({
     name: "codex",
     description: "管理当前会话的 Codex 请求偏好 / Manage Codex request preferences for this session",
-    input: { hint: "[status|reset|set fast on|off|set transport auto|sse|websocket|websocket-cached]" },
+    input: { hint: "[status|reset|set fast on|off|set transport ...|set verbosity ...|set summary ...]" },
     recordInput: false,
     handler: async ({ rawInput, agent }) => {
       const parts = String(rawInput).trim().split(/\s+/u).filter(Boolean)
@@ -29,7 +31,18 @@ export function registerCodexSessionCommand(ctx, preferences, options = {}) {
         }
         if (action.length === 3 && action[0] === "set" && action[1] === "transport") {
           if (!TRANSPORTS.has(action[2])) return { kind: "error", text: USAGE }
-          return success(preferences.configure(String(agent.id), { transport: action[2] }))
+          const sessionId = String(agent.id)
+          const snapshot = preferences.configure(sessionId, { transport: action[2] })
+          resetSession(sessionId)
+          return success(snapshot)
+        }
+        if (action.length === 3 && action[0] === "set" && action[1] === "verbosity") {
+          if (!TEXT_VERBOSITIES.has(action[2])) return { kind: "error", text: USAGE }
+          return success(preferences.configure(String(agent.id), { textVerbosity: action[2] }))
+        }
+        if (action.length === 3 && action[0] === "set" && action[1] === "summary") {
+          if (!REASONING_SUMMARIES.has(action[2])) return { kind: "error", text: USAGE }
+          return success(preferences.configure(String(agent.id), { reasoningSummary: action[2] }))
         }
         return { kind: "error", text: USAGE }
       } catch {
@@ -47,6 +60,6 @@ function success(snapshot, prefix = "") {
   const fastZh = snapshot.fast ? "开启" : "关闭"
   return {
     kind: "success",
-    text: `${prefix}Fast: ${fast} · Transport: ${snapshot.transport} / Fast：${fastZh} · 传输：${snapshot.transport}`,
+    text: `${prefix}Fast: ${fast} · Transport: ${snapshot.transport} · Text verbosity: ${snapshot.textVerbosity} · Reasoning summary: ${snapshot.reasoningSummary} / Fast：${fastZh} · 传输：${snapshot.transport} · 回复详细度：${snapshot.textVerbosity} · 推理摘要：${snapshot.reasoningSummary}`,
   }
 }

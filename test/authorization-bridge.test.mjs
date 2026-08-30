@@ -556,8 +556,11 @@ test("codex-login command refuses cancellation after credential commit starts", 
   assert.equal(cancelCalls, 0)
 })
 
-test("codex-usage reports only recent observations and rejects unknown input", async () => {
+test("codex-usage keeps status offline and refreshes normalized account usage without a model request", async () => {
   let command
+  let accountReads = 0
+  let receivedSignal
+  const secret = "usage-command-secret-must-not-cross-output"
   const context = {
     commands: { register: (spec) => { command = spec } },
   }
@@ -567,19 +570,88 @@ test("codex-usage reports only recent observations and rejects unknown input", a
       observedAt: Date.parse("2026-08-27T08:00:00.000Z"),
       resetAt: Date.parse("2026-08-27T08:44:34.000Z"),
     }),
+  }, {
+    accountUsageReader: {
+      async read({ signal }) {
+        accountReads += 1
+        receivedSignal = signal
+        return {
+          observedAt: Date.parse("2026-08-27T08:00:00.000Z"),
+          planType: secret,
+          rateLimits: [{
+            limitId: `codex-${secret}`,
+            primary: {
+              usedPercent: 12.5,
+              windowDurationMins: 300,
+              resetsAt: Date.parse("2026-08-27T13:00:00.000Z"),
+            },
+            secondary: {
+              usedPercent: 7,
+              windowDurationMins: 10_080,
+              resetsAt: Date.parse("2026-09-03T08:00:00.000Z"),
+            },
+          }, {
+            limitId: `additional-${secret}`,
+            limitName: "Code review",
+            primary: {
+              usedPercent: 40,
+              windowDurationMins: 60,
+              resetsAt: Date.parse("2026-08-27T09:00:00.000Z"),
+            },
+          }],
+          rawBody: secret,
+        }
+      },
+    },
   })
 
   assert.equal(command.name, "codex-usage")
   assert.equal(command.recordInput, false)
-  assert.equal(command.input.hint, "[status]")
+  assert.equal(command.input.hint, "[status|refresh]")
   const status = await command.handler({ rawInput: "status" })
   assert.equal(status.kind, "success")
   assert.match(status.text, /2026-08-27T08:44:34\.000Z/u)
   assert.doesNotMatch(status.text, /request id|token|secret/iu)
+  assert.equal(accountReads, 0)
+
+  const signal = new AbortController().signal
+  const refresh = await command.handler({ rawInput: "refresh", signal })
+  assert.equal(refresh.kind, "success")
+  assert.equal(accountReads, 1)
+  assert.equal(receivedSignal, signal)
+  assert.match(refresh.text, /Codex 账户额度 \/ Codex account usage/u)
+  assert.match(refresh.text, /5 小时额度.*12\.5%.*87\.5%.*5-hour limit/iu)
+  assert.match(refresh.text, /每周额度.*7%.*93%.*Weekly limit/iu)
+  assert.match(refresh.text, /附加额度 1（Code review） \/ Additional limit 1 \(Code review\)/u)
+  assert.match(refresh.text, /60 分钟额度.*40%.*60%.*60-minute limit/iu)
+  assert.match(refresh.text, /2026-08-27T08:00:00\.000Z/u)
+  assert.doesNotMatch(refresh.text, new RegExp(secret, "u"))
 
   const invalid = await command.handler({ rawInput: PROMPT_SECRET })
   assert.equal(invalid.kind, "error")
   assert.doesNotMatch(invalid.text, new RegExp(PROMPT_SECRET, "u"))
+})
+
+test("codex-usage refresh replaces account reader failures with a fixed bilingual error", async () => {
+  let command
+  const secret = "usage-refresh-error-secret"
+  registerCodexUsageCommand({
+    commands: { register: (spec) => { command = spec } },
+  }, {
+    snapshot: () => ({ status: "unknown" }),
+  }, {
+    accountUsageReader: {
+      read: async () => {
+        throw Object.assign(new Error(secret), { responseBody: secret })
+      },
+    },
+  })
+
+  const result = await command.handler({ rawInput: "refresh", signal: new AbortController().signal })
+  assert.equal(result.kind, "error")
+  assert.match(result.text, /暂时无法刷新 Codex 账户额度/u)
+  assert.match(result.text, /temporarily unable to refresh Codex account usage/iu)
+  assert.doesNotMatch(result.text, new RegExp(secret, "u"))
 })
 
 async function waitUntilDone(bridge, attemptId, after) {

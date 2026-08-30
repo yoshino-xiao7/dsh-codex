@@ -1,3 +1,5 @@
+import { getSupportedThinkingLevels } from "@earendil-works/pi-ai"
+
 const EFFORT_NAMES = Object.freeze({
   low: "Low",
   medium: "Medium",
@@ -5,51 +7,41 @@ const EFFORT_NAMES = Object.freeze({
   xhigh: "Xhigh",
   max: "Max",
 })
+const REASONING_LEVELS = Object.freeze(Object.keys(EFFORT_NAMES))
 
 const MODEL_MODALITIES = new Set(["text", "image"])
 
 const MODEL_CAPABILITIES = new Map([
   ["gpt-5.3-codex-spark", modelCapability({
-    defaultReasoningEffort: "high",
     reasoningEfforts: ["low", "medium", "high", "xhigh"],
   })],
   ["gpt-5.4", modelCapability({
-    defaultReasoningEffort: "medium",
     reasoningEfforts: ["low", "medium", "high", "xhigh"],
     fast: true,
   })],
   ["gpt-5.4-mini", modelCapability({
-    defaultReasoningEffort: "medium",
     reasoningEfforts: ["low", "medium", "high", "xhigh"],
   })],
   ["gpt-5.5", modelCapability({
-    defaultReasoningEffort: "medium",
     reasoningEfforts: ["low", "medium", "high", "xhigh"],
     fast: true,
   })],
   ["gpt-5.6-luna", modelCapability({
-    defaultReasoningEffort: "medium",
     reasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
     fast: true,
   })],
   ["gpt-5.6-sol", modelCapability({
-    defaultReasoningEffort: "low",
     reasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
     fast: true,
   })],
   ["gpt-5.6-terra", modelCapability({
-    defaultReasoningEffort: "medium",
     reasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
     fast: true,
   })],
 ])
 
-function modelCapability({ defaultReasoningEffort, reasoningEfforts, fast = false }) {
-  if (!reasoningEfforts.includes(defaultReasoningEffort)) {
-    throw new TypeError("defaultReasoningEffort must be included in reasoningEfforts")
-  }
+function modelCapability({ reasoningEfforts, fast = false }) {
   return Object.freeze({
-    defaultReasoningEffort,
     reasoningEfforts: Object.freeze(reasoningEfforts.map((id) => Object.freeze({
       id,
       name: EFFORT_NAMES[id],
@@ -72,9 +64,9 @@ export function codexModelCapability(modelId) {
  * seam; endpoint, pricing, compatibility, credentials, and other provider
  * implementation details are deliberately discarded.
  *
- * Reasoning and Fast are added only for models in the verified controls table.
- * An unknown future model remains usable through the provider catalog without
- * gaining inferred controls.
+ * Reasoning is copied only from the installed catalog's explicit map (or an
+ * already-normalized adapter descriptor). Fast remains an explicit verified
+ * allowlist. Unknown future models never gain inferred controls.
  */
 export function codexModelCapabilityDescriptor(model) {
   if (model === null || typeof model !== "object" || Array.isArray(model)) {
@@ -86,6 +78,9 @@ export function codexModelCapabilityDescriptor(model) {
 
   const capability = MODEL_CAPABILITIES.get(model.id)
   const inputModalities = catalogModalities(model)
+  const reasoning = capability === undefined
+    ? undefined
+    : catalogReasoning(model, capability)
   return Object.freeze({
     id: model.id,
     ...(typeof model.name === "string" && model.name.trim().length > 0
@@ -98,15 +93,8 @@ export function codexModelCapabilityDescriptor(model) {
       ? { maxTokens: model.maxTokens }
       : {}),
     ...(inputModalities === undefined ? {} : { inputModalities }),
-    ...(capability === undefined
-      ? {}
-      : {
-          reasoning: Object.freeze({
-            efforts: capability.reasoningEfforts,
-            defaultEffort: capability.defaultReasoningEffort,
-          }),
-          fast: capability.fast,
-        }),
+    ...(reasoning === undefined ? {} : { reasoning }),
+    ...(capability === undefined ? {} : { fast: capability.fast }),
   })
 }
 
@@ -153,4 +141,53 @@ function catalogModalities(model) {
       : undefined
   if (source === undefined) return undefined
   return Object.freeze([...new Set(source.filter((value) => MODEL_MODALITIES.has(value)))])
+}
+
+function catalogReasoning(model, capability) {
+  const allowed = new Set(capability.reasoningEfforts.map(({ id }) => id))
+  if (model.reasoning !== null && typeof model.reasoning === "object" && !Array.isArray(model.reasoning)) {
+    return copiedReasoning(model.reasoning, allowed)
+  }
+  if (model.reasoning !== true) return undefined
+  const supported = new Set(getSupportedThinkingLevels(model))
+  const efforts = REASONING_LEVELS
+    .filter((id) => allowed.has(id) && supported.has(id))
+    .map((id) => Object.freeze({ id, name: EFFORT_NAMES[id] }))
+  return efforts.length === 0
+    ? undefined
+    : Object.freeze({ efforts: Object.freeze(efforts) })
+}
+
+function copiedReasoning(value, allowed) {
+  if (!Array.isArray(value.efforts) || value.efforts.length < 1 || value.efforts.length > 8) {
+    return undefined
+  }
+  const seen = new Set()
+  const efforts = []
+  for (const effort of value.efforts) {
+    if (
+      !plainObject(effort)
+      || typeof effort.id !== "string"
+      || !/^[a-z][a-z0-9-]{0,31}$/u.test(effort.id)
+      || typeof effort.name !== "string"
+      || effort.name.length < 1
+      || effort.name.length > 32
+    ) return undefined
+    if (!allowed.has(effort.id) || seen.has(effort.id)) continue
+    seen.add(effort.id)
+    efforts.push(Object.freeze({ id: effort.id, name: EFFORT_NAMES[effort.id] }))
+  }
+  if (efforts.length === 0) return undefined
+  return Object.freeze({
+    efforts: Object.freeze(efforts),
+    ...(value.defaultEffort === undefined || !seen.has(value.defaultEffort)
+      ? {}
+      : { defaultEffort: value.defaultEffort }),
+  })
+}
+
+function plainObject(value) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false
+  const prototype = Object.getPrototypeOf(value)
+  return prototype === Object.prototype || prototype === null
 }

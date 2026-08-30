@@ -38,7 +38,7 @@ test("same-model replay maps the external history source and keeps canonical sta
   assert.deepEqual(chunks.at(-1).replayState, replayState)
 })
 
-test("exposes the verified Codex reasoning controls and model-specific default", async () => {
+test("exposes the installed catalog reasoning controls without inventing a default", async () => {
   const delegate = fakeCanonicalAdapter()
   const adapter = new CodexRouteAdapter(delegate)
 
@@ -50,7 +50,7 @@ test("exposes the verified Codex reasoning controls and model-specific default",
     "xhigh",
     "max",
   ])
-  assert.equal(sol.reasoning.defaultEffort, "low")
+  assert.equal(Object.hasOwn(sol.reasoning, "defaultEffort"), false)
 
   const spark = await adapter.resolveModel(CODEX_ROUTE_ID, "gpt-5.3-codex-spark")
   assert.deepEqual(spark.reasoning.efforts.map(({ id }) => id), [
@@ -59,7 +59,7 @@ test("exposes the verified Codex reasoning controls and model-specific default",
     "high",
     "xhigh",
   ])
-  assert.equal(spark.reasoning.defaultEffort, "high")
+  assert.equal(Object.hasOwn(spark.reasoning, "defaultEffort"), false)
 
   const unknown = await adapter.resolveModel(CODEX_ROUTE_ID, "gpt-future")
   assert.equal(unknown.reasoning, undefined)
@@ -105,26 +105,12 @@ test("projects every outward model row through the client-safe allowlist", async
     id: "gpt-5.4",
     name: "GPT-5.4",
     inputModalities: ["text", "image"],
-    reasoning: {
-      efforts: [
-        { id: "low", name: "Low" },
-        { id: "medium", name: "Medium" },
-        { id: "high", name: "High" },
-        { id: "xhigh", name: "Xhigh" },
-      ],
-      defaultEffort: "medium",
-    },
   })
   for (const outward of [listed, resolved, prepared.model]) {
     assert.equal(JSON.stringify(outward).includes("must-not-leak"), false)
     assert.equal("apiKey" in outward, false)
     assert.equal("headers" in outward, false)
-    assert.deepEqual(outward.reasoning.efforts.map(({ id }) => id), [
-      "low",
-      "medium",
-      "high",
-      "xhigh",
-    ])
+    assert.equal(outward.reasoning, undefined)
   }
   assert.deepEqual(resolved.context, { contextWindow: 272_000 })
   assert.equal(resolved.defaultMaxTokens, 128_000)
@@ -282,16 +268,27 @@ function fakeCanonicalAdapter() {
       return [{ provider, id: "gpt-5.4", name: "GPT-5.4" }]
     },
     async resolveModel(provider, model) {
+      const effortIds = model === "gpt-future"
+        ? []
+        : model.startsWith("gpt-5.6-")
+          ? ["low", "medium", "high", "xhigh", "max"]
+          : ["low", "medium", "high", "xhigh"]
       return {
         provider,
         id: model,
         name: model,
-        reasoning: {
-          efforts: [
-            { id: "off", name: "Off" },
-            { id: "minimal", name: "Minimal" },
-          ],
-        },
+        ...(effortIds.length === 0
+          ? {}
+          : {
+              reasoning: {
+                efforts: effortIds.map((id) => ({
+                  id,
+                  name: id === "xhigh"
+                    ? "Xhigh"
+                    : `${id[0].toUpperCase()}${id.slice(1)}`,
+                })),
+              },
+            }),
       }
     },
     async prepareCall(provider, model) {

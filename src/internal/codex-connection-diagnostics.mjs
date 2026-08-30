@@ -99,7 +99,7 @@ export function createCodexConnectionDiagnostics(options) {
           return report(mode, "cancelled", checks, clock)
         }
         checks.push(check("account-usage", "fail", {
-          code: publicAccountUsageFailureCode(error?.code),
+          code: publicAccountUsageFailureCode(error),
         }))
       }
     }
@@ -239,12 +239,27 @@ function accountUsageCheck(value) {
   return check("account-usage", "pass", { code: "account-usage-ready", facts })
 }
 
-function publicAccountUsageFailureCode(code) {
+function publicAccountUsageFailureCode(error) {
+  let code
+  let status
+  try {
+    code = error?.code
+    status = error?.status
+  } catch {
+    return "account-usage-unavailable"
+  }
   switch (code) {
     case "AUTH_UNAVAILABLE": return "account-auth-unavailable"
     case "NETWORK": return "account-network-unavailable"
     case "TIMEOUT": return "account-timeout"
-    case "HTTP_STATUS": return "account-http-error"
+    case "HTTP_STATUS": {
+      if (status === 401 || status === 403) return "account-http-auth-error"
+      if (status === 429) return "account-http-rate-limited"
+      if (Number.isInteger(status) && status >= 500 && status <= 599) {
+        return "account-http-server-error"
+      }
+      return "account-http-error"
+    }
     case "BODY_TOO_LARGE":
     case "INVALID_CONTENT_TYPE":
     case "INVALID_RESPONSE":

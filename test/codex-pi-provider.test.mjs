@@ -174,6 +174,22 @@ test("session transport overrides the stream option before provider dispatch", a
   assert.deepEqual(actual, expected)
 })
 
+test("passes session reply verbosity and reasoning summary to the Codex request", async () => {
+  const wrapped = createCodexPiProvider({
+    resolveSessionPreferences: () => ({
+      fast: false,
+      transport: "sse",
+      textVerbosity: "high",
+      reasoningSummary: "detailed",
+    }),
+  })
+
+  const payload = await capturePayload(wrapped, { sessionId: "session-output-controls" })
+
+  assert.equal(payload.text?.verbosity, "high")
+  assert.equal(payload.reasoning?.summary, "detailed")
+})
+
 test("supports a static priority tier when no session resolver is installed", async () => {
   const wrapped = createCodexPiProvider({ serviceTier: "priority" })
 
@@ -227,5 +243,29 @@ test("rejects invalid factory options and session preferences", () => {
       {},
     ),
     /session preferences transport is invalid/u,
+  )
+
+  const invalidTextVerbosity = createCodexPiProvider({
+    resolveSessionPreferences: () => ({ fast: false, textVerbosity: "verbose" }),
+  })
+  assert.throws(
+    () => invalidTextVerbosity.streamSimple(
+      invalidTextVerbosity.getModels()[0],
+      CONTEXT,
+      {},
+    ),
+    /session preferences textVerbosity is invalid/u,
+  )
+
+  const invalidReasoningSummary = createCodexPiProvider({
+    resolveSessionPreferences: () => ({ fast: false, reasoningSummary: "full" }),
+  })
+  assert.throws(
+    () => invalidReasoningSummary.streamSimple(
+      invalidReasoningSummary.getModels()[0],
+      CONTEXT,
+      {},
+    ),
+    /session preferences reasoningSummary is invalid/u,
   )
 })

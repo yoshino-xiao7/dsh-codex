@@ -26,6 +26,8 @@ const TRANSPORTS = new Set([
   "websocket",
   "websocket-cached",
 ])
+const TEXT_VERBOSITIES = new Set(["low", "medium", "high"])
+const REASONING_SUMMARIES = new Set(["auto", "concise", "detailed", "off"])
 
 function plainObject(value) {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return false
@@ -56,12 +58,22 @@ function validateFactoryOptions(options) {
 }
 
 function resolveSessionPreferenceOptions(resolver, sessionId) {
-  const preferences = resolver(sessionId) ?? { fast: false }
+  const preferences = resolver(sessionId) ?? {
+    fast: false,
+    transport: "auto",
+    textVerbosity: "low",
+    reasoningSummary: "auto",
+  }
   if (!plainObject(preferences)) {
     throw new TypeError("session preferences must be a plain object")
   }
   for (const key of Object.keys(preferences)) {
-    if (key !== "fast" && key !== "transport") {
+    if (
+      key !== "fast"
+      && key !== "transport"
+      && key !== "textVerbosity"
+      && key !== "reasoningSummary"
+    ) {
       throw new TypeError(`unknown session preference: ${key}`)
     }
   }
@@ -73,7 +85,15 @@ function resolveSessionPreferenceOptions(resolver, sessionId) {
   if (transport !== undefined && !TRANSPORTS.has(transport)) {
     throw new TypeError("session preferences transport is invalid")
   }
-  return { fast, transport }
+  const textVerbosity = preferences.textVerbosity ?? "low"
+  if (!TEXT_VERBOSITIES.has(textVerbosity)) {
+    throw new TypeError("session preferences textVerbosity is invalid")
+  }
+  const reasoningSummary = preferences.reasoningSummary ?? "auto"
+  if (!REASONING_SUMMARIES.has(reasoningSummary)) {
+    throw new TypeError("session preferences reasoningSummary is invalid")
+  }
+  return { fast, transport, textVerbosity, reasoningSummary }
 }
 
 function reasoningOptions(model, reasoning) {
@@ -158,6 +178,12 @@ export function createCodexPiProvider(options = {}) {
           ...(sessionPreferences?.transport === undefined
             ? {}
             : { transport: sessionPreferences.transport }),
+          ...(sessionPreferences === undefined
+            ? {}
+            : {
+                textVerbosity: sessionPreferences.textVerbosity,
+                reasoningSummary: sessionPreferences.reasoningSummary,
+              }),
         })
       },
     },

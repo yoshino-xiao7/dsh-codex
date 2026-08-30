@@ -35,12 +35,27 @@ test("/codex reports and changes Fast for only the receiving session", async () 
   const enabled = await invoke("set fast on")
   assert.equal(enabled.kind, "success")
   assert.match(enabled.text, /Fast: on/u)
-  assert.deepEqual(preferences.resolve("session-a"), { fast: true, transport: "auto" })
-  assert.deepEqual(preferences.resolve("session-b"), { fast: false, transport: "auto" })
+  assert.deepEqual(preferences.resolve("session-a"), {
+    fast: true,
+    transport: "auto",
+    textVerbosity: "low",
+    reasoningSummary: "auto",
+  })
+  assert.deepEqual(preferences.resolve("session-b"), {
+    fast: false,
+    transport: "auto",
+    textVerbosity: "low",
+    reasoningSummary: "auto",
+  })
 
   const disabled = await invoke("set fast off")
   assert.equal(disabled.kind, "success")
-  assert.deepEqual(preferences.resolve("session-a"), { fast: false, transport: "auto" })
+  assert.deepEqual(preferences.resolve("session-a"), {
+    fast: false,
+    transport: "auto",
+    textVerbosity: "low",
+    reasoningSummary: "auto",
+  })
 })
 
 test("/codex controls the current session transport and supports reset", async () => {
@@ -50,12 +65,37 @@ test("/codex controls the current session transport and supports reset", async (
   assert.deepEqual(preferences.resolve("session-a"), {
     fast: false,
     transport: "websocket-cached",
+    textVerbosity: "low",
+    reasoningSummary: "auto",
   })
+  assert.deepEqual(resets, ["session-a"])
   assert.match((await invoke("status")).text, /Transport: websocket-cached/u)
 
   assert.equal((await invoke("reset")).kind, "success")
-  assert.deepEqual(preferences.resolve("session-a"), { fast: false, transport: "auto" })
-  assert.deepEqual(resets, ["session-a"])
+  assert.deepEqual(preferences.resolve("session-a"), {
+    fast: false,
+    transport: "auto",
+    textVerbosity: "low",
+    reasoningSummary: "auto",
+  })
+  assert.deepEqual(resets, ["session-a", "session-a"])
+})
+
+test("/codex controls reply verbosity and reasoning summaries for the current session", async () => {
+  const { invoke, preferences } = commandFixture()
+
+  assert.equal((await invoke("set verbosity high")).kind, "success")
+  assert.equal((await invoke("set summary concise")).kind, "success")
+  assert.deepEqual(preferences.resolve("session-a"), {
+    fast: false,
+    transport: "auto",
+    textVerbosity: "high",
+    reasoningSummary: "concise",
+  })
+
+  const status = await invoke("status")
+  assert.match(status.text, /Text verbosity: high/u)
+  assert.match(status.text, /Reasoning summary: concise/u)
 })
 
 test("/codex rejects unknown input without changing session preferences", async () => {
@@ -65,6 +105,8 @@ test("/codex rejects unknown input without changing session preferences", async 
     "set",
     "set fast maybe",
     "set transport udp",
+    "set verbosity verbose",
+    "set summary full",
     "unknown",
     "status extra",
   ]) {
@@ -72,7 +114,12 @@ test("/codex rejects unknown input without changing session preferences", async 
     assert.equal(result.kind, "error", input)
     assert.match(result.text, /\/codex/u)
   }
-  assert.deepEqual(preferences.resolve("session-a"), { fast: false, transport: "auto" })
+  assert.deepEqual(preferences.resolve("session-a"), {
+    fast: false,
+    transport: "auto",
+    textVerbosity: "low",
+    reasoningSummary: "auto",
+  })
 })
 
 test("/codex contains preference-store failures", async () => {

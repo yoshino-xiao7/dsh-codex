@@ -58,6 +58,8 @@ void sessionPreference.get()
 void sessionPreference.getForModel("gpt-5.6-sol")
 void sessionPreference.setFast(true)
 void sessionPreference.setTransport("websocket-cached")
+void sessionPreference.setTextVerbosity("medium")
+void sessionPreference.setReasoningSummary("concise")
 const useModelDirectory: UseCodexModelDirectory = (selector) => selector({
   current: { provider: "dsh-codex", model: "gpt-5.6-sol" },
 })

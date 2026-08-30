@@ -159,6 +159,17 @@ test("runtime registers one external route, owned OAuth flow, and direct catalog
     typeof id === "string" && id.length > 0
     && typeof name === "string" && name.length > 0
   )), true)
+  assert.equal(catalog.every((model) => (
+    Object.keys(model).sort().join(",") === "contextWindow,id,maxTokens,name"
+  )), true)
+  const capabilityCatalog = runtime.getModelCapabilities()
+  assert.deepEqual(capabilityCatalog.map(({ id }) => id), catalog.map(({ id }) => id))
+  const knownCapabilities = capabilityCatalog.find(({ reasoning }) => reasoning !== undefined)
+  assert.ok(knownCapabilities)
+  assert.equal(Array.isArray(knownCapabilities.inputModalities), true)
+  assert.equal(Array.isArray(knownCapabilities.reasoning.efforts), true)
+  assert.equal(Object.hasOwn(knownCapabilities.reasoning, "defaultEffort"), false)
+  assert.equal(typeof knownCapabilities.fast, "boolean")
   assert.deepEqual(runtime.getConfig(), Config({}))
   assert.deepEqual(harness.adapters[0].providerInfo(CODEX_ROUTE_ID), {
     id: CODEX_ROUTE_ID,

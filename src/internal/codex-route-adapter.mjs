@@ -139,6 +139,7 @@ function externalModelInfo(model) {
     contextWindow: model?.context?.contextWindow ?? model?.contextWindow,
     maxTokens: model?.defaultMaxTokens ?? model?.maxTokens,
     inputModalities: model?.inputModalities ?? model?.input,
+    reasoning: model?.reasoning,
   })
   return Object.freeze({
     provider: CODEX_ROUTE_ID,

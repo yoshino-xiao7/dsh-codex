@@ -9,33 +9,70 @@ test("session preferences default to safe provider behavior", () => {
   assert.deepEqual(preferences.resolve(), {
     fast: false,
     transport: "auto",
+    textVerbosity: "low",
+    reasoningSummary: "auto",
   })
   assert.deepEqual(preferences.resolve("session-a"), {
     fast: false,
     transport: "auto",
+    textVerbosity: "low",
+    reasoningSummary: "auto",
   })
 })
 
-test("session preferences isolate explicit Fast and transport choices", () => {
+test("session preferences isolate explicit request choices", () => {
   const preferences = createSessionPreferences()
 
   assert.deepEqual(preferences.configure("session-a", { fast: true }), {
     fast: true,
     transport: "auto",
+    textVerbosity: "low",
+    reasoningSummary: "auto",
   })
   assert.deepEqual(preferences.configure("session-a", { transport: "sse" }), {
     fast: true,
     transport: "sse",
+    textVerbosity: "low",
+    reasoningSummary: "auto",
+  })
+  assert.deepEqual(preferences.configure("session-a", {
+    textVerbosity: "high",
+    reasoningSummary: "detailed",
+  }), {
+    fast: true,
+    transport: "sse",
+    textVerbosity: "high",
+    reasoningSummary: "detailed",
   })
   assert.deepEqual(preferences.resolve("session-b"), {
     fast: false,
     transport: "auto",
+    textVerbosity: "low",
+    reasoningSummary: "auto",
   })
 
   preferences.remove("session-a")
   assert.deepEqual(preferences.resolve("session-a"), {
     fast: false,
     transport: "auto",
+    textVerbosity: "low",
+    reasoningSummary: "auto",
+  })
+})
+
+test("session preferences accept explicit defaults for all public controls", () => {
+  const preferences = createSessionPreferences({
+    defaultFast: true,
+    defaultTransport: "websocket",
+    defaultTextVerbosity: "medium",
+    defaultReasoningSummary: "concise",
+  })
+
+  assert.deepEqual(preferences.resolve("session-a"), {
+    fast: true,
+    transport: "websocket",
+    textVerbosity: "medium",
+    reasoningSummary: "concise",
   })
 })
 
@@ -47,7 +84,17 @@ test("session preferences reject ambiguous or unbounded input", () => {
   assert.throws(() => preferences.configure("session-a", {}), /preference/u)
   assert.throws(() => preferences.configure("session-a", { fast: "yes" }), /fast/u)
   assert.throws(() => preferences.configure("session-a", { transport: "udp" }), /transport/u)
+  assert.throws(
+    () => preferences.configure("session-a", { textVerbosity: "verbose" }),
+    /textVerbosity/u,
+  )
+  assert.throws(
+    () => preferences.configure("session-a", { reasoningSummary: "full" }),
+    /reasoningSummary/u,
+  )
   assert.throws(() => preferences.configure("session-a", { fast: true, extra: true }), /preference/u)
+  assert.throws(() => createSessionPreferences({ defaultTextVerbosity: "verbose" }), /textVerbosity/u)
+  assert.throws(() => createSessionPreferences({ defaultReasoningSummary: "full" }), /reasoningSummary/u)
 
   preferences.configure("session-a", { fast: true })
   assert.throws(() => preferences.configure("session-b", { fast: true }), /capacity/u)
@@ -58,6 +105,8 @@ test("session preference snapshots are immutable and disposal closes writes", ()
   const snapshot = preferences.configure("session-a", {
     fast: true,
     transport: "websocket-cached",
+    textVerbosity: "medium",
+    reasoningSummary: "off",
   })
 
   assert.equal(Object.isFrozen(snapshot), true)
@@ -69,6 +118,8 @@ test("session preference snapshots are immutable and disposal closes writes", ()
   assert.deepEqual(preferences.resolve("session-a"), {
     fast: false,
     transport: "auto",
+    textVerbosity: "low",
+    reasoningSummary: "auto",
   })
   assert.throws(() => preferences.configure("session-a", { fast: false }), /disposed/u)
 })

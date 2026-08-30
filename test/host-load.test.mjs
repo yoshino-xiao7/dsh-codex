@@ -4,6 +4,7 @@ import test from "node:test"
 import { Config, apply, inject, name } from "../src/host/index.mjs"
 import { AUTHORIZATION_RPC_CHANNEL } from "../src/internal/authorization-bridge.mjs"
 import { CODEX_DIAGNOSTICS_RPC_CHANNEL } from "../src/internal/codex-connection-diagnostics.mjs"
+import { CODEX_MODEL_CAPABILITY_RPC_CHANNEL } from "../src/internal/codex-model-capability-bridge.mjs"
 import { CODEX_ROUTE_ID } from "../src/internal/codex-route-adapter.mjs"
 import { SESSION_PREFERENCE_RPC_CHANNEL } from "../src/internal/session-preference-bridge.mjs"
 
@@ -118,6 +119,7 @@ test("host entry exports a valid Cordis plugin and scoped stream listener", asyn
   assert.deepEqual([...rpcHandlers.keys()], [
     AUTHORIZATION_RPC_CHANNEL,
     SESSION_PREFERENCE_RPC_CHANNEL,
+    CODEX_MODEL_CAPABILITY_RPC_CHANNEL,
     CODEX_DIAGNOSTICS_RPC_CHANNEL,
   ])
   const status = await rpcHandlers.get(AUTHORIZATION_RPC_CHANNEL)(
@@ -134,7 +136,13 @@ test("host entry exports a valid Cordis plugin and scoped stream listener", asyn
   )
   assert.deepEqual(fast, {
     ok: true,
-    value: { fast: true, transport: "auto" },
+    value: {
+      fast: true,
+      transport: "auto",
+      textVerbosity: "low",
+      reasoningSummary: "auto",
+      transportHealth: { status: "idle" },
+    },
   })
   const transport = await rpcHandlers.get(SESSION_PREFERENCE_RPC_CHANNEL)(
     "set-transport",
@@ -143,8 +151,25 @@ test("host entry exports a valid Cordis plugin and scoped stream listener", asyn
   )
   assert.deepEqual(transport, {
     ok: true,
-    value: { fast: true, transport: "websocket-cached" },
+    value: {
+      fast: true,
+      transport: "websocket-cached",
+      textVerbosity: "low",
+      reasoningSummary: "auto",
+      transportHealth: { status: "idle" },
+    },
   })
+  const capabilities = await rpcHandlers.get(CODEX_MODEL_CAPABILITY_RPC_CHANNEL)(
+    "get",
+    {},
+    new AbortController().signal,
+  )
+  assert.equal(capabilities.ok, true)
+  assert.equal(capabilities.value.models.length > 0, true)
+  assert.equal(
+    capabilities.value.models.every(({ id }) => typeof id === "string" && id.length > 0),
+    true,
+  )
   const diagnostics = await rpcHandlers.get(CODEX_DIAGNOSTICS_RPC_CHANNEL)(
     "run",
     { mode: "local" },
