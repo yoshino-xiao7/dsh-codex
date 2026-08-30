@@ -4,7 +4,7 @@
 
 A Codex plugin for DeepSeek Harness with ChatGPT OAuth sign-in, Codex models, image input, and reliable streaming responses.
 
-> Current stable version: `0.0.3` technical preview, published under npm `latest` with a full GitHub Release. `0.0.4` is under development and has not been published. npm package: `dsh-codex-community`.
+> Current version: `0.0.4` technical preview, published under npm `latest` with a full GitHub Release. npm package: `dsh-codex-community`.
 
 ## Features
 
@@ -18,11 +18,7 @@ A Codex plugin for DeepSeek Harness with ChatGPT OAuth sign-in, Codex models, im
 - read the real five-hour and weekly usage limits whenever the settings page opens or is refreshed manually, with a safe fallback and no OAuth credentials exposed to the Web page;
 - present remaining usage in compact cards: five-hour limits show the exact reset time, while weekly limits show the exact time within 24 hours and otherwise use relative days;
 - list selected models first in settings and collapse unselected models by default, with compact `K` labels taken from the current provider catalog for context and maximum output;
-- use the lightning button to the left of the model selector for official Fast (1.5×), and use `/codex` to select Auto, SSE, WebSocket, or cached WebSocket transport for the current conversation.
-
-## 0.0.4 in development (unpublished)
-
-- Add a graphical transport selector beside the lightning button for Auto, SSE, WebSocket, or cached WebSocket without requiring a command;
+- use the lightning button to the left of the model selector for official Fast (1.5×), and use the adjacent graphical button or `/codex` to select Auto, SSE, WebSocket, or cached WebSocket transport for the current conversation;
 - read catalog fields, verified reasoning levels, and Fast support through one Host capability interface instead of maintaining a second model table in the Web client;
 - run an on-demand local or account check from collapsed connection diagnostics. The local check is fully offline; the account check reads usage and refreshes OAuth only when needed. Neither sends a model request or consumes model usage.
 
@@ -36,7 +32,7 @@ A Codex plugin for DeepSeek Harness with ChatGPT OAuth sign-in, Codex models, im
 Install an exact version:
 
 ```sh
-dsh plugin --profile web add dsh-codex-community@0.0.3
+dsh plugin --profile web add dsh-codex-community@0.0.4
 dsh web
 ```
 
@@ -44,7 +40,7 @@ dsh web
 
 1. Open **Settings → OpenAI Codex** and complete the ChatGPT OAuth prompts.
 2. Enable models on the same page.
-3. Choose a Codex model from the conversation model selector; use the lightning button to its left for Fast, or `/codex set transport ...` for the current conversation's transport. The graphical transport button is part of the unpublished `0.0.4` development version.
+3. Choose a Codex model from the conversation model selector; use the lightning button to its left for Fast, and use the adjacent transport button or `/codex set transport ...` for the current conversation's transport.
 
 Available commands:
 
@@ -64,7 +60,7 @@ Fast and transport preferences are kept only for the current session in the curr
 Update:
 
 ```sh
-dsh plugin --profile web update dsh-codex-community@0.0.3
+dsh plugin --profile web update dsh-codex-community@0.0.4
 dsh web
 ```
 
@@ -87,12 +83,12 @@ See [Troubleshooting](docs/troubleshooting.en.md) for diagnostic steps.
 ## Support boundaries
 
 - The `0.0.x` line does not promise a stable API; pin the exact version.
-- Linux, macOS, and Windows CI/profile smoke for `0.0.3` reached `3/3`; the accepted commit and platform evidence are in the [acceptance record](docs/releases/v0.0.3.acceptance.json).
-- Live OAuth, conversation, image, transport, and Fast network acceptance for `0.0.3` starts in a fresh record at `0/13 pending`. These unverified capabilities remain clearly disclosed and will be completed individually after publication.
+- Linux, macOS, and Windows CI/profile smoke for `0.0.4` reached `3/3`; the accepted commit and platform evidence are in the [acceptance record](docs/releases/v0.0.4.acceptance.json).
+- Live OAuth, conversation, image, transport, and Fast network acceptance for `0.0.4` starts in a fresh record at `0/13 pending`. These unverified capabilities remain clearly disclosed and will be completed individually post-release.
 - The settings page reads usage through the Web-backend compatibility endpoint used by the official Codex client. If that endpoint is unavailable or malformed, the page retains the latest safe reading and falls back to request observation or an unknown state instead of presenting the error as zero remaining usage.
 - Model names, context windows, and maximum outputs come from the installed provider catalog. The reasoning picker exposes only subscription-Codex levels through Max that the Provider can fully implement, plus each model's verified default. Generic `Default`, `Off`, and `Minimal` entries are hidden, and agent-level `Ultra` is not disguised as a plain reasoning effort.
 - Fast is limited to GPT-5.4, GPT-5.5, GPT-5.6 Luna, Sol, and Terra and consumes more usage. Other models never receive the Fast service tier.
-- Connection diagnostics in `0.0.4` do not perform an active model request. The local check is offline and the account check uses only the existing usage-reader boundary, so neither replaces live conversation, image, tool, or per-transport acceptance.
+- Connection diagnostics do not perform an active model request. The local check is offline and the account check uses only the existing usage-reader boundary, so neither replaces live conversation, image, tool, or per-transport acceptance.
 - Image generation and editing are not provided.
 - See [Compatibility](docs/compatibility.en.md) for Windows, Linux, real OAuth, and real Codex network acceptance status.
 
