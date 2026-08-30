@@ -76,6 +76,11 @@ window.__ModuleLoader__.load({
       quotaResetMinute: "分钟",
       quotaResetHour: "小时",
       quotaResetDay: "天",
+      quotaReminderLow: "{window}剩余 {remaining}%，请留意重置时间。",
+      quotaReminderExhausted: "{window}已用尽，请等待重置并检查当前登录账号。",
+      quotaResetRefreshing: "预计重置时间已到，正在刷新确认。",
+      quotaResetConfirmed: "已刷新最新额度。",
+      quotaResetUnconfirmed: "暂时无法确认额度已重置；仍显示上次验证数据，可手动刷新。",
       quotaRecentSuccess: "最近一次 Codex 请求成功",
       quotaSuccessCaution: "这只表示最近一次请求成功，不代表账户剩余额度。",
       quotaExhausted: "最近观测到 Codex 账户额度已用尽。",
@@ -128,6 +133,16 @@ window.__ModuleLoader__.load({
       transportReset: "恢复自动",
       transportResetLabel: "将当前会话的传输方式恢复为自动",
       requestSettings: "Codex 请求设置",
+      defaultsTitle: "全局请求默认值",
+      defaultsDescription: "新会话直接使用这些默认值；已有会话中未显式覆盖的字段会从下一次请求起跟随更新，正在进行的请求不变。",
+      defaultsFast: "默认启用 Fast（1.5×）",
+      defaultsTransport: "默认传输方式",
+      defaultsTextVerbosity: "默认回复详略",
+      defaultsReasoningSummary: "默认推理摘要",
+      defaultsLoading: "正在读取全局请求默认值…",
+      defaultsUnavailable: "当前环境没有可用的全局请求默认值设置接口。",
+      defaultsReadOnly: "当前设置存储为只读，无法修改全局请求默认值。",
+      defaultsSaving: "正在保存…",
       replyDetail: "回复详略",
       replyDetailLow: "精简",
       replyDetailMedium: "适中",
@@ -153,12 +168,23 @@ window.__ModuleLoader__.load({
       diagnosticsAccount: "检查账号",
       diagnosticsAccountRunning: "正在检查账号…",
       diagnosticsAccountHelp: "读取已有额度，必要时刷新 OAuth；不发送模型请求，也不消耗额度。",
+      diagnosticsNetwork: "真实请求诊断",
+      diagnosticsNetworkPreparing: "正在准备确认…",
+      diagnosticsNetworkRunning: "正在执行真实请求…",
+      diagnosticsNetworkHelp: "仅在二次确认后，使用确认框列出的模型发送一次真实 Codex 请求。",
+      diagnosticsNetworkConsentTitle: "确认执行一次真实请求",
+      diagnosticsNetworkConsentHelp: "此操作会发送一次真实 Codex 请求并消耗额度。请求固定使用 SSE、关闭 Fast，仅携带一条短提示，不携带当前会话内容或工具，也不会自动重试。Codex 专用接口没有可用的服务端硬输出上限；插件会在首次看到模型文本后立即结束流，但取消或结束流都不能保证请求未消耗额度。",
+      diagnosticsNetworkModel: "本次验证模型",
+      diagnosticsNetworkConfirm: "我了解会消耗额度，执行一次",
+      diagnosticsNetworkConsentCancel: "暂不执行",
+      diagnosticsConsentInvalid: "本次确认已过期或已使用，请重新准备后再执行。",
       diagnosticsCancel: "取消",
       diagnosticsFailed: "诊断暂时不可用，请重试。",
       diagnosticsOutcomePass: "检查通过",
       diagnosticsOutcomeWarning: "检查完成，有提示",
       diagnosticsOutcomeFail: "检查未通过",
       diagnosticsOutcomeCancelled: "检查已取消",
+      diagnosticsNetworkCancelledAfterStart: "已请求取消；真实请求可能已经发出并消耗额度，可在诊断历史中查看最终脱敏结果。",
       diagnosticsStatusPass: "通过",
       diagnosticsStatusWarning: "提示",
       diagnosticsStatusFail: "未通过",
@@ -167,10 +193,31 @@ window.__ModuleLoader__.load({
       diagnosticsCheckCredential: "授权凭据",
       diagnosticsCheckModels: "模型目录",
       diagnosticsCheckAccountUsage: "账号额度",
+      diagnosticsCheckModelRequest: "真实模型请求",
+      diagnosticsModeLocal: "本机",
+      diagnosticsModeAccount: "账号",
+      diagnosticsModeNetwork: "真实请求",
       diagnosticsObservedAt: "检查时间",
       diagnosticsCopy: "复制诊断报告",
       diagnosticsCopied: "诊断报告已复制",
       diagnosticsCopyFailed: "无法复制诊断报告。",
+      diagnosticsHistoryTitle: "诊断历史",
+      diagnosticsHistoryHelp: "仅在你点击后读取本机进程内最多 20 条脱敏报告；不会自动加载。",
+      diagnosticsHistoryLoad: "加载诊断历史",
+      diagnosticsHistoryLoading: "正在加载…",
+      diagnosticsHistoryEmpty: "暂无诊断历史。",
+      diagnosticsHistoryFailed: "无法加载诊断历史。",
+      diagnosticsHistoryExport: "导出历史 JSON",
+      diagnosticsHistoryExported: "历史 JSON 已导出",
+      diagnosticsHistoryExportFailed: "无法导出诊断历史。",
+      diagnosticsHistoryClear: "清空历史",
+      diagnosticsHistoryClearConfirmTitle: "清空诊断历史？",
+      diagnosticsHistoryClearConfirmHelp: "这会删除本机进程内保存的全部脱敏诊断报告，且无法撤销。",
+      diagnosticsHistoryClearConfirm: "确认清空",
+      diagnosticsHistoryClearCancel: "取消清空",
+      diagnosticsHistoryClearing: "正在清空…",
+      diagnosticsHistoryCleared: "诊断历史已清空。",
+      diagnosticsHistoryClearFailed: "无法清空诊断历史。",
       legacyReasoningRepair: "修复并设为新会话默认模型",
       legacyReasoningRepairing: "正在修复…",
       legacyReasoningRepaired: "已修复并设为新会话默认模型",
@@ -236,6 +283,11 @@ window.__ModuleLoader__.load({
       quotaResetMinute: "minute",
       quotaResetHour: "hour",
       quotaResetDay: "day",
+      quotaReminderLow: "The {window} has {remaining}% remaining. Check the reset time.",
+      quotaReminderExhausted: "The {window} is exhausted. Wait for reset and check the signed-in account.",
+      quotaResetRefreshing: "The expected reset time has arrived. Refreshing to confirm.",
+      quotaResetConfirmed: "Latest usage refreshed.",
+      quotaResetUnconfirmed: "The reset could not be confirmed. The last verified data remains visible; refresh manually.",
       quotaRecentSuccess: "The latest Codex request succeeded",
       quotaSuccessCaution: "This only describes the latest request; it does not represent remaining account quota.",
       quotaExhausted: "Codex account quota was exhausted in the latest observation.",
@@ -288,6 +340,16 @@ window.__ModuleLoader__.load({
       transportReset: "Reset to Auto",
       transportResetLabel: "Reset this conversation's transport to Auto",
       requestSettings: "Codex request settings",
+      defaultsTitle: "Global request defaults",
+      defaultsDescription: "New conversations use these defaults. Fields not explicitly overridden in existing conversations follow changes on the next request; requests already in progress are unchanged.",
+      defaultsFast: "Enable Fast (1.5×) by default",
+      defaultsTransport: "Default transport",
+      defaultsTextVerbosity: "Default reply detail",
+      defaultsReasoningSummary: "Default reasoning summary",
+      defaultsLoading: "Reading global request defaults…",
+      defaultsUnavailable: "Global request defaults are unavailable in this environment.",
+      defaultsReadOnly: "The settings store is read-only, so global request defaults cannot be changed.",
+      defaultsSaving: "Saving…",
       replyDetail: "Reply detail",
       replyDetailLow: "Concise",
       replyDetailMedium: "Balanced",
@@ -313,12 +375,23 @@ window.__ModuleLoader__.load({
       diagnosticsAccount: "Check account",
       diagnosticsAccountRunning: "Checking account…",
       diagnosticsAccountHelp: "Reads existing usage and refreshes OAuth only when needed; never sends a model request or consumes usage.",
+      diagnosticsNetwork: "Real request diagnostic",
+      diagnosticsNetworkPreparing: "Preparing confirmation…",
+      diagnosticsNetworkRunning: "Running real request…",
+      diagnosticsNetworkHelp: "After a second confirmation, sends one real Codex request with the model listed in the confirmation.",
+      diagnosticsNetworkConsentTitle: "Confirm one real request",
+      diagnosticsNetworkConsentHelp: "This sends one real Codex request and consumes usage. It uses SSE with Fast off and carries one short prompt, no conversation history or tools, and no automatic retry. The dedicated Codex endpoint exposes no usable server-side hard output limit; the plugin ends the stream after the first visible model text, but cancellation or stream teardown cannot guarantee that no usage was consumed.",
+      diagnosticsNetworkModel: "Model this diagnostic will validate",
+      diagnosticsNetworkConfirm: "I understand this consumes usage; run once",
+      diagnosticsNetworkConsentCancel: "Not now",
+      diagnosticsConsentInvalid: "This confirmation expired or was already used. Prepare a new one before running.",
       diagnosticsCancel: "Cancel",
       diagnosticsFailed: "Diagnostics are temporarily unavailable. Try again.",
       diagnosticsOutcomePass: "Checks passed",
       diagnosticsOutcomeWarning: "Checks completed with notes",
       diagnosticsOutcomeFail: "Checks did not pass",
       diagnosticsOutcomeCancelled: "Checks cancelled",
+      diagnosticsNetworkCancelledAfterStart: "Cancellation requested. The real request may already have been sent and consumed usage; load diagnostics history for its final sanitized result.",
       diagnosticsStatusPass: "Passed",
       diagnosticsStatusWarning: "Note",
       diagnosticsStatusFail: "Failed",
@@ -327,10 +400,31 @@ window.__ModuleLoader__.load({
       diagnosticsCheckCredential: "Credential",
       diagnosticsCheckModels: "Model catalog",
       diagnosticsCheckAccountUsage: "Account usage",
+      diagnosticsCheckModelRequest: "Real model request",
+      diagnosticsModeLocal: "Device",
+      diagnosticsModeAccount: "Account",
+      diagnosticsModeNetwork: "Real request",
       diagnosticsObservedAt: "Checked",
       diagnosticsCopy: "Copy diagnostics report",
       diagnosticsCopied: "Diagnostics report copied",
       diagnosticsCopyFailed: "Could not copy the diagnostics report.",
+      diagnosticsHistoryTitle: "Diagnostics history",
+      diagnosticsHistoryHelp: "Reads up to 20 sanitized reports from this local process only after you click; it never loads automatically.",
+      diagnosticsHistoryLoad: "Load diagnostics history",
+      diagnosticsHistoryLoading: "Loading…",
+      diagnosticsHistoryEmpty: "No diagnostics history yet.",
+      diagnosticsHistoryFailed: "Could not load diagnostics history.",
+      diagnosticsHistoryExport: "Export history JSON",
+      diagnosticsHistoryExported: "History JSON exported",
+      diagnosticsHistoryExportFailed: "Could not export diagnostics history.",
+      diagnosticsHistoryClear: "Clear history",
+      diagnosticsHistoryClearConfirmTitle: "Clear diagnostics history?",
+      diagnosticsHistoryClearConfirmHelp: "This permanently deletes every sanitized diagnostics report saved in this local process.",
+      diagnosticsHistoryClearConfirm: "Confirm clear",
+      diagnosticsHistoryClearCancel: "Cancel clear",
+      diagnosticsHistoryClearing: "Clearing…",
+      diagnosticsHistoryCleared: "Diagnostics history cleared.",
+      diagnosticsHistoryClearFailed: "Could not clear diagnostics history.",
       legacyReasoningRepair: "Repair and set as future default",
       legacyReasoningRepairing: "Repairing…",
       legacyReasoningRepaired: "Repaired and set as future default",
@@ -386,22 +480,32 @@ window.__ModuleLoader__.load({
       })
     }
 
-    const DIAGNOSTIC_MODES = new Set(["local", "account"])
+    const PASSIVE_DIAGNOSTIC_MODES = new Set(["local", "account"])
+    const DIAGNOSTIC_MODES = new Set(["local", "account", "network"])
     const DIAGNOSTIC_OUTCOMES = new Set(["pass", "warning", "fail", "cancelled"])
     const DIAGNOSTIC_CHECK_IDS = Object.freeze({
       local: Object.freeze(["runtime", "credential", "models"]),
       account: Object.freeze(["runtime", "credential", "models", "account-usage"]),
+      network: Object.freeze(["runtime", "credential", "models", "model-request"]),
     })
     const DIAGNOSTIC_CODE_PATTERN = /^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/u
+    const DIAGNOSTIC_CONSENT_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu
+    const DIAGNOSTIC_MODEL_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/u
+    const MAX_DIAGNOSTIC_HISTORY = 50
+    const MODEL_REQUEST_FACTS = Object.freeze(["attempted", "outputObserved", "modelId"])
     const DIAGNOSTIC_CHECK_CONTRACTS = Object.freeze({
       runtime: Object.freeze({
         cancelled: diagnosticCheckContract("skipped"),
+        "preflight-not-run": diagnosticCheckContract("skipped"),
+        "preflight-timeout": diagnosticCheckContract("fail"),
         "runtime-ready": diagnosticCheckContract("pass", ["route", "registered"]),
         "route-unavailable": diagnosticCheckContract("fail", ["route", "registered"]),
         "runtime-unavailable": diagnosticCheckContract("fail"),
       }),
       credential: Object.freeze({
         cancelled: diagnosticCheckContract("skipped"),
+        "preflight-not-run": diagnosticCheckContract("skipped"),
+        "preflight-timeout": diagnosticCheckContract("fail"),
         "credential-invalid": diagnosticCheckContract("fail", ["configured", "state", "writable"]),
         "credential-signed-out": diagnosticCheckContract("warning", ["configured", "state", "writable"]),
         "credential-read-only": diagnosticCheckContract("warning", ["configured", "state", "writable"]),
@@ -410,6 +514,8 @@ window.__ModuleLoader__.load({
       }),
       models: Object.freeze({
         cancelled: diagnosticCheckContract("skipped"),
+        "preflight-not-run": diagnosticCheckContract("skipped"),
+        "preflight-timeout": diagnosticCheckContract("fail"),
         "models-unavailable": diagnosticCheckContract("fail"),
         "catalog-empty": diagnosticCheckContract("fail", ["catalogCount", "enabledCount", "selection", "allEnabled"]),
         "models-disabled": diagnosticCheckContract("warning", ["catalogCount", "enabledCount", "selection", "allEnabled"]),
@@ -417,6 +523,8 @@ window.__ModuleLoader__.load({
       }),
       "account-usage": Object.freeze({
         cancelled: diagnosticCheckContract("skipped"),
+        "preflight-not-run": diagnosticCheckContract("skipped"),
+        "preflight-timeout": diagnosticCheckContract("fail"),
         "account-usage-invalid": diagnosticCheckContract("fail"),
         "account-usage-empty": diagnosticCheckContract("warning", ["rateLimitCount", "primaryWindows", "secondaryWindows"]),
         "account-usage-ready": diagnosticCheckContract("pass", ["rateLimitCount", "primaryWindows", "secondaryWindows"]),
@@ -429,6 +537,32 @@ window.__ModuleLoader__.load({
         "account-http-error": diagnosticCheckContract("fail"),
         "account-response-invalid": diagnosticCheckContract("fail"),
         "account-usage-unavailable": diagnosticCheckContract("fail"),
+      }),
+      "model-request": Object.freeze({
+        cancelled: diagnosticCheckContract("skipped"),
+        "preflight-not-run": diagnosticCheckContract("skipped"),
+        "preflight-timeout": diagnosticCheckContract("fail"),
+        "model-request-prerequisite-failed": diagnosticCheckContract("fail"),
+        "model-request-unavailable": diagnosticCheckContract("fail"),
+        "model-request-ready": diagnosticCheckContract("pass", MODEL_REQUEST_FACTS),
+        "model-request-max-tokens": diagnosticCheckContract("warning", MODEL_REQUEST_FACTS),
+        "model-request-tool-call": diagnosticCheckContract("warning", MODEL_REQUEST_FACTS),
+        "model-response-empty": diagnosticCheckContract("warning", MODEL_REQUEST_FACTS),
+        "model-request-auth-error": diagnosticCheckContract("fail", MODEL_REQUEST_FACTS),
+        "model-request-quota-exhausted": diagnosticCheckContract("fail", MODEL_REQUEST_FACTS),
+        "model-request-rate-limited": diagnosticCheckContract("fail", MODEL_REQUEST_FACTS),
+        "model-request-timeout": diagnosticCheckContract("fail", MODEL_REQUEST_FACTS),
+        "model-request-server-error": diagnosticCheckContract("fail", MODEL_REQUEST_FACTS),
+        "model-request-transport-error": diagnosticCheckContract("fail", MODEL_REQUEST_FACTS),
+        "model-request-unsupported": diagnosticCheckContract("fail", MODEL_REQUEST_FACTS),
+        "model-request-invalid": diagnosticCheckContract("fail", MODEL_REQUEST_FACTS),
+        "model-request-provider-error": diagnosticCheckContract("fail", MODEL_REQUEST_FACTS),
+        "model-request-unknown-model": diagnosticCheckContract("fail", MODEL_REQUEST_FACTS),
+        "model-request-credential-missing": diagnosticCheckContract("fail", MODEL_REQUEST_FACTS),
+        "model-request-aborted": diagnosticCheckContract("fail", MODEL_REQUEST_FACTS),
+        "model-request-cancelled-after-attempt": diagnosticCheckContract("warning", MODEL_REQUEST_FACTS),
+        "model-request-busy": diagnosticCheckContract("fail"),
+        "model-request-failed": diagnosticCheckContract("fail", MODEL_REQUEST_FACTS),
       }),
     })
     const DIAGNOSTIC_FACT_SCHEMAS = Object.freeze({
@@ -451,6 +585,11 @@ window.__ModuleLoader__.load({
         rateLimitCount: diagnosticCount,
         primaryWindows: diagnosticCount,
         secondaryWindows: diagnosticCount,
+      }),
+      "model-request": Object.freeze({
+        attempted: (value) => typeof value === "boolean" && value,
+        outputObserved: (value) => typeof value === "boolean",
+        modelId: (value) => typeof value === "string" && DIAGNOSTIC_MODEL_ID_PATTERN.test(value),
       }),
     })
 
@@ -496,6 +635,9 @@ window.__ModuleLoader__.load({
     }
 
     function diagnosticsOutcomeFor(checks) {
+      if (checks.some(({ status, code }) => status === "fail" && code === "preflight-timeout")) {
+        return "fail"
+      }
       if (checks.some(({ status }) => status === "skipped")) return "cancelled"
       if (checks.some(({ status }) => status === "fail")) return "fail"
       if (checks.some(({ status }) => status === "warning")) return "warning"
@@ -504,7 +646,7 @@ window.__ModuleLoader__.load({
 
     function safeDiagnosticsReport(value, expectedMode) {
       if (value === null || typeof value !== "object" || Array.isArray(value)
-        || value.version !== 1
+        || value.version !== 2
         || value.mode !== expectedMode
         || !DIAGNOSTIC_OUTCOMES.has(value.outcome)
         || !Number.isSafeInteger(value.observedAt)
@@ -533,7 +675,7 @@ window.__ModuleLoader__.load({
       })
       if (value.outcome !== diagnosticsOutcomeFor(checks)) throw invalidDiagnosticsResponse()
       return Object.freeze({
-        version: 1,
+        version: 2,
         mode: value.mode,
         outcome: value.outcome,
         observedAt: value.observedAt,
@@ -541,25 +683,96 @@ window.__ModuleLoader__.load({
       })
     }
 
+    function safeNetworkDiagnosticConsent(value) {
+      if (value === null || typeof value !== "object" || Array.isArray(value)
+        || Reflect.ownKeys(value).length !== 5
+        || value.version !== 1
+        || typeof value.consentId !== "string"
+        || !DIAGNOSTIC_CONSENT_ID_PATTERN.test(value.consentId)
+        || !Number.isSafeInteger(value.expiresAt)
+        || value.expiresAt < 0
+        || typeof value.modelId !== "string"
+        || !DIAGNOSTIC_MODEL_ID_PATTERN.test(value.modelId)
+        || value.transport !== "sse") {
+        throw invalidDiagnosticsResponse()
+      }
+      return Object.freeze({
+        version: 1,
+        consentId: value.consentId,
+        expiresAt: value.expiresAt,
+        modelId: value.modelId,
+        transport: "sse",
+      })
+    }
+
+    function safeDiagnosticsHistory(value) {
+      if (value === null || typeof value !== "object" || Array.isArray(value)
+        || Reflect.ownKeys(value).length !== 3
+        || value.version !== 1
+        || !Number.isSafeInteger(value.limit)
+        || value.limit < 1
+        || value.limit > MAX_DIAGNOSTIC_HISTORY
+        || !Array.isArray(value.reports)
+        || value.reports.length > value.limit) {
+        throw invalidDiagnosticsResponse()
+      }
+      const reports = value.reports.map((report) => {
+        if (!DIAGNOSTIC_MODES.has(report?.mode)) throw invalidDiagnosticsResponse()
+        return safeDiagnosticsReport(report, report.mode)
+      })
+      return Object.freeze({
+        version: 1,
+        limit: value.limit,
+        reports: Object.freeze(reports),
+      })
+    }
+
+    function safeClearedDiagnosticsHistory(value) {
+      if (value === null || typeof value !== "object" || Array.isArray(value)
+        || Reflect.ownKeys(value).length !== 1
+        || !Number.isSafeInteger(value.cleared)
+        || value.cleared < 0
+        || value.cleared > MAX_DIAGNOSTIC_HISTORY) {
+        throw invalidDiagnosticsResponse()
+      }
+      return Object.freeze({ cleared: value.cleared })
+    }
+
     function createConnectionDiagnosticsClient(connection) {
+      const call = async (endpoint, payload, signal) => {
+        const result = await connection.rpc.call(DIAGNOSTICS_CHANNEL, endpoint, payload, signal)
+        if (!result.ok) {
+          const error = new Error("Connection diagnostics failed.")
+          error.code = typeof result.error?.code === "string"
+            && DIAGNOSTIC_CODE_PATTERN.test(result.error.code)
+            ? result.error.code
+            : "DIAGNOSTICS_FAILED"
+          throw error
+        }
+        return result.value
+      }
       return Object.freeze({
         async run(mode, signal) {
-          if (!DIAGNOSTIC_MODES.has(mode)) throw new TypeError("Unsupported diagnostics mode.")
-          const result = await connection.rpc.call(
-            DIAGNOSTICS_CHANNEL,
-            "run",
-            { mode },
-            signal,
-          )
-          if (!result.ok) {
-            const error = new Error("Connection diagnostics failed.")
-            error.code = typeof result.error?.code === "string"
-              && DIAGNOSTIC_CODE_PATTERN.test(result.error.code)
-              ? result.error.code
-              : "DIAGNOSTICS_FAILED"
-            throw error
+          if (!PASSIVE_DIAGNOSTIC_MODES.has(mode)) throw new TypeError("Unsupported diagnostics mode.")
+          return safeDiagnosticsReport(await call("run", { mode }, signal), mode)
+        },
+        async prepareNetwork(signal) {
+          return safeNetworkDiagnosticConsent(await call("prepare-network", {}, signal))
+        },
+        async runNetwork(consentId, signal) {
+          if (typeof consentId !== "string" || !DIAGNOSTIC_CONSENT_ID_PATTERN.test(consentId)) {
+            throw new TypeError("Invalid diagnostics consent ID.")
           }
-          return safeDiagnosticsReport(result.value, mode)
+          return safeDiagnosticsReport(
+            await call("run-network", { consentId }, signal),
+            "network",
+          )
+        },
+        async history(signal) {
+          return safeDiagnosticsHistory(await call("history", {}, signal))
+        },
+        async clearHistory(signal) {
+          return safeClearedDiagnosticsHistory(await call("clear-history", {}, signal))
         },
       })
     }
@@ -577,6 +790,32 @@ window.__ModuleLoader__.load({
       await clipboard.writeText(value)
     }
 
+    function downloadTextFile(filename, value) {
+      const blobConstructor = globalThis.Blob
+      const objectUrl = globalThis.URL
+      const documentObject = globalThis.document
+      if (typeof filename !== "string" || filename.length === 0
+        || typeof value !== "string" || value.length === 0
+        || typeof blobConstructor !== "function"
+        || typeof objectUrl?.createObjectURL !== "function"
+        || typeof objectUrl?.revokeObjectURL !== "function"
+        || typeof documentObject?.createElement !== "function") {
+        throw new Error("File download is unavailable.")
+      }
+      const url = objectUrl.createObjectURL(
+        new blobConstructor([value], { type: "application/json;charset=utf-8" }),
+      )
+      try {
+        const anchor = documentObject.createElement("a")
+        anchor.href = url
+        anchor.download = filename
+        anchor.rel = "noopener"
+        anchor.click()
+      } finally {
+        objectUrl.revokeObjectURL(url)
+      }
+    }
+
     function diagnosticsReportText(value) {
       if (!DIAGNOSTIC_MODES.has(value?.mode)) throw invalidDiagnosticsResponse()
       const report = safeDiagnosticsReport(value, value.mode)
@@ -591,6 +830,27 @@ window.__ModuleLoader__.load({
           status: check.status,
           code: check.code,
           ...(check.facts === undefined ? {} : { facts: { ...check.facts } }),
+        })),
+      }, null, 2)
+    }
+
+    function diagnosticsHistoryText(value) {
+      const history = safeDiagnosticsHistory(value)
+      return JSON.stringify({
+        format: "dsh-codex-diagnostics-history",
+        version: history.version,
+        limit: history.limit,
+        reports: history.reports.map((report) => ({
+          version: report.version,
+          mode: report.mode,
+          outcome: report.outcome,
+          observedAt: report.observedAt,
+          checks: report.checks.map((check) => ({
+            id: check.id,
+            status: check.status,
+            code: check.code,
+            ...(check.facts === undefined ? {} : { facts: { ...check.facts } }),
+          })),
         })),
       }, null, 2)
     }
@@ -652,6 +912,22 @@ window.__ModuleLoader__.load({
     ])
     const TEXT_VERBOSITY_IDS = new Set(TEXT_VERBOSITY_OPTIONS.map(({ id }) => id))
     const REASONING_SUMMARY_IDS = new Set(REASONING_SUMMARY_OPTIONS.map(({ id }) => id))
+
+    function safeGlobalRequestDefaults(value) {
+      if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined
+      if (typeof value.defaultFast !== "boolean"
+        || !TRANSPORT_IDS.has(value.defaultTransport)
+        || !TEXT_VERBOSITY_IDS.has(value.defaultTextVerbosity)
+        || !REASONING_SUMMARY_IDS.has(value.defaultReasoningSummary)) {
+        return undefined
+      }
+      return Object.freeze({
+        defaultFast: value.defaultFast,
+        defaultTransport: value.defaultTransport,
+        defaultTextVerbosity: value.defaultTextVerbosity,
+        defaultReasoningSummary: value.defaultReasoningSummary,
+      })
+    }
 
     function safeTransportHealth(value) {
       if (value?.status === "idle") return { status: "idle" }
@@ -1330,7 +1606,15 @@ window.__ModuleLoader__.load({
           if (window === undefined) continue
           const candidates = [{ at: window.resetsAt, refresh: true }]
           if (window.windowDurationMins === 10_080) {
-            candidates.push({ at: window.resetsAt - 24 * 60 * 60_000, refresh: false })
+            const dayMs = 24 * 60 * 60_000
+            const remaining = window.resetsAt - now
+            if (remaining > dayMs) {
+              const displayedDays = Math.ceil(remaining / dayMs)
+              candidates.push({
+                at: window.resetsAt - (displayedDays - 1) * dayMs,
+                refresh: false,
+              })
+            }
           }
           for (const candidate of candidates) {
             if (!Number.isSafeInteger(candidate.at) || candidate.at <= now) continue
@@ -1340,6 +1624,68 @@ window.__ModuleLoader__.load({
         }
       }
       return next
+    }
+
+    function accountUsageReminders(value, now = Date.now()) {
+      if (!Number.isSafeInteger(now) || now < 0) return Object.freeze([])
+      const usage = safeAccountUsage(value)
+      if (usage === undefined) return Object.freeze([])
+      const byWindow = new Map()
+      for (const limit of usage.rateLimits) {
+        if (limit.limitId !== "codex") continue
+        for (const window of [limit.primary, limit.secondary]) {
+          if (window === undefined
+            || (window.windowDurationMins !== 300 && window.windowDurationMins !== 10_080)
+            || window.resetsAt <= now) continue
+          const remaining = Math.max(0, Math.min(100, 100 - window.usedPercent))
+          if (remaining > 20) continue
+          const reminder = Object.freeze({
+            kind: remaining === 0 ? "exhausted" : "low",
+            windowDurationMins: window.windowDurationMins,
+            remainingPercent: Math.round(remaining * 10) / 10,
+            resetsAt: window.resetsAt,
+          })
+          const previous = byWindow.get(window.windowDurationMins)
+          if (previous === undefined || reminder.remainingPercent < previous.remainingPercent) {
+            byWindow.set(window.windowDurationMins, reminder)
+          }
+        }
+      }
+      return Object.freeze([...byWindow.values()].sort(
+        (left, right) => left.windowDurationMins - right.windowDurationMins,
+      ))
+    }
+
+    function renderQuotaReminders(usage, t, now, resetState) {
+      if (resetState.kind !== "idle") {
+        const key = resetState.kind === "refreshing"
+          ? "quotaResetRefreshing"
+          : resetState.kind === "confirmed"
+            ? "quotaResetConfirmed"
+            : "quotaResetUnconfirmed"
+        return h("div", {
+          className: `dshCodexQuotaReminder dshCodexQuotaReminder-${resetState.kind}`,
+          role: "status",
+          "aria-live": "polite",
+        }, t(key))
+      }
+      const reminders = accountUsageReminders(usage, now)
+      if (reminders.length === 0) return null
+      const exhausted = reminders.some(({ kind }) => kind === "exhausted")
+      return h("div", {
+        className: `dshCodexQuotaReminder dshCodexQuotaReminder-${exhausted ? "exhausted" : "low"}`,
+        role: exhausted ? "alert" : "status",
+        "aria-live": exhausted ? "assertive" : "polite",
+      }, h("ul", null, ...reminders.map((reminder) => {
+        const label = usageWindowLabel(reminder, t)
+        const template = t(reminder.kind === "exhausted"
+          ? "quotaReminderExhausted"
+          : "quotaReminderLow")
+        const text = template
+          .replace("{window}", label)
+          .replace("{remaining}", percentText(reminder.remainingPercent))
+        return h("li", { key: `${reminder.windowDurationMins}-${reminder.resetsAt}` }, text)
+      })))
     }
 
     function renderAccountUsage(usage, t, now = Date.now()) {
@@ -1622,10 +1968,47 @@ window.__ModuleLoader__.load({
       return Object.freeze({ available, load, save, subscribe })
     }
 
+    function createGlobalRequestDefaultsClient(scope) {
+      const available = typeof scope?.getSnapshot === "function"
+        && typeof scope?.subscribe === "function"
+        && typeof scope?.set === "function"
+
+      const load = () => {
+        if (!available) return { kind: "unavailable" }
+        const snapshot = scope.getSnapshot()
+        const value = safeGlobalRequestDefaults(snapshot?.value)
+        if (snapshot?.status === "ready" && value !== undefined) {
+          return {
+            kind: "ready",
+            writable: snapshot.writable === true,
+            value,
+          }
+        }
+        if (snapshot?.status === "ready") return { kind: "unavailable" }
+        if (snapshot?.status === "unavailable") return { kind: "unavailable" }
+        return { kind: "loading" }
+      }
+
+      const set = async (field, value) => {
+        const snapshot = load()
+        if (!available || snapshot.kind !== "ready") throw new Error("Codex request defaults are unavailable")
+        if (!snapshot.writable) throw new Error("Codex request defaults are read-only")
+        await scope.set(field, value)
+      }
+
+      return Object.freeze({
+        available,
+        load,
+        set,
+        subscribe: (listener) => available ? scope.subscribe(listener) : () => undefined,
+      })
+    }
+
     function AuthorizationSettings({ client, t }) {
       const [snapshot, setSnapshot] = React.useState({ status: "loading" })
       const [usageSnapshot, setUsageSnapshot] = React.useState({ status: "idle" })
       const [usageNow, setUsageNow] = React.useState(() => Date.now())
+      const [resetRefreshState, setResetRefreshState] = React.useState({ kind: "idle" })
       const [attempt, setAttempt] = React.useState(null)
       const [notices, setNotices] = React.useState([])
       const [prompt, setPrompt] = React.useState(null)
@@ -1644,8 +2027,10 @@ window.__ModuleLoader__.load({
       const refreshGenerationRef = React.useRef(0)
       const refreshControllerRef = React.useRef(null)
 
-      const refresh = React.useCallback(async () => {
+      const refresh = React.useCallback(async (reason = "normal") => {
         if (!mountedRef.current) return
+        const resetRefresh = reason === "reset"
+        setResetRefreshState({ kind: resetRefresh ? "refreshing" : "idle" })
         const generation = ++refreshGenerationRef.current
         refreshControllerRef.current?.abort()
         const controller = new AbortController()
@@ -1660,6 +2045,7 @@ window.__ModuleLoader__.load({
             || (credentialState === undefined && value?.credential?.configured === true)
           if (!signedIn || typeof client.usage !== "function") {
             setUsageSnapshot({ status: "idle" })
+            setResetRefreshState({ kind: "idle" })
             return
           }
           setUsageSnapshot((current) => ({
@@ -1672,16 +2058,19 @@ window.__ModuleLoader__.load({
             if (!mountedRef.current || generation !== refreshGenerationRef.current || controller.signal.aborted) return
             setUsageNow(Date.now())
             setUsageSnapshot({ status: "ready", value: usage })
+            setResetRefreshState({ kind: resetRefresh ? "confirmed" : "idle" })
           } catch {
             if (!mountedRef.current || generation !== refreshGenerationRef.current || controller.signal.aborted) return
             setUsageSnapshot((current) => ({
               status: "error",
               ...(current.value === undefined ? {} : { value: current.value }),
             }))
+            setResetRefreshState({ kind: resetRefresh ? "unconfirmed" : "idle" })
           }
         } catch {
           if (!mountedRef.current || generation !== refreshGenerationRef.current || controller.signal.aborted) return
           setSnapshot({ status: "error" })
+          setResetRefreshState({ kind: resetRefresh ? "unconfirmed" : "idle" })
         } finally {
           if (generation === refreshGenerationRef.current && refreshControllerRef.current === controller) {
             refreshControllerRef.current = null
@@ -1715,11 +2104,21 @@ window.__ModuleLoader__.load({
         const delay = Math.min(2_147_483_647, Math.max(1, transition.at - usageNow))
         const timer = window.setTimeout(() => {
           if (!mountedRef.current) return
-          if (transition.refresh && transition.at - Date.now() <= 1_000) void refresh()
+          if (transition.refresh && transition.at - Date.now() <= 1_000) void refresh("reset")
           else setUsageNow(Date.now())
         }, delay)
         return () => window.clearTimeout(timer)
       }, [refresh, usageNow, usageSnapshot.value])
+
+      React.useEffect(() => {
+        if (resetRefreshState.kind !== "confirmed"
+          || typeof window?.setTimeout !== "function"
+          || typeof window?.clearTimeout !== "function") return undefined
+        const timer = window.setTimeout(() => {
+          if (mountedRef.current) setResetRefreshState({ kind: "idle" })
+        }, 4_000)
+        return () => window.clearTimeout(timer)
+      }, [resetRefreshState.kind])
 
       React.useEffect(() => {
         if (typeof document === "undefined" || typeof document.addEventListener !== "function") {
@@ -1802,6 +2201,7 @@ window.__ModuleLoader__.load({
         // verified percentage from the previous account across that boundary.
         setUsageSnapshot({ status: "idle" })
         setUsageNow(Date.now())
+        setResetRefreshState({ kind: "idle" })
         setNotices([])
         setPrompt(null)
         setOutcome(null)
@@ -1880,6 +2280,7 @@ window.__ModuleLoader__.load({
           if (!mountedRef.current) return
           setUsageSnapshot({ status: "idle" })
           setUsageNow(Date.now())
+          setResetRefreshState({ kind: "idle" })
           setNotices([])
           setPrompt(null)
           setAnswer("")
@@ -2106,7 +2507,6 @@ window.__ModuleLoader__.load({
           className: "dshCodexQuota",
           "data-quota-status": quota.status,
           "aria-busy": usageSnapshot.status === "loading" ? "true" : undefined,
-          "aria-live": "polite",
           "aria-labelledby": "dsh-codex-quota-title",
         },
         h("div", { className: "dshCodexQuotaHeader" },
@@ -2117,13 +2517,16 @@ window.__ModuleLoader__.load({
             "data-loading": usageSnapshot.status === "loading" ? "true" : undefined,
             "aria-busy": usageSnapshot.status === "loading" ? "true" : undefined,
             disabled: actionBusy || usageSnapshot.status === "loading",
-            onClick: refresh,
+            onClick: () => void refresh(),
           },
           refreshIcon(),
           h("span", null, usageSnapshot.status === "loading" ? t("refreshing") : t("refresh")))),
         liveUsage === undefined
           ? h("p", { className: "dshCodexQuotaProduct" }, t("quotaProduct"))
           : null,
+        liveUsage === undefined
+          ? null
+          : renderQuotaReminders(liveUsage, t, usageNow, resetRefreshState),
         quotaBody))
     }
 
@@ -2153,7 +2556,15 @@ window.__ModuleLoader__.load({
       if (checkId === "credential") return t("diagnosticsCheckCredential")
       if (checkId === "models") return t("diagnosticsCheckModels")
       if (checkId === "account-usage") return t("diagnosticsCheckAccountUsage")
+      if (checkId === "model-request") return t("diagnosticsCheckModelRequest")
       return checkId
+    }
+
+    function diagnosticsModeLabel(mode, t) {
+      if (mode === "local") return t("diagnosticsModeLocal")
+      if (mode === "account") return t("diagnosticsModeAccount")
+      if (mode === "network") return t("diagnosticsModeNetwork")
+      return mode
     }
 
     function diagnosticsChevron() {
@@ -2175,31 +2586,82 @@ window.__ModuleLoader__.load({
     function ConnectionDiagnosticsSettings({ client, t }) {
       const [expanded, setExpanded] = React.useState(false)
       const [state, setState] = React.useState({ kind: "idle" })
+      const [consent, setConsent] = React.useState(null)
       const [copyStatus, setCopyStatus] = React.useState("idle")
+      const [historyState, setHistoryState] = React.useState({ kind: "idle" })
+      const [historyNotice, setHistoryNotice] = React.useState("idle")
+      const [confirmClear, setConfirmClear] = React.useState(false)
       const instanceId = React.useId().replace(/[^a-zA-Z0-9_-]/gu, "")
       const contentId = `dsh-codex-diagnostics-${instanceId}`
+      const consentTitleId = `${contentId}-network-consent-title`
+      const consentDescriptionId = `${contentId}-network-consent-description`
+      const historyClearTitleId = `${contentId}-history-clear-title`
+      const historyClearDescriptionId = `${contentId}-history-clear-description`
       const mountedRef = React.useRef(false)
       const generationRef = React.useRef(0)
+      const historyGenerationRef = React.useRef(0)
       const controllerRef = React.useRef(null)
+      const historyControllerRef = React.useRef(null)
+      const networkTriggerRef = React.useRef(null)
+      const networkConfirmRef = React.useRef(null)
+      const restoreNetworkFocusRef = React.useRef(false)
+      const historyClearTriggerRef = React.useRef(null)
+      const historyClearConfirmRef = React.useRef(null)
+      const restoreHistoryFocusRef = React.useRef(false)
 
       React.useEffect(() => {
         mountedRef.current = true
         return () => {
           mountedRef.current = false
           generationRef.current += 1
+          historyGenerationRef.current += 1
           controllerRef.current?.abort()
+          historyControllerRef.current?.abort()
           controllerRef.current = null
+          historyControllerRef.current = null
         }
       }, [])
 
-      const run = async (mode) => {
-        if (!mountedRef.current || state.kind === "running" || !DIAGNOSTIC_MODES.has(mode)) return
+      React.useEffect(() => {
+        if (consent !== null) {
+          networkConfirmRef.current?.focus?.()
+          return
+        }
+        if (!restoreNetworkFocusRef.current) return
+        restoreNetworkFocusRef.current = false
+        networkTriggerRef.current?.focus?.()
+      }, [consent])
+
+      React.useEffect(() => {
+        if (confirmClear) {
+          historyClearConfirmRef.current?.focus?.()
+          return
+        }
+        if (!restoreHistoryFocusRef.current) return
+        restoreHistoryFocusRef.current = false
+        historyClearTriggerRef.current?.focus?.()
+      }, [confirmClear])
+
+      const beginOperation = (kind, mode) => {
         const generation = ++generationRef.current
         controllerRef.current?.abort()
         const controller = new AbortController()
         controllerRef.current = controller
         setCopyStatus("idle")
-        setState({ kind: "running", mode })
+        setState(mode === undefined ? { kind } : { kind, mode })
+        return { generation, controller }
+      }
+
+      const finishOperation = (generation, controller) => {
+        if (generation === generationRef.current && controllerRef.current === controller) {
+          controllerRef.current = null
+        }
+      }
+
+      const run = async (mode) => {
+        if (!mountedRef.current || isDiagnosticsBusy(state) || !PASSIVE_DIAGNOSTIC_MODES.has(mode)) return
+        setConsent(null)
+        const { generation, controller } = beginOperation("running", mode)
         try {
           const report = await client.run(mode, controller.signal)
           if (!mountedRef.current
@@ -2212,18 +2674,78 @@ window.__ModuleLoader__.load({
             || controller.signal.aborted) return
           setState({ kind: "error", mode })
         } finally {
-          if (generation === generationRef.current && controllerRef.current === controller) {
-            controllerRef.current = null
-          }
+          finishOperation(generation, controller)
+        }
+      }
+
+      const prepareNetwork = async () => {
+        if (!mountedRef.current || isDiagnosticsBusy(state)) return
+        setConsent(null)
+        const { generation, controller } = beginOperation("preparing-network", "network")
+        try {
+          const prepared = await client.prepareNetwork(controller.signal)
+          if (!mountedRef.current
+            || generation !== generationRef.current
+            || controller.signal.aborted) return
+          setConsent(prepared)
+          setState({ kind: "idle" })
+        } catch (error) {
+          if (!mountedRef.current
+            || generation !== generationRef.current
+            || controller.signal.aborted) return
+          setState({ kind: error?.code === "consent-invalid" ? "consent-error" : "error", mode: "network" })
+        } finally {
+          finishOperation(generation, controller)
+        }
+      }
+
+      const runNetwork = async () => {
+        if (!mountedRef.current || isDiagnosticsBusy(state) || consent === null) return
+        const consentId = consent.consentId
+        setConsent(null)
+        const { generation, controller } = beginOperation("running", "network")
+        try {
+          const report = await client.runNetwork(consentId, controller.signal)
+          if (!mountedRef.current
+            || generation !== generationRef.current
+            || controller.signal.aborted) return
+          setState({ kind: "ready", report })
+        } catch (error) {
+          if (!mountedRef.current
+            || generation !== generationRef.current
+            || controller.signal.aborted) return
+          setState({ kind: error?.code === "consent-invalid" ? "consent-error" : "error", mode: "network" })
+        } finally {
+          finishOperation(generation, controller)
         }
       }
 
       const cancel = () => {
-        if (!mountedRef.current || state.kind !== "running") return
+        if (!mountedRef.current || !isDiagnosticsBusy(state)) return
+        const dispatched = state.kind === "running" && state.mode === "network"
         generationRef.current += 1
         controllerRef.current?.abort()
         controllerRef.current = null
-        setState({ kind: "cancelled", mode: state.mode })
+        setConsent(null)
+        setState({ kind: "cancelled", mode: state.mode, dispatched })
+      }
+
+      const dismissNetworkConsent = () => {
+        if (!mountedRef.current || consent === null || isDiagnosticsBusy(state)) return
+        restoreNetworkFocusRef.current = true
+        setConsent(null)
+        setState({ kind: "idle" })
+      }
+
+      const showClearConfirmation = () => {
+        if (!mountedRef.current || historyState.kind !== "ready") return
+        setConfirmClear(true)
+      }
+
+      const dismissClearConfirmation = () => {
+        if (!mountedRef.current || !confirmClear || historyState.kind === "clearing") return
+        restoreHistoryFocusRef.current = true
+        setConfirmClear(false)
       }
 
       const copyReport = async () => {
@@ -2236,57 +2758,100 @@ window.__ModuleLoader__.load({
         }
       }
 
-      let result = null
-      if (state.kind === "ready") {
-        const report = state.report
-        const observedDate = new Date(report.observedAt)
-        const observedLabel = Number.isNaN(observedDate.valueOf())
-          ? String(report.observedAt)
-          : observedDate.toLocaleString(t("locale"))
-        result = h("div", {
-          className: "dshCodexDiagnosticsResult",
-          "data-outcome": report.outcome,
-          role: "status",
-          "aria-live": "polite",
-        },
-        h("div", { className: "dshCodexDiagnosticsResultHeader" },
-          h("strong", null, t(diagnosticsOutcomeCopyKey(report.outcome))),
-          h("span", null,
-            `${t("diagnosticsObservedAt")} `,
-            h("time", {
-              dateTime: Number.isNaN(observedDate.valueOf()) ? undefined : observedDate.toISOString(),
-            }, observedLabel)),
-          h("button", {
-            type: "button",
-            className: "dshCodexInlineCopy",
-            onClick: () => void copyReport(),
-          }, t("diagnosticsCopy"))),
-        copyStatus === "idle"
-          ? null
-          : h("p", {
-              className: copyStatus === "error" ? "dshCodexError" : "dshCodexSuccess",
-              role: "status",
-            }, t(copyStatus === "error" ? "diagnosticsCopyFailed" : "diagnosticsCopied")),
-        h("ul", { className: "dshCodexDiagnosticsChecks" },
-          ...report.checks.map((check) => {
-            const facts = check.facts === undefined
-              ? []
-              : Object.entries(check.facts).map(([key, value]) => `${key}=${String(value)}`)
-            return h("li", { key: check.id, "data-status": check.status },
-              h("span", { className: "dshCodexDiagnosticsCheckStatus" }, t(diagnosticsStatusCopyKey(check.status))),
-              h("strong", null, diagnosticsCheckLabel(check.id, t)),
-              h("code", null, check.code),
-              facts.length === 0
-                ? null
-                : h("span", { className: "dshCodexDiagnosticsFacts" }, facts.join(" · ")))
-          })))
-      } else if (state.kind === "error") {
-        result = h("p", { className: "dshCodexError", role: "alert" }, t("diagnosticsFailed"))
-      } else if (state.kind === "cancelled") {
-        result = h("p", { className: "dshCodexMuted", role: "status" }, t("diagnosticsOutcomeCancelled"))
+      const loadHistory = async () => {
+        if (!mountedRef.current || historyState.kind === "loading" || historyState.kind === "clearing") return
+        const generation = ++historyGenerationRef.current
+        historyControllerRef.current?.abort()
+        const controller = new AbortController()
+        historyControllerRef.current = controller
+        setConfirmClear(false)
+        setHistoryNotice("idle")
+        setHistoryState({ kind: "loading" })
+        try {
+          const history = await client.history(controller.signal)
+          if (!mountedRef.current
+            || generation !== historyGenerationRef.current
+            || controller.signal.aborted) return
+          setHistoryState({ kind: "ready", history })
+        } catch {
+          if (!mountedRef.current
+            || generation !== historyGenerationRef.current
+            || controller.signal.aborted) return
+          setHistoryState({ kind: "error" })
+        } finally {
+          if (generation === historyGenerationRef.current && historyControllerRef.current === controller) {
+            historyControllerRef.current = null
+          }
+        }
       }
 
+      const exportHistory = () => {
+        if (!mountedRef.current || historyState.kind !== "ready") return
+        try {
+          downloadTextFile(
+            "dsh-codex-diagnostics-history.json",
+            diagnosticsHistoryText(historyState.history),
+          )
+          setHistoryNotice("exported")
+        } catch {
+          setHistoryNotice("export-error")
+        }
+      }
+
+      const clearHistory = async () => {
+        if (!mountedRef.current || historyState.kind !== "ready" || !confirmClear) return
+        const previous = historyState.history
+        const generation = ++historyGenerationRef.current
+        historyControllerRef.current?.abort()
+        const controller = new AbortController()
+        historyControllerRef.current = controller
+        setHistoryNotice("idle")
+        setHistoryState({ kind: "clearing", history: previous })
+        try {
+          await client.clearHistory(controller.signal)
+          if (!mountedRef.current
+            || generation !== historyGenerationRef.current
+            || controller.signal.aborted) return
+          restoreHistoryFocusRef.current = true
+          setConfirmClear(false)
+          setHistoryState({
+            kind: "ready",
+            history: Object.freeze({
+              version: 1,
+              limit: previous.limit,
+              reports: Object.freeze([]),
+            }),
+          })
+          setHistoryNotice("cleared")
+        } catch {
+          if (!mountedRef.current
+            || generation !== historyGenerationRef.current
+            || controller.signal.aborted) return
+          setHistoryState({ kind: "ready", history: previous })
+          setHistoryNotice("clear-error")
+        } finally {
+          if (generation === historyGenerationRef.current && historyControllerRef.current === controller) {
+            historyControllerRef.current = null
+          }
+        }
+      }
+
+      let result = null
+      if (state.kind === "ready") {
+        result = diagnosticsResult(state.report, copyStatus, copyReport, t)
+      } else if (state.kind === "error") {
+        result = h("p", { className: "dshCodexError", role: "alert" }, t("diagnosticsFailed"))
+      } else if (state.kind === "consent-error") {
+        result = h("p", { className: "dshCodexError", role: "alert" }, t("diagnosticsConsentInvalid"))
+      } else if (state.kind === "cancelled") {
+        result = h("p", { className: "dshCodexMuted", role: "status" }, t(state.dispatched
+          ? "diagnosticsNetworkCancelledAfterStart"
+          : "diagnosticsOutcomeCancelled"))
+      }
+
+      const busy = isDiagnosticsBusy(state)
       const runningMode = state.kind === "running" ? state.mode : null
+      const preparingNetwork = state.kind === "preparing-network"
       return h("section", {
         className: "dshCodexDiagnostics",
         "data-expanded": expanded ? "true" : undefined,
@@ -2309,7 +2874,7 @@ window.__ModuleLoader__.load({
             h("button", {
               type: "button",
               className: "dshCodexButton",
-              disabled: runningMode !== null,
+              disabled: busy || consent !== null,
               "aria-busy": runningMode === "local" ? "true" : undefined,
               onClick: () => void run("local"),
             }, runningMode === "local" ? t("diagnosticsLocalRunning") : t("diagnosticsLocal")),
@@ -2318,17 +2883,237 @@ window.__ModuleLoader__.load({
             h("button", {
               type: "button",
               className: "dshCodexButton",
-              disabled: runningMode !== null,
+              disabled: busy || consent !== null,
               "aria-busy": runningMode === "account" ? "true" : undefined,
               onClick: () => void run("account"),
             }, runningMode === "account" ? t("diagnosticsAccountRunning") : t("diagnosticsAccount")),
-            h("span", null, t("diagnosticsAccountHelp")))),
-        runningMode === null ? null : h("button", {
+            h("span", null, t("diagnosticsAccountHelp"))),
+          h("div", { className: "dshCodexDiagnosticsMode" },
+            h("button", {
+              ref: networkTriggerRef,
+              type: "button",
+              className: "dshCodexButton",
+              disabled: busy || consent !== null,
+              "aria-busy": preparingNetwork || runningMode === "network" ? "true" : undefined,
+              "aria-haspopup": "dialog",
+              onClick: () => void prepareNetwork(),
+            }, preparingNetwork
+              ? t("diagnosticsNetworkPreparing")
+              : runningMode === "network"
+                ? t("diagnosticsNetworkRunning")
+                : t("diagnosticsNetwork")),
+            h("span", null, t("diagnosticsNetworkHelp")))),
+        consent === null ? null : h("div", {
+          className: "dshCodexDiagnosticsConsent",
+          role: "alertdialog",
+          "aria-labelledby": consentTitleId,
+          "aria-describedby": consentDescriptionId,
+          onKeyDown: (event) => {
+            if (event.key !== "Escape" || busy) return
+            event.preventDefault?.()
+            event.stopPropagation?.()
+            dismissNetworkConsent()
+          },
+        },
+        h("strong", { id: consentTitleId }, t("diagnosticsNetworkConsentTitle")),
+        h("p", { id: consentDescriptionId }, t("diagnosticsNetworkConsentHelp")),
+        h("p", { className: "dshCodexDiagnosticsFacts" },
+          `${t("diagnosticsNetworkModel")} `,
+          h("code", null, consent.modelId)),
+        h("div", { className: "dshCodexDiagnosticsConsentActions" },
+          h("button", {
+            ref: networkConfirmRef,
+            type: "button",
+            className: "dshCodexButton dshCodexPrimary",
+            disabled: busy,
+            onClick: () => void runNetwork(),
+          }, t("diagnosticsNetworkConfirm")),
+          h("button", {
+            type: "button",
+            className: "dshCodexButton",
+            disabled: busy,
+            onClick: dismissNetworkConsent,
+          }, t("diagnosticsNetworkConsentCancel")))),
+        !busy ? null : h("button", {
           type: "button",
           className: "dshCodexDiagnosticsCancel",
           onClick: cancel,
         }, t("diagnosticsCancel")),
-        result))
+        result,
+        diagnosticsHistoryPanel({
+          confirmClear,
+          exportHistory,
+          historyNotice,
+          historyState,
+          historyClearDescriptionId,
+          historyClearTitleId,
+          historyClearConfirmRef,
+          historyClearTriggerRef,
+          loadHistory,
+          dismissClearConfirmation,
+          showClearConfirmation,
+          clearHistory,
+          t,
+        })))
+    }
+
+    function isDiagnosticsBusy(state) {
+      return state.kind === "running" || state.kind === "preparing-network"
+    }
+
+    function diagnosticsResult(report, copyStatus, copyReport, t) {
+      const observedDate = new Date(report.observedAt)
+      const observedLabel = Number.isNaN(observedDate.valueOf())
+        ? String(report.observedAt)
+        : observedDate.toLocaleString(t("locale"))
+      return h("div", {
+        className: "dshCodexDiagnosticsResult",
+        "data-outcome": report.outcome,
+        role: "status",
+        "aria-live": "polite",
+      },
+      h("div", { className: "dshCodexDiagnosticsResultHeader" },
+        h("strong", null, t(diagnosticsOutcomeCopyKey(report.outcome))),
+        h("span", null,
+          `${t("diagnosticsObservedAt")} `,
+          h("time", {
+            dateTime: Number.isNaN(observedDate.valueOf()) ? undefined : observedDate.toISOString(),
+          }, observedLabel)),
+        h("button", {
+          type: "button",
+          className: "dshCodexInlineCopy",
+          onClick: () => void copyReport(),
+        }, t("diagnosticsCopy"))),
+      copyStatus === "idle"
+        ? null
+        : h("p", {
+            className: copyStatus === "error" ? "dshCodexError" : "dshCodexSuccess",
+            role: "status",
+          }, t(copyStatus === "error" ? "diagnosticsCopyFailed" : "diagnosticsCopied")),
+      h("ul", { className: "dshCodexDiagnosticsChecks" },
+        ...report.checks.map((check) => {
+          const facts = check.facts === undefined
+            ? []
+            : Object.entries(check.facts).map(([key, value]) => `${key}=${String(value)}`)
+          return h("li", { key: check.id, "data-status": check.status },
+            h("span", { className: "dshCodexDiagnosticsCheckStatus" }, t(diagnosticsStatusCopyKey(check.status))),
+            h("strong", null, diagnosticsCheckLabel(check.id, t)),
+            h("code", null, check.code),
+            facts.length === 0
+              ? null
+              : h("span", { className: "dshCodexDiagnosticsFacts" }, facts.join(" · ")))
+        })))
+    }
+
+    function diagnosticsHistoryPanel(input) {
+      const {
+        confirmClear,
+        dismissClearConfirmation,
+        exportHistory,
+        historyClearConfirmRef,
+        historyClearDescriptionId,
+        historyClearTitleId,
+        historyClearTriggerRef,
+        historyNotice,
+        historyState,
+        loadHistory,
+        showClearConfirmation,
+        clearHistory,
+        t,
+      } = input
+      const history = historyState.history
+      const pending = historyState.kind === "loading" || historyState.kind === "clearing"
+      let content = null
+      if (historyState.kind === "error") {
+        content = h("p", { className: "dshCodexError", role: "alert" }, t("diagnosticsHistoryFailed"))
+      } else if (history !== undefined) {
+        content = history.reports.length === 0
+          ? h("p", { className: "dshCodexMuted" }, t("diagnosticsHistoryEmpty"))
+          : h("ol", { className: "dshCodexDiagnosticsHistoryList" },
+              ...history.reports.map((report, index) => {
+                const observedDate = new Date(report.observedAt)
+                const observedLabel = Number.isNaN(observedDate.valueOf())
+                  ? String(report.observedAt)
+                  : observedDate.toLocaleString(t("locale"))
+                return h("li", { key: `${report.observedAt}-${report.mode}-${index}` },
+                  h("strong", null, `${diagnosticsModeLabel(report.mode, t)} · ${t(diagnosticsOutcomeCopyKey(report.outcome))}`),
+                  h("time", {
+                    dateTime: Number.isNaN(observedDate.valueOf()) ? undefined : observedDate.toISOString(),
+                  }, observedLabel),
+                  h("code", null, report.checks.map(({ code }) => code).join(" · ")))
+              }))
+      }
+      return h("section", { className: "dshCodexDiagnosticsHistory" },
+        h("div", { className: "dshCodexDiagnosticsHistoryHeader" },
+          h("div", null,
+            h("strong", null, t("diagnosticsHistoryTitle")),
+            h("p", null, t("diagnosticsHistoryHelp"))),
+          h("button", {
+            type: "button",
+            className: "dshCodexButton",
+            disabled: pending,
+            "aria-busy": historyState.kind === "loading" ? "true" : undefined,
+            onClick: () => void loadHistory(),
+          }, historyState.kind === "loading"
+            ? t("diagnosticsHistoryLoading")
+            : t("diagnosticsHistoryLoad"))),
+        content,
+        history === undefined ? null : h("div", { className: "dshCodexDiagnosticsHistoryActions" },
+          h("button", {
+            type: "button",
+            className: "dshCodexButton",
+            disabled: pending,
+            onClick: exportHistory,
+          }, t("diagnosticsHistoryExport")),
+          h("button", {
+            ref: historyClearTriggerRef,
+            type: "button",
+            className: "dshCodexButton",
+            disabled: pending,
+            "aria-haspopup": "dialog",
+            onClick: showClearConfirmation,
+          }, t("diagnosticsHistoryClear"))),
+        !confirmClear || history === undefined ? null : h("div", {
+          className: "dshCodexDiagnosticsHistoryConfirm",
+          role: "alertdialog",
+          "aria-labelledby": historyClearTitleId,
+          "aria-describedby": historyClearDescriptionId,
+          onKeyDown: (event) => {
+            if (event.key !== "Escape" || pending) return
+            event.preventDefault?.()
+            event.stopPropagation?.()
+            dismissClearConfirmation()
+          },
+        },
+        h("div", { className: "dshCodexDiagnosticsHistoryConfirmCopy" },
+          h("strong", { id: historyClearTitleId }, t("diagnosticsHistoryClearConfirmTitle")),
+          h("p", { id: historyClearDescriptionId }, t("diagnosticsHistoryClearConfirmHelp"))),
+        h("button", {
+          ref: historyClearConfirmRef,
+          type: "button",
+          className: "dshCodexButton dshCodexPrimary",
+          disabled: pending,
+          "aria-busy": historyState.kind === "clearing" ? "true" : undefined,
+          onClick: () => void clearHistory(),
+        }, historyState.kind === "clearing"
+          ? t("diagnosticsHistoryClearing")
+          : t("diagnosticsHistoryClearConfirm")),
+        h("button", {
+          type: "button",
+          className: "dshCodexButton",
+          disabled: pending,
+          onClick: dismissClearConfirmation,
+        }, t("diagnosticsHistoryClearCancel"))),
+        historyNotice === "idle" ? null : h("p", {
+          className: historyNotice.endsWith("error") ? "dshCodexError" : "dshCodexSuccess",
+          role: "status",
+        }, t(historyNotice === "exported"
+          ? "diagnosticsHistoryExported"
+          : historyNotice === "export-error"
+            ? "diagnosticsHistoryExportFailed"
+            : historyNotice === "cleared"
+              ? "diagnosticsHistoryCleared"
+              : "diagnosticsHistoryClearFailed")))
     }
 
     function ModelEnablementSettings({ client, t }) {
@@ -2545,13 +3330,149 @@ window.__ModuleLoader__.load({
         content)
     }
 
-    function CodexSettings({ client, diagnosticsClient, modelClient, t }) {
+    function GlobalRequestDefaultsSettings({ client, t }) {
+      const [snapshot, setSnapshot] = React.useState(() => client.load())
+      const [savingField, setSavingField] = React.useState(null)
+      const [failure, setFailure] = React.useState(null)
+      const mountedRef = React.useRef(false)
+      const titleId = React.useId()
+      const fastControlId = React.useId()
+      const fastLabelId = `${fastControlId}-label`
+      const transportControlId = React.useId()
+      const textVerbosityControlId = React.useId()
+      const reasoningSummaryControlId = React.useId()
+
+      React.useEffect(() => {
+        mountedRef.current = true
+        const refresh = () => setSnapshot(client.load())
+        const unsubscribe = client.subscribe(refresh)
+        refresh()
+        return () => {
+          mountedRef.current = false
+          unsubscribe()
+        }
+      }, [client])
+
+      const save = async (field, value) => {
+        if (!mountedRef.current || snapshot.kind !== "ready" || !snapshot.writable || savingField !== null) return
+        setSavingField(field)
+        setFailure(null)
+        try {
+          await client.set(field, value)
+        } catch (error) {
+          if (!mountedRef.current) return
+          setFailure(error instanceof Error ? error.message : String(error))
+        } finally {
+          if (mountedRef.current) setSavingField(null)
+        }
+      }
+
+      let content
+      if (snapshot.kind === "loading") {
+        content = h("p", { className: "dshCodexMuted", "aria-busy": "true" }, t("defaultsLoading"))
+      } else if (snapshot.kind === "unavailable") {
+        content = h("p", { role: "status", className: "dshCodexMuted" }, t("defaultsUnavailable"))
+      } else {
+        const disabled = savingField !== null || !snapshot.writable
+        const fieldProps = (field) => ({
+          disabled,
+          "aria-busy": savingField === field ? "true" : undefined,
+        })
+        const selectRow = ({ controlId, field, label, options, value }) => {
+          const labelId = `${controlId}-label`
+          const current = options.find((option) => option.id === value)
+          return h("label", {
+            className: "dshCodexDefaultsRow dshCodexDefaultsSelectRow",
+            "data-busy": savingField === field ? "true" : "false",
+            "data-disabled": disabled ? "true" : "false",
+            htmlFor: controlId,
+          },
+          h("span", { id: labelId, className: "dshCodexDefaultsLabel" }, t(label)),
+          h("span", {
+            className: "dshCodexDefaultsSelectVisual",
+            "aria-hidden": "true",
+          },
+          h("span", { className: "dshCodexDefaultsSelectCurrent" }, t(current?.label ?? label)),
+          diagnosticsChevron()),
+          h("select", {
+            ...fieldProps(field),
+            id: controlId,
+            className: "dshCodexDefaultsNativeSelect",
+            "aria-labelledby": labelId,
+            value,
+            onChange: (event) => void save(field, event.target.value),
+          }, ...options.map((option) => h("option", {
+            key: option.id,
+            value: option.id,
+          }, t(option.label)))))
+        }
+        content = h(React.Fragment, null,
+          snapshot.writable ? null : h("p", { role: "status", className: "dshCodexMuted" }, t("defaultsReadOnly")),
+          h("div", {
+            className: "dshCodexDefaultsFields",
+            role: "group",
+            "aria-labelledby": titleId,
+          },
+          h("label", {
+            className: "dshCodexDefaultsRow dshCodexDefaultsFastRow",
+            "data-checked": snapshot.value.defaultFast === true ? "true" : "false",
+            "data-disabled": disabled ? "true" : "false",
+            htmlFor: fastControlId,
+          },
+          h("input", {
+            ...fieldProps("defaultFast"),
+            id: fastControlId,
+            className: "dshCodexDefaultsCheckbox",
+            type: "checkbox",
+            "aria-labelledby": fastLabelId,
+            checked: snapshot.value.defaultFast === true,
+            onChange: (event) => void save("defaultFast", event.target.checked),
+          }),
+          h("span", {
+            id: fastLabelId,
+            className: "dshCodexDefaultsLabel",
+          }, t("defaultsFast"))),
+          selectRow({
+            controlId: transportControlId,
+            field: "defaultTransport",
+            label: "defaultsTransport",
+            options: TRANSPORT_OPTIONS,
+            value: snapshot.value.defaultTransport,
+          }),
+          selectRow({
+            controlId: textVerbosityControlId,
+            field: "defaultTextVerbosity",
+            label: "defaultsTextVerbosity",
+            options: TEXT_VERBOSITY_OPTIONS,
+            value: snapshot.value.defaultTextVerbosity,
+          }),
+          selectRow({
+            controlId: reasoningSummaryControlId,
+            field: "defaultReasoningSummary",
+            label: "defaultsReasoningSummary",
+            options: REASONING_SUMMARY_OPTIONS,
+            value: snapshot.value.defaultReasoningSummary,
+          })),
+          savingField === null ? null : h("p", { role: "status", className: "dshCodexMuted", "aria-busy": "true" }, t("defaultsSaving")),
+          failure === null ? null : h("p", { role: "alert", className: "dshCodexError" }, failure))
+      }
+
+      return h("section", { className: "dshCodexPanel dshCodexCard" },
+        h("header", { className: "dshCodexHeader" },
+          h("div", null,
+            h("h3", { id: titleId }, t("defaultsTitle")),
+            h("p", { className: "dshCodexWarning" }, t("defaultsDescription")))),
+        content)
+    }
+
+    function CodexSettings({ client, diagnosticsClient, modelClient, defaultsClient, t }) {
       return h("div", { className: "dshCodexPage" },
         h("header", { className: "dshCodexHero" },
           h("h2", null, t("title")),
           h("p", null, t("description"))),
         h(AuthorizationSettings, { client, t }),
         h(ConnectionDiagnosticsSettings, { client: diagnosticsClient, t }),
+        h(GlobalRequestDefaultsSettings, { client: defaultsClient, t }),
         h(ModelEnablementSettings, { client: modelClient, t }))
     }
 
@@ -2566,13 +3487,14 @@ window.__ModuleLoader__.load({
       const diagnosticsClient = createConnectionDiagnosticsClient(ctx.connection)
       const sessionPreferenceClient = createSessionPreferenceClient(ctx.connection)
       const modelClient = createModelEnablementClient(ctx.connection, ctx.settingsScope?.describe?.())
+      const defaultsClient = createGlobalRequestDefaultsClient(ctx.settingsScope?.bind?.({ namespace: CODEX_SETTINGS_NS }))
       ctx.slots.inject("settings.section", () => ctx.slots.register({
         name: "settings.section",
         id: "codex",
         order: 15,
         label: () => t("nav"),
         locale: NS,
-        inject: () => ({ client, diagnosticsClient, modelClient, t }),
+        inject: () => ({ client, diagnosticsClient, modelClient, defaultsClient, t }),
       }, CodexSettings))
       ctx.inject?.(["slots", "modelDirectories"], (scope) => {
         scope.slots.inject("conversation.input.right", () => scope.slots.register({
@@ -2723,6 +3645,14 @@ window.__ModuleLoader__.load({
         ".dshCodexDiagnosticsMode{display:flex;min-width:0;align-items:flex-start;gap:9px}",
         ".dshCodexDiagnosticsMode .dshCodexButton{min-width:104px;flex:none;padding:6px 10px;font-size:12px;line-height:18px}",
         ".dshCodexDiagnosticsMode>span{color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:18px}",
+        ".dshCodexDiagnosticsConsent{display:flex;min-width:0;flex-direction:column;gap:8px;border:1px solid var(--dsw-alias-state-warning-primary,var(--dsw-alias-border-l2));border-radius:10px;background:var(--dsw-alias-bg-layer-1);padding:10px 12px;font-size:12px;line-height:18px}",
+        ".dshCodexDiagnosticsConsent>strong{font-weight:500}",
+        ".dshCodexDiagnosticsConsent>p{margin:0;color:var(--dsw-alias-label-secondary)}",
+        ".dshCodexDiagnosticsConsentActions,.dshCodexDiagnosticsHistoryActions,.dshCodexDiagnosticsHistoryConfirm{display:flex;min-width:0;flex-wrap:wrap;gap:8px}",
+        ".dshCodexDiagnosticsConsentActions .dshCodexButton,.dshCodexDiagnosticsHistoryActions .dshCodexButton,.dshCodexDiagnosticsHistoryConfirm .dshCodexButton{padding:6px 10px;font-size:12px;line-height:18px}",
+        ".dshCodexDiagnosticsHistoryConfirmCopy{display:flex;min-width:0;flex:1 0 100%;flex-direction:column;gap:2px}",
+        ".dshCodexDiagnosticsHistoryConfirmCopy>strong{font-weight:500}",
+        ".dshCodexDiagnosticsHistoryConfirmCopy>p{margin:0;color:var(--dsw-alias-label-secondary)}",
         ".dshCodexDiagnosticsCancel{align-self:flex-start;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-state-business-primary);font:inherit;font-size:12px;line-height:18px;cursor:pointer;padding:2px 4px}",
         ".dshCodexDiagnosticsCancel:hover{background:var(--dsw-alias-interactive-bg-hover,var(--dsw-alias-bg-layer-2))}",
         ".dshCodexDiagnosticsResult{display:flex;min-width:0;flex-direction:column;gap:8px;border-top:1px solid var(--dsw-alias-border-l2);padding-top:10px}",
@@ -2741,6 +3671,18 @@ window.__ModuleLoader__.load({
         ".dshCodexDiagnosticsCheckStatus{border-radius:999px;background:var(--dsw-alias-bg-layer-2,var(--dsw-alias-bg-module-platform));color:var(--dsw-alias-label-secondary);padding:0 6px}",
         ".dshCodexDiagnosticsChecks li[data-status=pass] .dshCodexDiagnosticsCheckStatus{color:var(--dsw-alias-state-success-primary)}",
         ".dshCodexDiagnosticsChecks li[data-status=fail] .dshCodexDiagnosticsCheckStatus{color:var(--dsw-alias-state-error-primary)}",
+        ".dshCodexDiagnosticsHistory{display:flex;min-width:0;flex-direction:column;gap:9px;border-top:1px solid var(--dsw-alias-border-l2);padding-top:10px}",
+        ".dshCodexDiagnosticsHistory>p{margin:0}",
+        ".dshCodexDiagnosticsHistoryHeader{display:flex;min-width:0;align-items:flex-start;justify-content:space-between;gap:12px}",
+        ".dshCodexDiagnosticsHistoryHeader>div{min-width:0}",
+        ".dshCodexDiagnosticsHistoryHeader strong{font-size:13px;font-weight:500;line-height:20px}",
+        ".dshCodexDiagnosticsHistoryHeader p{margin:2px 0 0;color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:18px}",
+        ".dshCodexDiagnosticsHistoryHeader>.dshCodexButton{flex:none;padding:6px 10px;font-size:12px;line-height:18px}",
+        ".dshCodexDiagnosticsHistoryList{display:flex;min-width:0;max-height:220px;flex-direction:column;gap:5px;overflow:auto;margin:0;padding:0;list-style:none}",
+        ".dshCodexDiagnosticsHistoryList li{display:grid;min-width:0;grid-template-columns:minmax(0,auto) minmax(0,1fr);gap:2px 10px;border-radius:8px;background:var(--dsw-alias-bg-layer-1);padding:7px 9px;font-size:12px;line-height:18px}",
+        ".dshCodexDiagnosticsHistoryList strong{font-weight:500}",
+        ".dshCodexDiagnosticsHistoryList time{justify-self:end;color:var(--dsw-alias-label-tertiary)}",
+        ".dshCodexDiagnosticsHistoryList code{grid-column:1/-1;min-width:0;overflow-wrap:anywhere;color:var(--dsw-alias-label-tertiary);font:inherit}",
         ".dshCodexAuthToolbar{display:flex;min-width:0;align-items:center;justify-content:space-between;gap:18px}",
         ".dshCodexStatus{display:flex;min-width:0;align-items:center;gap:10px;font-size:14px;line-height:22px}",
         ".dshCodexStatus strong{font-weight:500;white-space:nowrap}",
@@ -2758,6 +3700,11 @@ window.__ModuleLoader__.load({
         ".dshCodexQuotaUnknown::before{background:var(--dsw-alias-label-tertiary)}",
         ".dshCodexQuotaExhausted::before{background:var(--dsw-alias-state-error-primary)}",
         ".dshCodexQuotaExhausted{color:var(--dsw-alias-state-error-primary)}",
+        ".dshCodexQuotaReminder{box-sizing:border-box;min-width:0;border:1px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-secondary);font-size:12px;line-height:18px;padding:9px 11px}",
+        ".dshCodexQuotaReminder ul{display:flex;min-width:0;flex-direction:column;gap:3px;margin:0;padding-left:18px}",
+        ".dshCodexQuotaReminder-low{border-color:var(--dsw-alias-state-warning-primary,var(--dsw-alias-border-l2));color:var(--dsw-alias-state-warning-primary,var(--dsw-alias-label-secondary))}",
+        ".dshCodexQuotaReminder-exhausted,.dshCodexQuotaReminder-unconfirmed{border-color:var(--dsw-alias-state-error-primary);color:var(--dsw-alias-state-error-primary)}",
+        ".dshCodexQuotaReminder-confirmed{border-color:var(--dsw-alias-state-success-primary);color:var(--dsw-alias-state-success-primary)}",
         ".dshCodexQuotaGroup{display:flex;min-width:0;flex-direction:column;gap:8px}",
         ".dshCodexQuotaGroup+.dshCodexQuotaGroup{border-top:1px solid var(--dsw-alias-border-l2);padding-top:14px}",
         ".dshCodexQuotaWindows{display:grid;min-width:0;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}",
@@ -2785,6 +3732,21 @@ window.__ModuleLoader__.load({
         ".dshCodexButton:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover,var(--dsw-alias-bg-layer-2))}",
         ".dshCodexButton:focus-visible,.dshCodexModelOption:has(input:focus-visible){outline:2px solid var(--dsw-alias-brand-primary,var(--dsw-alias-border-l3));outline-offset:2px}",
         ".dshCodexButton:disabled{cursor:not-allowed;opacity:.5}",
+        ".dshCodexDefaultsFields{display:flex;min-width:0;flex-direction:column;gap:8px}",
+        ".dshCodexDefaultsRow{position:relative;display:flex;width:100%;min-width:0;min-height:44px;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);cursor:pointer;padding:8px 10px;transition:background-color .15s ease,border-color .15s ease}",
+        ".dshCodexDefaultsRow:hover:not([data-disabled=true]){background:var(--dsw-alias-interactive-bg-hover,var(--dsw-alias-bg-layer-2))}",
+        ".dshCodexDefaultsRow:has(.dshCodexDefaultsCheckbox:focus-visible),.dshCodexDefaultsRow:has(.dshCodexDefaultsNativeSelect:focus-visible){outline:2px solid var(--dsw-alias-brand-primary,var(--dsw-alias-border-l3));outline-offset:2px}",
+        ".dshCodexDefaultsRow[data-disabled=true]{cursor:not-allowed;opacity:.55}",
+        ".dshCodexDefaultsFastRow{justify-content:flex-start}",
+        ".dshCodexDefaultsCheckbox{width:18px;height:18px;flex:none;margin:0;accent-color:var(--dsw-alias-state-business-primary);cursor:pointer}",
+        ".dshCodexDefaultsCheckbox:disabled{cursor:not-allowed}",
+        ".dshCodexDefaultsLabel{min-width:0;flex:1;font-size:14px;line-height:22px}",
+        ".dshCodexDefaultsSelectVisual{display:inline-flex;min-width:112px;max-width:55%;min-height:30px;flex:none;align-items:center;justify-content:flex-end;gap:6px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-2,var(--dsw-alias-bg-module-platform));color:var(--dsw-alias-label-secondary);padding:4px 7px 4px 10px;pointer-events:none}",
+        ".dshCodexDefaultsSelectVisual>svg{width:16px;height:16px;flex:none;color:var(--dsw-alias-label-tertiary)}",
+        ".dshCodexDefaultsSelectCurrent{min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:13px;line-height:20px;white-space:nowrap}",
+        ".dshCodexDefaultsSelectRow:has(.dshCodexDefaultsNativeSelect:focus-visible) .dshCodexDefaultsSelectVisual{border-color:var(--dsw-alias-state-business-primary);color:var(--dsw-alias-label-primary)}",
+        ".dshCodexDefaultsNativeSelect{position:absolute;inset:0;z-index:1;width:100%;height:100%;margin:0;border:0;opacity:0;color:inherit;background:transparent;font:inherit;cursor:pointer;appearance:none;-webkit-appearance:none}",
+        ".dshCodexDefaultsNativeSelect:disabled{cursor:not-allowed}",
         ".dshCodexFastToggle{box-sizing:border-box;display:inline-flex;width:28px;height:28px;flex:none;align-items:center;justify-content:center;border:0;border-radius:999px;background:transparent;color:var(--dsw-alias-label-tertiary);font:inherit;cursor:pointer;padding:0;transition:background-color .15s ease,color .15s ease}",
         ".dshCodexFastToggle:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover,var(--dsw-alias-bg-layer-2));color:var(--dsw-alias-label-primary)}",
         ".dshCodexFastToggle[data-fast=true]{background:var(--dsw-alias-state-business-secondary,var(--dsw-alias-bg-layer-2));color:var(--dsw-alias-state-business-primary)}",
@@ -2857,7 +3819,7 @@ window.__ModuleLoader__.load({
         "@media(prefers-reduced-motion:reduce){.dshCodexRefreshButton[data-loading=true] .dshCodexRefreshIcon{animation:none}.dshCodexDiagnosticsToggle>svg{transition:none}}",
         "@media(max-width:760px){.dshCodexQuotaWindows,.dshCodexModelList,.dshCodexDiagnosticsModes,.dshCodexDiagnosticsChecks{grid-template-columns:1fr}.dshCodexModelActions{justify-content:flex-start}}",
         "@media(max-width:640px){.dshCodexAuthToolbar,.dshCodexHeader{align-items:stretch;flex-direction:column}.dshCodexAuthActions{margin-left:0;justify-content:flex-start}}",
-        "@media(max-width:480px){.dshCodexPage{gap:10px;padding:0 0 16px}.dshCodexCard{border-radius:14px;padding:16px}.dshCodexActions{align-items:stretch;flex-direction:column}.dshCodexButton{width:100%}.dshCodexQuotaHeader .dshCodexRefreshButton{width:auto}.dshCodexQuotaWindowHeader{gap:8px}.dshCodexDiagnosticsMode{flex-direction:column}.dshCodexDiagnosticsMode .dshCodexButton{width:100%;min-width:0}.dshCodexDiagnosticsMode>span{max-width:100%;overflow-wrap:anywhere}}",
+        "@media(max-width:480px){.dshCodexPage{gap:10px;padding:0 0 16px}.dshCodexCard{border-radius:14px;padding:16px}.dshCodexActions{align-items:stretch;flex-direction:column}.dshCodexButton{width:100%}.dshCodexQuotaHeader .dshCodexRefreshButton{width:auto}.dshCodexQuotaWindowHeader{gap:8px}.dshCodexDiagnosticsMode{flex-direction:column}.dshCodexDiagnosticsMode .dshCodexButton{width:100%;min-width:0}.dshCodexDiagnosticsMode>span{max-width:100%;overflow-wrap:anywhere}.dshCodexDiagnosticsConsentActions,.dshCodexDiagnosticsHistoryActions,.dshCodexDiagnosticsHistoryConfirm,.dshCodexDiagnosticsHistoryHeader{align-items:stretch;flex-direction:column}.dshCodexDiagnosticsHistoryHeader>.dshCodexButton{width:100%}.dshCodexDiagnosticsHistoryList li{grid-template-columns:1fr}.dshCodexDiagnosticsHistoryList time{justify-self:start}.dshCodexDiagnosticsHistoryList code{grid-column:1}}",
       ].join("")
       const references = style[STYLE_REF_KEY]
       style[STYLE_REF_KEY] = Number.isSafeInteger(references) && references > 0
@@ -2885,14 +3847,18 @@ window.__ModuleLoader__.load({
     exports.CodexFastToggle = CodexFastToggle
     exports.CodexSettings = CodexSettings
     exports.DIAGNOSTICS_CHANNEL = DIAGNOSTICS_CHANNEL
+    exports.GlobalRequestDefaultsSettings = GlobalRequestDefaultsSettings
     exports.MODEL_CAPABILITIES_CHANNEL = MODEL_CAPABILITIES_CHANNEL
     exports.ModelEnablementSettings = ModelEnablementSettings
     exports.NS = NS
     exports.apply = apply
+    exports.accountUsageReminders = accountUsageReminders
     exports.createAuthorizationClient = createAuthorizationClient
     exports.createConnectionDiagnosticsClient = createConnectionDiagnosticsClient
+    exports.createGlobalRequestDefaultsClient = createGlobalRequestDefaultsClient
     exports.createModelEnablementClient = createModelEnablementClient
     exports.createSessionPreferenceClient = createSessionPreferenceClient
+    exports.diagnosticsHistoryText = diagnosticsHistoryText
     exports.diagnosticsReportText = diagnosticsReportText
     exports.formatResetDistance = formatResetDistance
     exports.inject = inject

@@ -63,6 +63,10 @@ test("host entry exports a valid Cordis plugin and scoped stream listener", asyn
   assert.equal(name, "dsh-codex")
   assert.deepEqual(inject, ["llm", "authorization", "credentials"])
   assert.equal(Config({}).partialResponseRecovery, true)
+  assert.equal(Config({}).defaultFast, false)
+  assert.equal(Config({}).defaultTransport, "auto")
+  assert.equal(Config({}).defaultTextVerbosity, "low")
+  assert.equal(Config({}).defaultReasoningSummary, "auto")
   apply(context, {})
 
   assert.deepEqual(adapterRoutes, [[CODEX_ROUTE_ID]])
@@ -176,7 +180,7 @@ test("host entry exports a valid Cordis plugin and scoped stream listener", asyn
     new AbortController().signal,
   )
   assert.equal(diagnostics.ok, true)
-  assert.equal(diagnostics.value.version, 1)
+  assert.equal(diagnostics.value.version, 2)
   assert.equal(diagnostics.value.mode, "local")
   assert.deepEqual(diagnostics.value.checks.map(({ id }) => id), [
     "runtime",

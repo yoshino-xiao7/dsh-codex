@@ -664,6 +664,7 @@ test("strict release verification covers every packed publication-state document
   assert.match(source, /assertPublicationAcceptanceRecord/u)
   assert.match(source, /当前版本：\\`\$\{version\}\\` 正式版/u)
   assert.match(source, /Current version: \\`\$\{version\}\\` stable release/u)
+  assert.match(source, /dsh plugin --profile web add dsh-codex-community@\$\{version\}/u)
   assert.doesNotMatch(source, /assertNoPublishPlaceholders/u)
   assert.match(source, /test\/fixtures\/dsh-runtime\/package\.json/u)
   assert.match(source, /test\/fixtures\/dsh-runtime\/pnpm-lock\.yaml/u)

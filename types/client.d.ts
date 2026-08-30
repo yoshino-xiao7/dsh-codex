@@ -67,7 +67,15 @@ export interface CodexAccountUsage {
   rateLimits: readonly CodexUsageRateLimit[]
 }
 
-export type CodexDiagnosticMode = "local" | "account"
+export interface CodexAccountUsageReminder {
+  readonly kind: "low" | "exhausted"
+  readonly windowDurationMins: 300 | 10_080
+  readonly remainingPercent: number
+  readonly resetsAt: number
+}
+
+export type CodexPassiveDiagnosticMode = "local" | "account"
+export type CodexDiagnosticMode = CodexPassiveDiagnosticMode | "network"
 export type CodexDiagnosticOutcome = "pass" | "warning" | "fail" | "cancelled"
 export type CodexDiagnosticStatus = "pass" | "warning" | "fail" | "skipped"
 
@@ -79,15 +87,33 @@ export interface CodexDiagnosticCheck {
 }
 
 export interface CodexDiagnosticsReport {
-  readonly version: 1
+  readonly version: 2
   readonly mode: CodexDiagnosticMode
   readonly outcome: CodexDiagnosticOutcome
   readonly observedAt: number
   readonly checks: readonly CodexDiagnosticCheck[]
 }
 
+export interface CodexNetworkDiagnosticConsent {
+  readonly version: 1
+  readonly consentId: string
+  readonly expiresAt: number
+  readonly modelId: string
+  readonly transport: "sse"
+}
+
+export interface CodexDiagnosticsHistory {
+  readonly version: 1
+  readonly limit: number
+  readonly reports: readonly CodexDiagnosticsReport[]
+}
+
 export interface ConnectionDiagnosticsClient {
-  run(mode: CodexDiagnosticMode, signal?: AbortSignal): Promise<CodexDiagnosticsReport>
+  run(mode: CodexPassiveDiagnosticMode, signal?: AbortSignal): Promise<CodexDiagnosticsReport>
+  prepareNetwork(signal?: AbortSignal): Promise<CodexNetworkDiagnosticConsent>
+  runNetwork(consentId: string, signal?: AbortSignal): Promise<CodexDiagnosticsReport>
+  history(signal?: AbortSignal): Promise<CodexDiagnosticsHistory>
+  clearHistory(signal?: AbortSignal): Promise<{ readonly cleared: number }>
 }
 
 export interface AuthorizationClient {
@@ -234,6 +260,32 @@ export interface SettingsDescribeFace {
   acceptView(view: SettingsNamespaceMirrorView): void
 }
 
+export interface CodexGlobalRequestDefaults {
+  defaultFast: boolean
+  defaultTransport: CodexSessionPreference["transport"]
+  defaultTextVerbosity: CodexSessionPreference["textVerbosity"]
+  defaultReasoningSummary: CodexSessionPreference["reasoningSummary"]
+}
+
+export type CodexGlobalRequestDefaultsSnapshot =
+  | { kind: "loading" }
+  | { kind: "unavailable" }
+  | {
+      kind: "ready"
+      writable: boolean
+      value: CodexGlobalRequestDefaults
+    }
+
+export interface GlobalRequestDefaultsClient {
+  readonly available: boolean
+  load(): CodexGlobalRequestDefaultsSnapshot
+  set<Field extends keyof CodexGlobalRequestDefaults>(
+    field: Field,
+    value: CodexGlobalRequestDefaults[Field],
+  ): Promise<void>
+  subscribe(listener: () => void): () => void
+}
+
 export interface RpcConnection {
   rpc: {
     call(
@@ -249,6 +301,9 @@ export declare function createAuthorizationClient(connection: RpcConnection): Au
 export declare function createConnectionDiagnosticsClient(
   connection: RpcConnection,
 ): ConnectionDiagnosticsClient
+export declare function createGlobalRequestDefaultsClient(
+  scope: unknown,
+): GlobalRequestDefaultsClient
 export declare function createSessionPreferenceClient(
   connection: RpcConnection,
 ): SessionPreferenceClientFactory
@@ -267,16 +322,31 @@ export declare function safeQuotaSnapshot(value: unknown, now?: number):
       remainingMinutes?: number
     }
 export declare function diagnosticsReportText(value: unknown): string
+export declare function diagnosticsHistoryText(value: unknown): string
 export declare function nextAccountUsageTransition(
   usage: CodexAccountUsage,
   now?: number,
 ): { at: number; refresh: boolean } | undefined
+export declare function accountUsageReminders(
+  usage: CodexAccountUsage,
+  now?: number,
+): readonly CodexAccountUsageReminder[]
+export declare function formatResetDistance(
+  resetsAt: number,
+  t: (key: string) => string,
+  now?: number,
+): string
+export declare function installSettingsNavIcon(): (() => void) | undefined
 export declare function AuthorizationSettings(props: {
   client: AuthorizationClient
   t(key: string): string
 }): unknown
 export declare function ConnectionDiagnosticsSettings(props: {
   client: ConnectionDiagnosticsClient
+  t(key: string): string
+}): unknown
+export declare function GlobalRequestDefaultsSettings(props: {
+  client: GlobalRequestDefaultsClient
   t(key: string): string
 }): unknown
 export declare function CodexFastToggle(props: {
@@ -294,6 +364,7 @@ export declare function CodexSettings(props: {
   client: AuthorizationClient
   diagnosticsClient: ConnectionDiagnosticsClient
   modelClient: ModelEnablementClient
+  defaultsClient: GlobalRequestDefaultsClient
   t(key: string): string
 }): unknown
 export declare function apply(ctx: unknown): void

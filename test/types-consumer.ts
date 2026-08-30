@@ -13,8 +13,14 @@ import {
   ConnectionDiagnosticsSettings,
   CodexFastToggle,
   CodexSettings,
+  GlobalRequestDefaultsSettings,
+  accountUsageReminders,
   createAuthorizationClient,
   createConnectionDiagnosticsClient,
+  createGlobalRequestDefaultsClient,
+  diagnosticsHistoryText,
+  formatResetDistance,
+  installSettingsNavIcon,
   createModelEnablementClient,
   createSessionPreferenceClient,
 } from "dsh-codex-community/client"
@@ -22,6 +28,7 @@ import type {
   CodexAccountUsage,
   AuthorizationClient,
   ConnectionDiagnosticsClient,
+  GlobalRequestDefaultsClient,
   RpcConnection,
   SessionPreferenceClient,
   UseCodexModelDirectory,
@@ -41,17 +48,37 @@ declare const options: GenerateOptions
 declare const failure: LlmFailure
 declare const next: () => AsyncIterable<StreamChunk>
 
-const config: HostConfig = { partialResponseRecovery: true }
+const config: HostConfig = {
+  defaultFast: true,
+  defaultTransport: "websocket-cached",
+  defaultTextVerbosity: "medium",
+  defaultReasoningSummary: "concise",
+  partialResponseRecovery: true,
+}
 applyHost(ctx, config)
 ConfigSchema(config)
 
 const client: AuthorizationClient = createAuthorizationClient(connection)
 const diagnosticsClient: ConnectionDiagnosticsClient = createConnectionDiagnosticsClient(connection)
 const modelClient = createModelEnablementClient(connection)
+const defaultsClient: GlobalRequestDefaultsClient = createGlobalRequestDefaultsClient(undefined)
 void client.describe()
 void diagnosticsClient.run("local")
 void diagnosticsClient.run("account")
+void diagnosticsClient.prepareNetwork()
+void diagnosticsClient.runNetwork("00000000-0000-4000-8000-000000000000")
+void diagnosticsClient.history()
+void diagnosticsClient.clearHistory()
+void diagnosticsHistoryText({ version: 1, limit: 20, reports: [] })
 const accountUsage: Promise<CodexAccountUsage> = client.usage()
+accountUsage.then((usage) => accountUsageReminders(usage))
+const resetDistance: string = formatResetDistance(Date.now() + 60_000, (key) => key)
+const removeSettingsNavIcon: (() => void) | undefined = installSettingsNavIcon()
+removeSettingsNavIcon?.()
+void defaultsClient.set("defaultFast", true)
+void defaultsClient.set("defaultTransport", "sse")
+void defaultsClient.set("defaultTextVerbosity", "high")
+void defaultsClient.set("defaultReasoningSummary", "detailed")
 const sessionPreferences = createSessionPreferenceClient(connection)
 const sessionPreference: SessionPreferenceClient = sessionPreferences.forSession("session-1")
 void sessionPreference.get()
@@ -65,6 +92,7 @@ const useModelDirectory: UseCodexModelDirectory = (selector) => selector({
 })
 AuthorizationSettings({ client, t: (key) => key })
 ConnectionDiagnosticsSettings({ client: diagnosticsClient, t: (key) => key })
+GlobalRequestDefaultsSettings({ client: defaultsClient, t: (key) => key })
 CodexFastToggle({
   session: { removed: false },
   useModelDirectory,
@@ -72,7 +100,7 @@ CodexFastToggle({
   selectModel: async () => undefined,
   t: (key) => key,
 })
-CodexSettings({ client, diagnosticsClient, modelClient, t: (key) => key })
+CodexSettings({ client, diagnosticsClient, modelClient, defaultsClient, t: (key) => key })
 
 const facts = inspectCodexFailure(failure)
 const quota = createQuotaObserver({ staleMs: 300_000 })
@@ -89,5 +117,6 @@ void [
   normalized.changed,
   attachmentPolicy.maxPixels,
   accountUsage,
+  resetDistance,
   stream,
 ]

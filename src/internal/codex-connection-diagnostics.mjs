@@ -1,13 +1,25 @@
+import { randomUUID } from "node:crypto"
+
 import { CODEX_ROUTE_ID } from "./codex-identifiers.mjs"
+import { isCodexNetworkProbeModelId } from "./codex-network-probe-contract.mjs"
 
 export const CODEX_DIAGNOSTICS_RPC_CHANNEL = "/dsh-codex-diagnostics"
 
-const REPORT_VERSION = 1
-const MODES = new Set(["local", "account"])
+const REPORT_VERSION = 2
+const HISTORY_VERSION = 1
+const DEFAULT_HISTORY_LIMIT = 20
+const MAX_HISTORY_LIMIT = 50
+const CONSENT_TTL_MS = 60_000
+const MAX_CONSENTS = 8
+const DEFAULT_NETWORK_PREFLIGHT_TIMEOUT_MS = 30_000
+const MAX_NETWORK_PREFLIGHT_TIMEOUT_MS = 60_000
+const MODES = new Set(["local", "account", "network"])
+const PASSIVE_MODES = new Set(["local", "account"])
 const CREDENTIAL_STATES = new Set(["signed-in", "signed-out", "invalid"])
 const SELECTIONS = new Set(["all", "custom"])
 const LOCAL_CHECK_IDS = Object.freeze(["runtime", "credential", "models"])
 const ACCOUNT_CHECK_IDS = Object.freeze([...LOCAL_CHECK_IDS, "account-usage"])
+const NETWORK_CHECK_IDS = Object.freeze([...LOCAL_CHECK_IDS, "model-request"])
 
 class RpcInputError extends Error {
   constructor(message) {
@@ -16,40 +28,112 @@ class RpcInputError extends Error {
   }
 }
 
+class DiagnosticConsentError extends Error {
+  constructor() {
+    super("Network diagnostic consent is missing or expired")
+    this.name = "DiagnosticConsentError"
+  }
+}
+
 /**
  * Build a bounded, read-only diagnostic surface for the installed Codex route.
  *
  * `local` calls only the process-local snapshot and credential metadata seams.
- * `account` performs those same checks and then calls AccountUsageReader once;
- * it never owns or receives an LLM stream function. Reports are constructed
- * from fixed check IDs, status codes, and primitive facts so provider failures,
- * OAuth grants, account identifiers, and tokens cannot cross the interface.
+ * `account` performs those same checks and then calls AccountUsageReader once.
+ * `network` is reachable only through a short-lived, one-shot consent and asks
+ * the injected isolated probe to make at most one real request. Reports are
+ * constructed from fixed check IDs, status codes, and primitive facts so
+ * provider failures, OAuth grants, account identifiers, response content, and
+ * tokens cannot cross the interface.
  */
 export function createCodexConnectionDiagnostics(options) {
   const input = plainOptions(options)
   const getRuntimeSnapshot = requiredFunction(input, "getRuntimeSnapshot")
   const describeCredential = requiredFunction(input, "describeCredential")
   const accountUsageReader = input.accountUsageReader
+  const networkProbe = input.networkProbe
   const clock = input.clock ?? Date.now
+  const historyLimit = input.historyLimit ?? DEFAULT_HISTORY_LIMIT
+  const networkPreflightTimeoutMs = input.networkPreflightTimeoutMs
+    ?? DEFAULT_NETWORK_PREFLIGHT_TIMEOUT_MS
 
   if (accountUsageReader?.read === undefined || typeof accountUsageReader.read !== "function") {
     throw new TypeError("accountUsageReader must provide read")
   }
+  if (networkProbe?.run === undefined || typeof networkProbe.run !== "function") {
+    throw new TypeError("networkProbe must provide run")
+  }
+  if (networkProbe.dispose !== undefined && typeof networkProbe.dispose !== "function") {
+    throw new TypeError("networkProbe.dispose must be a function when provided")
+  }
   if (typeof clock !== "function") throw new TypeError("clock must be a function")
+  if (!Number.isSafeInteger(historyLimit) || historyLimit < 1 || historyLimit > MAX_HISTORY_LIMIT) {
+    throw new TypeError(`historyLimit must be an integer from 1 to ${MAX_HISTORY_LIMIT}`)
+  }
+  if (
+    !Number.isSafeInteger(networkPreflightTimeoutMs)
+    || networkPreflightTimeoutMs < 1
+    || networkPreflightTimeoutMs > MAX_NETWORK_PREFLIGHT_TIMEOUT_MS
+  ) {
+    throw new TypeError(
+      `networkPreflightTimeoutMs must be an integer from 1 to ${MAX_NETWORK_PREFLIGHT_TIMEOUT_MS}`,
+    )
+  }
 
-  async function run(mode, signal) {
-    if (!MODES.has(mode)) throw new TypeError("diagnostic mode must be local or account")
+  const previousReports = []
+  const consents = new Map()
+  const lifetime = new AbortController()
+  let disposed = false
+
+  function complete(mode, outcome, checks) {
+    const value = report(mode, outcome, checks, clock)
+    if (disposed) return value
+    previousReports.push(value)
+    if (previousReports.length > historyLimit) previousReports.shift()
+    return value
+  }
+
+  async function runDiagnostic(mode, signal, networkModelId) {
+    if (disposed) throw new Error("diagnostics are disposed")
+    if (!MODES.has(mode)) throw new TypeError("diagnostic mode must be local, account, or network")
     assertAbortSignal(signal)
 
-    const expectedIds = mode === "account" ? ACCOUNT_CHECK_IDS : LOCAL_CHECK_IDS
-    if (signal?.aborted === true) {
-      return report(mode, "cancelled", expectedIds.map(cancelledCheck), clock)
+    const expectedIds = mode === "account"
+      ? ACCOUNT_CHECK_IDS
+      : mode === "network"
+        ? NETWORK_CHECK_IDS
+        : LOCAL_CHECK_IDS
+    const diagnosticSignal = AbortSignal.any([
+      lifetime.signal,
+      ...(signal === undefined ? [] : [signal]),
+    ])
+    const preflightSignal = mode === "network"
+      ? AbortSignal.any([
+          diagnosticSignal,
+          AbortSignal.timeout(networkPreflightTimeoutMs),
+        ])
+      : diagnosticSignal
+    if (diagnosticSignal?.aborted === true) {
+      return complete(mode, "cancelled", expectedIds.map(cancelledCheck))
     }
 
     const checks = []
     let runtimeSnapshot
+    const runtimeStep = await diagnosticStep(
+      () => getRuntimeSnapshot({ signal: preflightSignal }),
+      preflightSignal,
+    )
+    if (runtimeStep.kind === "aborted") {
+      if (diagnosticSignal.aborted) {
+        appendCancelledChecks(checks, expectedIds)
+        return complete(mode, "cancelled", checks)
+      }
+      appendPreflightTimeoutChecks(checks, expectedIds)
+      return complete(mode, "fail", checks)
+    }
     try {
-      runtimeSnapshot = normalizeRuntimeSnapshot(await getRuntimeSnapshot())
+      if (runtimeStep.kind === "failed") throw runtimeStep.error
+      runtimeSnapshot = normalizeRuntimeSnapshot(runtimeStep.value)
       checks.push(check("runtime", runtimeSnapshot.routeRegistered ? "pass" : "fail", {
         code: runtimeSnapshot.routeRegistered ? "runtime-ready" : "route-unavailable",
         facts: {
@@ -61,42 +145,60 @@ export function createCodexConnectionDiagnostics(options) {
       checks.push(check("runtime", "fail", { code: "runtime-unavailable" }))
     }
 
-    if (signal?.aborted === true) {
+    if (diagnosticSignal?.aborted === true) {
       appendCancelledChecks(checks, expectedIds)
-      return report(mode, "cancelled", checks, clock)
+      return complete(mode, "cancelled", checks)
     }
 
+    let credential
+    const credentialStep = await diagnosticStep(
+      () => describeCredential({ signal: preflightSignal }),
+      preflightSignal,
+    )
+    if (credentialStep.kind === "aborted") {
+      if (diagnosticSignal.aborted) {
+        appendCancelledChecks(checks, expectedIds)
+        return complete(mode, "cancelled", checks)
+      }
+      appendPreflightTimeoutChecks(checks, expectedIds)
+      return complete(mode, "fail", checks)
+    }
     try {
-      const credential = normalizeCredential(await describeCredential())
+      if (credentialStep.kind === "failed") throw credentialStep.error
+      credential = normalizeCredential(credentialStep.value)
       checks.push(credentialCheck(credential))
     } catch {
       checks.push(check("credential", "fail", { code: "credential-unavailable" }))
     }
 
-    if (signal?.aborted === true) {
+    if (diagnosticSignal?.aborted === true) {
       appendCancelledChecks(checks, expectedIds)
-      return report(mode, "cancelled", checks, clock)
+      return complete(mode, "cancelled", checks)
     }
 
     checks.push(modelsCheck(runtimeSnapshot))
 
     if (mode === "account") {
-      if (signal?.aborted === true) {
+      if (diagnosticSignal?.aborted === true) {
         checks.push(cancelledCheck("account-usage"))
-        return report(mode, "cancelled", checks, clock)
+        return complete(mode, "cancelled", checks)
       }
 
       try {
-        const usage = await accountUsageReader.read({ signal })
-        if (signal?.aborted === true) {
+        const usageStep = await diagnosticStep(
+          () => accountUsageReader.read({ signal: diagnosticSignal }),
+          diagnosticSignal,
+        )
+        if (usageStep.kind === "aborted") {
           checks.push(cancelledCheck("account-usage"))
-          return report(mode, "cancelled", checks, clock)
+          return complete(mode, "cancelled", checks)
         }
-        checks.push(accountUsageCheck(usage))
+        if (usageStep.kind === "failed") throw usageStep.error
+        checks.push(accountUsageCheck(usageStep.value))
       } catch (error) {
-        if (signal?.aborted === true || error?.code === "ABORTED") {
+        if (diagnosticSignal?.aborted === true || error?.code === "ABORTED") {
           checks.push(cancelledCheck("account-usage"))
-          return report(mode, "cancelled", checks, clock)
+          return complete(mode, "cancelled", checks)
         }
         checks.push(check("account-usage", "fail", {
           code: publicAccountUsageFailureCode(error),
@@ -104,10 +206,132 @@ export function createCodexConnectionDiagnostics(options) {
       }
     }
 
-    return report(mode, outcomeFor(checks), checks, clock)
+    if (mode === "network") {
+      if (diagnosticSignal.aborted === true) {
+        checks.push(cancelledCheck("model-request"))
+        return complete(mode, "cancelled", checks)
+      }
+      if (
+        runtimeSnapshot?.routeRegistered !== true
+        || credential?.state !== "signed-in"
+        || runtimeSnapshot.enabledCount < 1
+        || !runtimeSnapshot.enabledModelIds.includes(networkModelId)
+      ) {
+        checks.push(check("model-request", "fail", {
+          code: "model-request-prerequisite-failed",
+        }))
+        return complete(mode, outcomeFor(checks), checks)
+      }
+      try {
+        const probeStep = await diagnosticStep(
+          () => networkProbe.run(diagnosticSignal, networkModelId),
+          diagnosticSignal,
+        )
+        if (probeStep.kind === "aborted") {
+          checks.push(networkRequestCheck({
+            kind: "cancelled-after-attempt",
+            outputObserved: false,
+          }, networkModelId))
+        } else {
+          if (probeStep.kind === "failed") throw probeStep.error
+          checks.push(networkRequestCheck(probeStep.value, networkModelId))
+        }
+      } catch {
+        checks.push(check("model-request", "fail", { code: "model-request-unavailable" }))
+      }
+    }
+
+    return complete(mode, outcomeFor(checks), checks)
   }
 
-  return Object.freeze({ run })
+  function run(mode, signal) {
+    if (!PASSIVE_MODES.has(mode)) {
+      throw new TypeError("diagnostic mode must be local or account")
+    }
+    return runDiagnostic(mode, signal)
+  }
+
+  async function prepareNetwork(signal) {
+    if (disposed) throw new DiagnosticConsentError()
+    assertAbortSignal(signal)
+    if (signal?.aborted === true) throw new DiagnosticConsentError()
+    const preparationSignal = AbortSignal.any([
+      lifetime.signal,
+      AbortSignal.timeout(networkPreflightTimeoutMs),
+      ...(signal === undefined ? [] : [signal]),
+    ])
+    const snapshotStep = await diagnosticStep(
+      () => getRuntimeSnapshot({ signal: preparationSignal }),
+      preparationSignal,
+    )
+    if (snapshotStep.kind !== "completed") throw new DiagnosticConsentError()
+    let snapshot
+    try {
+      snapshot = normalizeRuntimeSnapshot(snapshotStep.value)
+    } catch {
+      throw new DiagnosticConsentError()
+    }
+    const modelId = snapshot.enabledModelIds[0]
+    if (snapshot.routeRegistered !== true || !isCodexNetworkProbeModelId(modelId)) {
+      throw new DiagnosticConsentError()
+    }
+    expireConsents(consents, readClock(clock))
+    while (consents.size >= MAX_CONSENTS) consents.delete(consents.keys().next().value)
+    const preparedAt = readClock(clock)
+    const consentId = randomUUID()
+    const expiresAt = preparedAt + CONSENT_TTL_MS
+    consents.set(consentId, Object.freeze({ expiresAt, modelId }))
+    return Object.freeze({
+      version: 1,
+      consentId,
+      expiresAt,
+      modelId,
+      transport: "sse",
+    })
+  }
+
+  async function runNetwork(consentId, signal) {
+    if (disposed) throw new DiagnosticConsentError()
+    assertAbortSignal(signal)
+    if (typeof consentId !== "string" || !/^[0-9a-f-]{36}$/u.test(consentId)) {
+      throw new DiagnosticConsentError()
+    }
+    const now = readClock(clock)
+    expireConsents(consents, now)
+    const consent = consents.get(consentId)
+    consents.delete(consentId)
+    if (consent === undefined || consent.expiresAt <= now || signal?.aborted === true) {
+      throw new DiagnosticConsentError()
+    }
+    return runDiagnostic("network", signal, consent.modelId)
+  }
+
+  function history() {
+    if (disposed) throw new Error("diagnostics are disposed")
+    return Object.freeze({
+      version: HISTORY_VERSION,
+      limit: historyLimit,
+      reports: Object.freeze([...previousReports]),
+    })
+  }
+
+  function clearHistory() {
+    if (disposed) return Object.freeze({ cleared: 0 })
+    const cleared = previousReports.length
+    previousReports.length = 0
+    return Object.freeze({ cleared })
+  }
+
+  function dispose() {
+    if (disposed) return
+    disposed = true
+    lifetime.abort()
+    consents.clear()
+    previousReports.length = 0
+    networkProbe.dispose?.()
+  }
+
+  return Object.freeze({ clearHistory, dispose, history, prepareNetwork, run, runNetwork })
 }
 
 /** Register diagnostics on an isolated loopback-only RPC channel. */
@@ -118,15 +342,27 @@ export function registerCodexDiagnosticsRpc(ctx, diagnostics) {
     createCodexDiagnosticsRpcHandler(bridge),
     { authority: "loopback" },
   )
+  ctx.effect?.(() => () => bridge.dispose(), "dsh-codex: diagnostics RPC state")
   return bridge
 }
 
 export class CodexDiagnosticsBridge {
   #diagnostics
+  #disposed = false
 
   constructor(diagnostics) {
-    if (diagnostics === null || typeof diagnostics !== "object" || typeof diagnostics.run !== "function") {
-      throw new TypeError("diagnostics must provide run")
+    if (
+      diagnostics === null
+      || typeof diagnostics !== "object"
+      || typeof diagnostics.run !== "function"
+      || typeof diagnostics.prepareNetwork !== "function"
+      || typeof diagnostics.runNetwork !== "function"
+      || typeof diagnostics.history !== "function"
+      || typeof diagnostics.clearHistory !== "function"
+    ) {
+      throw new TypeError(
+        "diagnostics must provide run, prepareNetwork, runNetwork, history, and clearHistory",
+      )
     }
     this.#diagnostics = diagnostics
   }
@@ -134,13 +370,64 @@ export class CodexDiagnosticsBridge {
   run(payload, signal) {
     const input = objectInput(payload)
     assertOnlyKeys(input, ["mode"])
-    if (!MODES.has(input.mode)) throw new RpcInputError("mode must be local or account")
-    return this.#diagnostics.run(input.mode, signal)
+    if (!PASSIVE_MODES.has(input.mode)) throw new RpcInputError("mode must be local or account")
+    return this.#service().run(input.mode, signal)
+  }
+
+  prepareNetwork(payload, signal) {
+    throwIfCancelled(signal)
+    const input = objectInput(payload)
+    assertOnlyKeys(input, [])
+    return this.#service().prepareNetwork(signal)
+  }
+
+  runNetwork(payload, signal) {
+    throwIfCancelled(signal)
+    const input = objectInput(payload)
+    assertOnlyKeys(input, ["consentId"])
+    if (
+      typeof input.consentId !== "string"
+      || input.consentId.length < 1
+      || input.consentId.length > 64
+    ) {
+      throw new RpcInputError("consentId must be a bounded string")
+    }
+    return this.#service().runNetwork(input.consentId, signal)
+  }
+
+  history(payload, signal) {
+    throwIfCancelled(signal)
+    const input = objectInput(payload)
+    assertOnlyKeys(input, [])
+    return this.#service().history()
+  }
+
+  clearHistory(payload, signal) {
+    throwIfCancelled(signal)
+    const input = objectInput(payload)
+    assertOnlyKeys(input, [])
+    return this.#service().clearHistory()
+  }
+
+  dispose() {
+    this.#disposed = true
   }
 
   dispatch(endpoint, payload, signal) {
-    if (endpoint !== "run") throw new RpcInputError("Unknown diagnostics RPC endpoint")
-    return this.run(payload, signal)
+    this.#service()
+    switch (endpoint) {
+      case "run": return this.run(payload, signal)
+      case "prepare-network": return this.prepareNetwork(payload, signal)
+      case "run-network": return this.runNetwork(payload, signal)
+      case "history": return this.history(payload, signal)
+      case "clear-history": return this.clearHistory(payload, signal)
+      default: throw new RpcInputError("Unknown diagnostics RPC endpoint")
+    }
+  }
+
+  #service() {
+    if (this.#disposed) throw new Error("diagnostics RPC bridge is disposed")
+    return this.#diagnostics
   }
 }
 
@@ -157,6 +444,16 @@ export function createCodexDiagnosticsRpcHandler(bridge) {
         return {
           ok: false,
           error: { code: "bad-request", message: error.message, details: { issues: [] } },
+        }
+      }
+      if (error instanceof DiagnosticConsentError) {
+        return {
+          ok: false,
+          error: {
+            code: "consent-invalid",
+            message: "Network diagnostic consent is missing or expired",
+            details: {},
+          },
         }
       }
       return {
@@ -239,6 +536,65 @@ function accountUsageCheck(value) {
   return check("account-usage", "pass", { code: "account-usage-ready", facts })
 }
 
+function networkRequestCheck(value, modelId) {
+  if (
+    value === null
+    || typeof value !== "object"
+    || Array.isArray(value)
+    || typeof value.kind !== "string"
+    || typeof value.outputObserved !== "boolean"
+  ) {
+    return check("model-request", "fail", { code: "model-request-unavailable" })
+  }
+  if (value.kind === "model-unavailable") {
+    return check("model-request", "fail", { code: "model-request-unavailable" })
+  }
+  if (value.kind === "cancelled") return cancelledCheck("model-request")
+  if (value.kind === "busy") {
+    return check("model-request", "fail", { code: "model-request-busy" })
+  }
+  if (!isCodexNetworkProbeModelId(modelId)) {
+    return check("model-request", "fail", { code: "model-request-unavailable" })
+  }
+  const facts = { attempted: true, outputObserved: value.outputObserved, modelId }
+  switch (value.kind) {
+    case "cancelled-after-attempt": return check("model-request", "warning", {
+      code: "model-request-cancelled-after-attempt",
+      facts,
+    })
+    case "success": return check("model-request", "pass", {
+      code: "model-request-ready",
+      facts,
+    })
+    case "max-tokens": return check("model-request", "warning", {
+      code: "model-request-max-tokens",
+      facts,
+    })
+    case "unexpected-tool-call": return check("model-request", "warning", {
+      code: "model-request-tool-call",
+      facts,
+    })
+    case "empty-response": return check("model-request", "warning", {
+      code: "model-response-empty",
+      facts,
+    })
+    case "auth": return check("model-request", "fail", { code: "model-request-auth-error", facts })
+    case "quota": return check("model-request", "fail", { code: "model-request-quota-exhausted", facts })
+    case "rate-limit": return check("model-request", "fail", { code: "model-request-rate-limited", facts })
+    case "timeout": return check("model-request", "fail", { code: "model-request-timeout", facts })
+    case "server": return check("model-request", "fail", { code: "model-request-server-error", facts })
+    case "transport":
+    case "stream-closed": return check("model-request", "fail", { code: "model-request-transport-error", facts })
+    case "unsupported": return check("model-request", "fail", { code: "model-request-unsupported", facts })
+    case "invalid-request": return check("model-request", "fail", { code: "model-request-invalid", facts })
+    case "provider-error": return check("model-request", "fail", { code: "model-request-provider-error", facts })
+    case "unknown-model": return check("model-request", "fail", { code: "model-request-unknown-model", facts })
+    case "missing-credential": return check("model-request", "fail", { code: "model-request-credential-missing", facts })
+    case "aborted": return check("model-request", "fail", { code: "model-request-aborted", facts })
+    default: return check("model-request", "fail", { code: "model-request-failed", facts })
+  }
+}
+
 function publicAccountUsageFailureCode(error) {
   let code
   let status
@@ -292,6 +648,7 @@ function normalizeRuntimeSnapshot(value) {
     routeRegistered: value.routeRegistered,
     catalogCount: catalog.size,
     enabledCount: enabled.size,
+    enabledModelIds: Object.freeze([...enabled]),
     selection: value.selection,
   })
 }
@@ -300,7 +657,7 @@ function modelIds(entries, name) {
   const result = new Set()
   for (const entry of entries) {
     const id = typeof entry === "string" ? entry : entry?.id
-    if (typeof id !== "string" || id.length === 0 || id.length > 256 || result.has(id)) {
+    if (!isCodexNetworkProbeModelId(id) || result.has(id)) {
       throw new TypeError(`${name} contains an invalid model identifier`)
     }
     result.add(id)
@@ -352,7 +709,23 @@ function appendCancelledChecks(checks, expectedIds) {
   }
 }
 
+function appendPreflightTimeoutChecks(checks, expectedIds) {
+  const completed = new Set(checks.map(({ id }) => id))
+  let timedOut = false
+  for (const id of expectedIds) {
+    if (completed.has(id)) continue
+    checks.push(check(id, timedOut ? "skipped" : "fail", {
+      code: timedOut ? "preflight-not-run" : "preflight-timeout",
+    }))
+    timedOut = true
+  }
+}
+
 function outcomeFor(checks) {
+  if (checks.some(({ status, code }) => status === "fail" && code === "preflight-timeout")) {
+    return "fail"
+  }
+  if (checks.some(({ status }) => status === "skipped")) return "cancelled"
   if (checks.some(({ status }) => status === "fail")) return "fail"
   if (checks.some(({ status }) => status === "warning")) return "warning"
   return "pass"
@@ -375,6 +748,22 @@ function report(mode, outcome, checks, clock) {
   })
 }
 
+function readClock(clock) {
+  let value
+  try {
+    value = clock()
+  } catch {
+    value = 0
+  }
+  return Number.isSafeInteger(value) && value >= 0 ? value : 0
+}
+
+function expireConsents(consents, now) {
+  for (const [consentId, consent] of consents) {
+    if (consent.expiresAt <= now) consents.delete(consentId)
+  }
+}
+
 function plainOptions(value) {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     throw new TypeError("diagnostic options must be an object")
@@ -383,11 +772,36 @@ function plainOptions(value) {
   if (prototype !== Object.prototype && prototype !== null) {
     throw new TypeError("diagnostic options must be a plain object")
   }
-  const allowed = new Set(["accountUsageReader", "clock", "describeCredential", "getRuntimeSnapshot"])
+  const allowed = new Set([
+    "accountUsageReader",
+    "clock",
+    "describeCredential",
+    "getRuntimeSnapshot",
+    "historyLimit",
+    "networkPreflightTimeoutMs",
+    "networkProbe",
+  ])
   if (Reflect.ownKeys(value).some((key) => typeof key !== "string" || !allowed.has(key))) {
     throw new TypeError("diagnostic options contain an unknown field")
   }
   return value
+}
+
+function diagnosticStep(operation, signal) {
+  if (signal?.aborted === true) return Promise.resolve({ kind: "aborted" })
+  const attempt = Promise.resolve().then(operation).then(
+    (value) => ({ kind: "completed", value }),
+    (error) => ({ kind: "failed", error }),
+  )
+  if (signal === undefined) return attempt
+  let listener
+  const aborted = new Promise((resolve) => {
+    listener = () => resolve({ kind: "aborted" })
+    signal.addEventListener("abort", listener, { once: true })
+  })
+  return Promise.race([attempt, aborted]).finally(() => {
+    signal.removeEventListener("abort", listener)
+  })
 }
 
 function requiredFunction(value, name) {
@@ -417,4 +831,9 @@ function assertAbortSignal(value) {
   if (value !== undefined && !(value instanceof AbortSignal)) {
     throw new TypeError("signal must be an AbortSignal")
   }
+}
+
+function throwIfCancelled(signal) {
+  assertAbortSignal(signal)
+  if (signal?.aborted === true) throw new RpcInputError("Request cancelled")
 }

@@ -13,6 +13,7 @@ import {
 } from "../src/internal/codex-provider-runtime.mjs"
 import { createCodexPiProvider } from "../src/internal/codex-pi-provider.mjs"
 import { CODEX_ROUTE_ID } from "../src/internal/codex-route-adapter.mjs"
+import { createSessionPreferences } from "../src/internal/session-preferences.mjs"
 
 const RUNTIME_ACCESS = "runtime-refreshed-access-must-not-leak"
 const RUNTIME_ACCOUNT_ID = "runtime-account-id-must-not-leak"
@@ -46,6 +47,10 @@ test("Codex runtime config resolves safe image, cache, and recovery defaults", (
   })
 
   assert.equal(config.partialResponseRecovery, true)
+  assert.equal(config.defaultFast, false)
+  assert.equal(config.defaultTransport, "auto")
+  assert.equal(config.defaultTextVerbosity, "low")
+  assert.equal(config.defaultReasoningSummary, "auto")
   assert.equal(config.cacheRetention, "short")
   assert.equal(config.streamIdleTimeoutMs, 300_000)
   assert.equal(config.maxRequestImageBytes, 20_971_520)
@@ -62,6 +67,10 @@ test("Codex runtime config resolves safe image, cache, and recovery defaults", (
   for (const requestImagePixelBudget of ["", 0, -1, 1.5, Number.NaN]) {
     assert.throws(() => Config({ requestImagePixelBudget }))
   }
+  assert.throws(() => Config({ defaultFast: "yes" }))
+  assert.throws(() => Config({ defaultTransport: "udp" }))
+  assert.throws(() => Config({ defaultTextVerbosity: "verbose" }))
+  assert.throws(() => Config({ defaultReasoningSummary: "full" }))
 })
 
 test("Codex runtime config rejects non-finite timers and nullable model overrides", () => {
@@ -390,6 +399,140 @@ test("settings namespace changes the next adapter operation without mutating an 
     [second.id, CODEX_ROUTE_ID],
   ])
   assert.equal((await adapter.resolveModel(CODEX_ROUTE_ID, first.id)).id, first.id)
+})
+
+test("settings updates live defaults and rolls only inherited transport generations", async () => {
+  const sessionPreferences = createSessionPreferences()
+  sessionPreferences.configure("explicit-fast", { fast: true })
+  sessionPreferences.configure("explicit-transport", { transport: "sse" })
+  let resetAllCalls = 0
+  let rolloverInheritedCalls = 0
+  const sessionResources = {
+    reset() {},
+    resetAll() {
+      resetAllCalls += 1
+    },
+    rolloverInherited() {
+      rolloverInheritedCalls += 1
+    },
+  }
+  let resolved = Config({
+    defaultFast: false,
+    defaultTransport: "auto",
+    defaultTextVerbosity: "low",
+    defaultReasoningSummary: "auto",
+  })
+  let watcher
+  const settingsContext = {
+    settings: {
+      register(namespace, schema) {
+        assert.equal(namespace, CODEX_SETTINGS_NAMESPACE)
+        assert.equal(schema, Config)
+        return {
+          get: () => resolved,
+          watch(callback) {
+            watcher = callback
+            return () => undefined
+          },
+        }
+      },
+    },
+    effect(callback) {
+      callback()
+      return () => undefined
+    },
+  }
+
+  installCodexProviderRuntime(fakeHarness({ settingsContext }).ctx, resolved, {
+    sessionPreferences,
+    sessionResources,
+  })
+
+  assert.deepEqual(sessionPreferences.resolve("inherited"), {
+    fast: false,
+    transport: "auto",
+    textVerbosity: "low",
+    reasoningSummary: "auto",
+  })
+  assert.equal(resetAllCalls, 0)
+  assert.equal(rolloverInheritedCalls, 0)
+
+  let previous = resolved
+  resolved = Config({
+    defaultFast: true,
+    defaultTransport: "auto",
+    defaultTextVerbosity: "high",
+    defaultReasoningSummary: "concise",
+  })
+  await watcher(resolved, previous)
+
+  assert.deepEqual(sessionPreferences.resolve("inherited"), {
+    fast: true,
+    transport: "auto",
+    textVerbosity: "high",
+    reasoningSummary: "concise",
+  })
+  assert.deepEqual(sessionPreferences.resolve("explicit-fast"), {
+    fast: true,
+    transport: "auto",
+    textVerbosity: "high",
+    reasoningSummary: "concise",
+  })
+  assert.deepEqual(sessionPreferences.resolve("explicit-transport"), {
+    fast: true,
+    transport: "sse",
+    textVerbosity: "high",
+    reasoningSummary: "concise",
+  })
+  assert.equal(resetAllCalls, 0)
+  assert.equal(rolloverInheritedCalls, 0)
+
+  previous = resolved
+  resolved = Config({
+    defaultFast: true,
+    defaultTransport: "websocket-cached",
+    defaultTextVerbosity: "medium",
+    defaultReasoningSummary: "detailed",
+  })
+  await watcher(resolved, previous)
+
+  assert.deepEqual(sessionPreferences.resolve("inherited"), {
+    fast: true,
+    transport: "websocket-cached",
+    textVerbosity: "medium",
+    reasoningSummary: "detailed",
+  })
+  assert.deepEqual(sessionPreferences.resolve("explicit-transport"), {
+    fast: true,
+    transport: "sse",
+    textVerbosity: "medium",
+    reasoningSummary: "detailed",
+  })
+  assert.equal(resetAllCalls, 0)
+  assert.equal(rolloverInheritedCalls, 1)
+
+  previous = resolved
+  resolved = Config({
+    defaultFast: false,
+    defaultTransport: "websocket-cached",
+    defaultTextVerbosity: "low",
+    defaultReasoningSummary: "off",
+  })
+  await watcher(resolved, previous)
+  assert.deepEqual(sessionPreferences.resolve("inherited"), {
+    fast: false,
+    transport: "websocket-cached",
+    textVerbosity: "low",
+    reasoningSummary: "off",
+  })
+  assert.deepEqual(sessionPreferences.resolve("explicit-fast"), {
+    fast: true,
+    transport: "websocket-cached",
+    textVerbosity: "low",
+    reasoningSummary: "off",
+  })
+  assert.equal(resetAllCalls, 0)
+  assert.equal(rolloverInheritedCalls, 1)
 })
 
 test("an explicit empty model list hides discovery without invalidating exact model resolution", async () => {

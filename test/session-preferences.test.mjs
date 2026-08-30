@@ -76,6 +76,64 @@ test("session preferences accept explicit defaults for all public controls", () 
   })
 })
 
+test("session overrides stay sparse while live defaults change atomically", () => {
+  const preferences = createSessionPreferences()
+  preferences.configure("session-a", { fast: true })
+  preferences.configure("session-b", { transport: "sse", textVerbosity: "high" })
+
+  assert.equal(preferences.hasOverride("session-a", "transport"), false)
+  assert.equal(preferences.hasOverride("session-b", "transport"), true)
+  assert.equal(preferences.hasOverride("session-b", "reasoningSummary"), false)
+
+  assert.deepEqual(preferences.replaceDefaults({
+    fast: false,
+    transport: "websocket",
+    textVerbosity: "medium",
+    reasoningSummary: "concise",
+  }), {
+    fast: false,
+    transport: "websocket",
+    textVerbosity: "medium",
+    reasoningSummary: "concise",
+  })
+  assert.deepEqual(preferences.resolve("session-a"), {
+    fast: true,
+    transport: "websocket",
+    textVerbosity: "medium",
+    reasoningSummary: "concise",
+  })
+  assert.deepEqual(preferences.resolve("session-b"), {
+    fast: false,
+    transport: "sse",
+    textVerbosity: "high",
+    reasoningSummary: "concise",
+  })
+  assert.deepEqual(preferences.resolve("session-c"), {
+    fast: false,
+    transport: "websocket",
+    textVerbosity: "medium",
+    reasoningSummary: "concise",
+  })
+
+  preferences.remove("session-a")
+  assert.deepEqual(preferences.resolve("session-a"), preferences.resolve("session-c"))
+
+  const before = preferences.resolve("session-b")
+  assert.throws(() => preferences.replaceDefaults({
+    fast: "yes",
+    transport: "auto",
+    textVerbosity: "low",
+    reasoningSummary: "auto",
+  }), /fast/u)
+  assert.deepEqual(preferences.resolve("session-b"), before)
+  assert.throws(() => preferences.replaceDefaults({
+    fast: false,
+    transport: "auto",
+    textVerbosity: "low",
+  }), /defaults/u)
+  assert.throws(() => preferences.hasOverride("session-b", "unknown"), /preference key/u)
+})
+
 test("session preferences reject ambiguous or unbounded input", () => {
   const preferences = createSessionPreferences({ maxSessions: 1 })
 
@@ -122,4 +180,10 @@ test("session preference snapshots are immutable and disposal closes writes", ()
     reasoningSummary: "auto",
   })
   assert.throws(() => preferences.configure("session-a", { fast: false }), /disposed/u)
+  assert.throws(() => preferences.replaceDefaults({
+    fast: false,
+    transport: "auto",
+    textVerbosity: "low",
+    reasoningSummary: "auto",
+  }), /disposed/u)
 })

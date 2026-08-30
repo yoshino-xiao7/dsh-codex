@@ -7,6 +7,10 @@ The production configuration for the `dsh-codex` bundle lives under `dsh-codex.c
 ## Bundle defaults
 
 ```yaml
+defaultFast: false
+defaultTransport: auto
+defaultTextVerbosity: low
+defaultReasoningSummary: auto
 partialResponseRecovery: true
 cacheRetention: short
 streamIdleTimeoutMs: 300000
@@ -21,6 +25,10 @@ Omitting `models` makes the model selector show every Codex model in the current
 
 | Key | Type and allowed values | Default | Unit and behavior |
 | --- | --- | --- | --- |
+| `defaultFast` | Boolean | `false` | No unit. When the selected model supports Fast, selects whether requests without an explicit conversation override use the priority service tier. |
+| `defaultTransport` | `auto`, `sse`, `websocket`, or `websocket-cached` | `auto` | No unit. Default for conversations without an explicit transport override. A change moves those conversations' next request to a new transport generation, without inheriting the old connection, cache, or fallback latch. An in-flight request drains on its old generation before cleanup; conversations with an explicit transport override do not roll over for this global change. |
+| `defaultTextVerbosity` | `low`, `medium`, or `high` | `low` | No unit. Reply verbosity used when no explicit conversation override exists. |
+| `defaultReasoningSummary` | `auto`, `concise`, `detailed`, or `off` | `auto` | No unit. Reasoning-summary form used when no explicit conversation override exists; `off` requests no summary. |
 | `partialResponseRecovery` | Boolean | `true` | No unit. When enabled, a stream that fails after safe plain text can close the text and preserve the partial response. When disabled, the error remains an error instead of converting the partial response to success. A stream with an incomplete tool call always fails closed. |
 | `models` | Array of model entries, or omitted | Omitted | No unit. Omission exposes the complete catalog; an empty array hides every Codex model from the selector; a non-empty array exposes only the listed models. Saved sessions can still resolve a catalog model by its exact model ID. |
 | `cacheRetention` | `none`, `short`, or `long` | `short` | No unit. Passed through as the context-cache retention policy for Codex requests. The plugin does not convert these enum values into fixed durations. |
@@ -68,13 +76,19 @@ The selector no longer shows generic `Default`, `Off`, or `Minimal` entries that
 
 Model cards show text/image input, the selectable reasoning range, and Fast only when supplied by the safe capability projection. An unknown model never receives reasoning or Fast badges merely because its name resembles a known model. If an older conversation still stores `Off` or `Minimal`, a **Repair old reasoning level** action appears beside the composer. Merely opening the conversation never rewrites the selection. Clicking the action removes the unsupported explicit effort, after which the current Provider or service applies its default behavior. Repair neither displays, writes, nor claims a concrete default effort that the catalog does not provide. It still uses the Harness model selector's model-persistence semantics, so the current model becomes the default model for future conversations.
 
+## Global defaults and conversation overrides
+
+`1.1.0` reads the four global-default fields above from the `dsh-codex` settings namespace. Changing one field in settings writes back only that field; it does not replace model selection or other values in the namespace. DSH persists these defaults, so they survive a restart.
+
+The in-memory conversation table retains only fields the user explicitly changes and merges them with the current global defaults when resolving a request. A conversation that explicitly selected Fast therefore keeps that choice, while its untouched Transport, reply-verbosity, and reasoning-summary fields follow later global-default changes. `/codex reset` removes the current conversation's explicit overrides instead of writing four factory constants. Restarting the process discards conversation overrides but retains the persistent global defaults.
+
 ## Per-session request preferences
 
 The lightning button to the left of the conversation model selector and `/codex set fast on|off` update the same current-session Fast preference. On GPT-5.4, GPT-5.5, GPT-5.6 Luna, Sol, and Terra, enabling it uses the official Fast priority service tier starting with the next request; disabling it restores standard speed starting with the next request. Fast targets 1.5× speed and consumes more usage. GPT-5.3 Codex Spark and GPT-5.4 mini never receive the Fast service tier.
 
 The adjacent Transport button and `/codex set transport auto|sse|websocket|websocket-cached` share the current-conversation transport preference. The graphical menu displays the actual current value and can reset to Auto. `auto` lets the Provider select a transport; the other three choices request their named transport explicitly.
 
-Every explicit transport selection clears only the current exact conversation's existing WebSocket connection, debug counters, and WebSocket-to-SSE fallback latch. The next request rebuilds transport state under the selected preference without affecting other conversations. If `auto` is already selected while health reports an active SSE fallback, **Reset to Auto** remains enabled so that latch can be cleared.
+Every explicit transport selection moves only the current exact conversation to a new transport generation. The next request no longer inherits the old WebSocket connection, debug counters, or WebSocket-to-SSE fallback latch, and other conversations are unaffected. A request already running on the retired generation is not closed and cleanup waits for it to finish. If `auto` is already selected while health reports an active SSE fallback, **Reset to Auto** remains enabled so that the next request can establish clean transport state.
 
 The same menu provides two truthful request preferences:
 
@@ -83,7 +97,7 @@ The same menu provides two truthful request preferences:
 
 Both values are passed directly to the Provider request layer and do not rewrite model reasoning effort. `verbosity` controls final-answer detail, while `summary` selects the reasoning-summary form and `off` requests no summary. Like Fast and Transport, each change applies to the next request.
 
-Fast, Transport, reply verbosity, and reasoning summary belong only to the current session and process. Restart restores off, `auto`, `low`, and `auto`. An in-flight request is not changed by a toggle, and a failed Fast request is not replayed automatically on a lower tier. Transport health at the bottom of the menu is sanitized, process-local state for this conversation—requests, connection reuse, delta context, and SSE fallbacks—not an account-side service status. It contains neither response IDs nor raw WebSocket errors.
+Current-conversation overrides for these four controls exist only in process memory; fields without an override use the persistent global defaults. An in-flight request is not changed by a toggle, and a failed Fast request is not replayed automatically on a lower tier. Transport health at the bottom of the menu is sanitized, process-local state for this conversation—requests, connection reuse, delta context, and SSE fallbacks—not an account-side service status. It contains neither response IDs nor raw WebSocket errors.
 
 ## Validation and activation
 
@@ -91,4 +105,4 @@ Fast, Transport, reply verbosity, and reasoning summary belong only to the curre
 - Type mismatches, unknown enum values, ordinary numbers outside the allowed ranges, fractional image limits, and unknown or duplicate model IDs are rejected during plugin load or settings save. A rejected update does not replace the last valid configuration.
 - Use only the finite JSON/YAML numbers listed above. `NaN`, infinity, and undocumented fields are outside the supported configuration interface.
 - A configuration update takes effect on the next adapter operation. An operation already in progress continues with the immutable configuration snapshot it captured at start.
-- Fast, transport, reply-verbosity, and reasoning-summary preferences are temporary state for the current session in the current process, not bundle configuration keys. `/codex` can change them, and the lightning button plus adjacent conversation-request menu provide the same controls graphically.
+- Global defaults are bundle configuration keys. The model selector, adjacent conversation-request menu, and `/codex` change process-local overrides for the current conversation.

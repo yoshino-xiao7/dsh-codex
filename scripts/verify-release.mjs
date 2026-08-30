@@ -147,6 +147,9 @@ function assertPublicationStateMetadata(releaseDate) {
   const enCompatibility = publicationStateDocuments.get("docs/compatibility.en.md") ?? ""
   assert(zhReadme.includes(`当前版本：\`${version}\` 正式版`), "README must name the current stable release")
   assert(enReadme.includes(`Current version: \`${version}\` stable release`), "English README must name the current stable release")
+  const installCommand = `dsh plugin --profile web add dsh-codex-community@${version}`
+  assert(zhReadme.includes(installCommand), "README install command must pin the current release")
+  assert(enReadme.includes(installCommand), "English README install command must pin the current release")
   assert(zhCompatibility.includes("发布后"), "Chinese compatibility status must describe post-release validation")
   assert(/post-release/iu.test(enCompatibility), "English compatibility status must describe post-release validation")
 }

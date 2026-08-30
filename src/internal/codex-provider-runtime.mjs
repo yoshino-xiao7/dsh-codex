@@ -10,6 +10,7 @@ import Schema from "@deepseek-ai/schemastery"
 import { registerCodexAuthorizationFlow } from "./codex-authorization.mjs"
 import { createCodexAccountUsageReader } from "./codex-account-usage.mjs"
 import { createCodexConnectionDiagnostics } from "./codex-connection-diagnostics.mjs"
+import { createCodexNetworkProbe } from "./codex-network-probe.mjs"
 import {
   CODEX_CREDENTIAL_KEY,
   CODEX_PROVIDER_ID,
@@ -38,6 +39,18 @@ const MODEL_SCHEMA = Schema.object({
 })
 
 export const Config = Schema.object({
+  defaultFast: Schema.boolean()
+    .default(false)
+    .description("Use Codex Fast for new sessions when the selected model supports it"),
+  defaultTransport: Schema.union(["auto", "sse", "websocket", "websocket-cached"])
+    .default("auto")
+    .description("Default transport for sessions without an explicit override"),
+  defaultTextVerbosity: Schema.union(["low", "medium", "high"])
+    .default("low")
+    .description("Default reply verbosity for sessions without an explicit override"),
+  defaultReasoningSummary: Schema.union(["auto", "concise", "detailed", "off"])
+    .default("auto")
+    .description("Default reasoning summary style for sessions without an explicit override"),
   partialResponseRecovery: Schema.boolean()
     .default(true)
     .description("Preserve safe partial text instead of replaying an already-visible Codex request"),
@@ -131,15 +144,39 @@ export function installCodexProviderRuntime(ctx, entryConfig = {}, options = {})
   const sessionResources = options.sessionResources
   const resolveSessionPreferences = (sessionId) => sessionPreferences?.resolve(sessionId)
     ?? DEFAULT_SESSION_PREFERENCES
+  let synchronizedDefaultTransport
+
+  function synchronizeSessionDefaults(current) {
+    const transportChanged = synchronizedDefaultTransport !== undefined
+      && synchronizedDefaultTransport !== current.defaultTransport
+    if (typeof sessionPreferences?.replaceDefaults === "function") {
+      sessionPreferences.replaceDefaults({
+        fast: current.defaultFast,
+        transport: current.defaultTransport,
+        textVerbosity: current.defaultTextVerbosity,
+        reasoningSummary: current.defaultReasoningSummary,
+      })
+    }
+    synchronizedDefaultTransport = current.defaultTransport
+    if (transportChanged) sessionResources?.rolloverInherited?.()
+  }
+  synchronizeSessionDefaults(entry)
   const provider = options.provider ?? createCodexPiProvider({
     resolveSessionPreferences,
-    ...(sessionResources === undefined
-      ? {}
-      : {
-          resolveTransportSessionId: (sessionId) => (
-            sessionResources.transportSessionId(sessionId)
-          ),
-        }),
+    ...(typeof sessionResources?.acquire === "function"
+      ? {
+          acquireTransportSession: (sessionId) => sessionResources.acquire(sessionId, {
+            inheritsDefault: sessionId === undefined
+              || sessionPreferences?.hasOverride?.(sessionId, "transport") !== true,
+          }),
+        }
+      : typeof sessionResources?.transportSessionId === "function"
+        ? {
+            resolveTransportSessionId: (sessionId) => (
+              sessionResources.transportSessionId(sessionId)
+            ),
+          }
+        : {}),
   })
   const credentialStore = createCodexCredentialStore(ctx.credentials)
   const authContext = Object.freeze({
@@ -234,11 +271,32 @@ export function installCodexProviderRuntime(ctx, entryConfig = {}, options = {})
       // PiAiAdapter reads the profile map once per operation; invalid settings
       // are rejected by validate before this source can become authoritative.
       profiles()
+      synchronizeSessionDefaults(source())
     },
   })
 
+  const networkProbe = (
+    typeof sessionPreferences?.configure === "function"
+    && typeof sessionPreferences?.remove === "function"
+    && typeof sessionResources?.reset === "function"
+  )
+    ? createCodexNetworkProbe({
+        stream: (request) => routeAdapter.stream(request),
+        selectModel() {
+          const configured = source().models
+          if (configured !== undefined) return configured[0]?.id
+          return provider.getModels()[0]?.id
+        },
+        sessionPreferences,
+        sessionResources,
+      })
+    : Object.freeze({
+        run: async () => Object.freeze({ kind: "model-unavailable", outputObserved: false }),
+      })
+
   const connectionDiagnostics = createCodexConnectionDiagnostics({
     accountUsageReader,
+    networkProbe,
     getRuntimeSnapshot() {
       const catalog = provider.getModels()
       const configured = source().models
@@ -272,6 +330,7 @@ export function installCodexProviderRuntime(ctx, entryConfig = {}, options = {})
   return Object.freeze({
     accountUsageReader,
     connectionDiagnostics,
+    dispose: () => connectionDiagnostics.dispose(),
     getModelCapabilities: () => codexModelCapabilityCatalog(provider.getModels()),
     getConfig: () => source(),
   })
