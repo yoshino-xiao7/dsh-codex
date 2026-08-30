@@ -263,7 +263,7 @@ jobs:
         run: |
           set -eu
           verified=false
-          for attempt in 1 2 3 4 5 6; do
+          for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
             destination="registry/readback-$attempt"
             mkdir -p "$destination"
             if npm pack "dsh-codex-community@$REQUESTED_VERSION" --pack-destination "$destination"; then
@@ -271,11 +271,11 @@ jobs:
               verified=true
               break
             fi
-            sleep 5
+            sleep 10
           done
           test "$verified" = true
           metadata_verified=false
-          for attempt in 1 2 3 4 5 6; do
+          for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
             if npm view "dsh-codex-community@$REQUESTED_VERSION" repository.url --json > release/registry-repository.json \
               && npm view "dsh-codex-community@$REQUESTED_VERSION" dist.integrity --json > release/registry-integrity.json \
               && npm view "dsh-codex-community@$REQUESTED_VERSION" dist.attestations --json > release/registry-attestations.json \
@@ -336,7 +336,7 @@ jobs:
               metadata_verified=true
               break
             fi
-            sleep 5
+            sleep 10
           done
           test "$metadata_verified" = true
       - name: Verify Registry signatures and provenance attestations

@@ -458,6 +458,12 @@ test("publication pins npm independently and compares the immutable candidate to
 
 test("registry readback verifies exact integrity and downloads provenance only from the expected endpoint", async () => {
   const source = await workflow("release.yml")
+  assert.equal(
+    (source.match(/for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do/gu) ?? []).length,
+    2,
+  )
+  assert.equal((source.match(/sleep 10/gu) ?? []).length, 2)
+  assert.doesNotMatch(source, /sleep 5/u)
   assert.match(
     source,
     /const expectedIntegrity = fs\.readFileSync\(`\$\{process\.env\.PACKAGE_FILE\}\.sri`, "utf8"\)\.trim\(\)/u,
