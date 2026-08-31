@@ -4,7 +4,7 @@
 
 A Codex plugin for DeepSeek Harness with ChatGPT OAuth sign-in, Codex models, image input, and reliable streaming responses.
 
-> Current version: `1.1.0` stable release, published through npm `latest` and a full GitHub Release. npm package: `dsh-codex-community`.
+> Current version: `1.1.1` release candidate, not yet published; npm `latest` remains `1.1.0`. npm package: `dsh-codex-community`.
 
 ## Features
 
@@ -14,6 +14,7 @@ A Codex plugin for DeepSeek Harness with ChatGPT OAuth sign-in, Codex models, im
 - let `read_image` safely read HTTP(S) images with address, redirect, format, size, and timeout limits;
 - provide valid pixel and byte budgets for request images, preventing invalid `maxPixels` values;
 - classify `AccountQuotaExceeded` as non-retryable account quota and show a sanitized reset time;
+- classify the known Codex overload failure as a bounded-retry server error, preserving safe text while continuing to forbid full-request replay after tool execution starts;
 - preserve safe partial text after a stream failure, while incomplete tool calls stop without replaying the request;
 - actively refresh real five-hour and weekly limits when settings opens, the page becomes visible again, or a usage-window reset boundary is reached, with immediate refresh through the button or `/codex-usage refresh`; weekly relative-day decrements and the under-24-hour transition update local time display only;
 - present one consistent remaining-usage meaning in compact cards, including the safe plan type and reset time; five-hour limits always use exact time and weekly limits do so inside 24 hours;
@@ -24,6 +25,12 @@ A Codex plugin for DeepSeek Harness with ChatGPT OAuth sign-in, Codex models, im
 - copy the OAuth sign-in link and verification code separately; copying occurs only after an explicit user click and does not log short-lived credentials;
 - run an on-demand local or account check from collapsed connection diagnostics and copy a sanitized report containing only fixed statuses and bounded facts;
 - inspect sanitized per-conversation transport health, including request count, connection reuse, delta context, and SSE fallbacks.
+
+Fixed in `1.1.1`:
+
+- precisely recognize pi-ai's fixed Codex overload error without misclassifying ordinary busy or overloaded prose;
+- preserve safe text after output starts and direct the user to send “continue” manually, while keeping full-request replay disabled after tool execution starts;
+- show a sanitized bilingual overload message instead of exposing the raw server error.
 
 Added in `1.1.0`:
 
@@ -42,7 +49,7 @@ Added in `1.1.0`:
 Install the exact version:
 
 ```sh
-dsh plugin --profile web add dsh-codex-community@1.1.0
+dsh plugin --profile web add dsh-codex-community@1.1.1
 dsh web
 ```
 
@@ -73,7 +80,7 @@ Available commands:
 Update:
 
 ```sh
-dsh plugin --profile web update dsh-codex-community@1.1.0
+dsh plugin --profile web update dsh-codex-community@1.1.1
 dsh web
 ```
 
@@ -89,14 +96,15 @@ dsh web
 - `Image request maxPixels must be a positive integer.`: omitted or `null` image budgets receive safe defaults; zero, negative, fractional, and other explicitly invalid values are rejected while loading configuration.
 - `AccountQuotaExceeded`: the plugin stops automatic retries and preserves safe visible text. A reset time is shown only when present and validated. It does not try to bypass account quota by changing transport.
 - `QUOTA_OR_RATE_LIMIT`: when only generic 429 text remains and structured evidence is unavailable, the plugin neither reports confirmed account quota nor retries automatically. Retry manually later or check the account surface.
+- Codex service overload: failures before output use the existing bounded retry policy. After safe text appears, the plugin preserves it and stops with guidance to send “continue” later; it never replays the full request after tool execution starts.
 - A response stops halfway: plain text can be preserved safely; an incomplete tool call is not replayed, avoiding duplicate side effects.
 
 See [Troubleshooting](docs/troubleshooting.en.md) for diagnostic steps.
 
 ## Support boundaries
 
-- The complete checks and Linux, macOS, and Windows CI/profile smoke for `1.1.0` passed `3/3` against this release candidate and were approved by the maintainer. Post-release live-account validation starts at `0/13`; see the [acceptance record](docs/releases/v1.1.0.acceptance.json).
-- Historical `1.0.0` release evidence remains available but is not inherited as `1.1.0` acceptance.
+- Local complete checks for `1.1.1` passed. Linux, macOS, and Windows CI/profile smoke plus maintainer approval remain in the publication gate; see the current [acceptance record](docs/releases/v1.1.1.acceptance.json).
+- Historical `1.1.0` and `1.0.0` release evidence remains available but is not inherited as `1.1.1` acceptance.
 - The settings page reads usage through the Web-backend compatibility endpoint used by the official Codex client. If that endpoint is unavailable or malformed, the page retains the latest safe reading and falls back to request observation or an unknown state instead of presenting the error as zero remaining usage.
 - Model names, context windows, maximum outputs, and selectable Low-through-Max reasoning efforts follow the actual semantics of the installed provider catalog. The plugin neither invents nor labels a default effort that the catalog does not provide; when no effort is explicit, the current Provider or service applies its default behavior. Generic `Default`, `Off`, and `Minimal` entries are hidden, and agent-level `Ultra` is not disguised as a plain reasoning effort.
 - Fast is limited to GPT-5.4, GPT-5.5, GPT-5.6 Luna, Sol, and Terra and consumes more usage. Other models never receive the Fast service tier.

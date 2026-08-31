@@ -3,6 +3,32 @@
 本项目遵循 Keep a Changelog 的结构；`1.0.0` 起作为正式版发布，具体兼容性边界以对应发布说明为准。
 This project follows the Keep a Changelog structure. Starting with `1.0.0`, releases are stable; each release note defines its exact compatibility boundary.
 
+## [1.1.1] - Unreleased
+
+### 中文
+
+#### 新增
+
+- 无新增功能；本版本仅包含可靠性修复。
+
+#### 修复
+
+- 精确识别 pi-ai 在 Codex 服务过载时返回的固定错误文案，并将其归一化为可有限重试的服务端错误；不会把普通的 busy/overloaded 文本误判为服务故障。
+- 服务过载发生在安全文本输出之后时，保留已有输出并引导用户手动发送“继续”；工具调用已经开始时仍禁止整次请求重放，避免重复输出或工具副作用。
+- 对用户显示脱敏的中英双语服务繁忙提示，不再透传原始服务端错误。
+
+### English
+
+#### Added
+
+- No new features; this release contains reliability fixes only.
+
+#### Fixed
+
+- Precisely recognize the fixed pi-ai Codex overload message and normalize it as a bounded-retry server failure without treating ordinary busy or overloaded prose as a service error.
+- Preserve safe text already emitted before an overload and direct the user to send “continue” manually. Full-request replay remains disabled after a tool call has started, preventing duplicate output or tool side effects.
+- Show a sanitized bilingual service-overload message instead of exposing the raw server error.
+
 ## [1.1.0] - 2026-08-30
 
 ### 中文
