@@ -4,16 +4,16 @@
 
 最近更新：2026-08-31。
 
-`1.1.1` 是当前发布候选，尚未发布。完整本地检查已通过；Linux、macOS、Windows CI/profile smoke、维护者批准与发布后真实账号验证按本版本独立记录，不继承旧版本证据。
+`1.1.1` 是当前正式版。完整检查与 Linux、macOS、Windows CI/profile smoke 已按本版本候选 `3/3` 通过并获维护者批准；发布后真实账号验证从 `0/13` 开始，不继承旧版本证据。
 
 | 组件或环境 | `1.1.1` 兼容目标 | 状态 |
 | --- | --- | --- |
 | DeepSeek Harness | `test/fixtures/dsh-runtime/pnpm-lock.yaml` 继续锁定 `@deepseek-ai/dsh@0.1.1-rc.2` runtime/peer 图 | 完整检查与 profile smoke 已通过 |
 | pi-ai | 锁定 `@earendil-works/pi-ai@0.82.1`，提供全局请求默认值、会话稀疏覆盖、传输 generation 与一次性诊断 seam | 合同回归已通过；真实网络验收发布后记录 |
 | Node.js | 声明 `>=22.19.0 <25` | 本地与三平台 Node 22/24 门禁已通过 |
-| macOS | `macos-latest` Node 22/24 完整检查、冻结 DSH 安装与 Web/profile smoke | 候选 CI 待完成 |
-| Windows x64 | `windows-latest` Node 22/24 完整检查、冻结 DSH 安装与 Web/profile smoke | 候选 CI 待完成 |
-| Linux x64 | `ubuntu-latest` Node 22/24 完整检查、冻结 DSH 安装与 Web/profile smoke | 候选 CI 待完成 |
+| macOS | `macos-latest` Node 22/24 完整检查、冻结 DSH 安装与 Web/profile smoke | `passed` |
+| Windows x64 | `windows-latest` Node 22/24 完整检查、冻结 DSH 安装与 Web/profile smoke | `passed` |
+| Linux x64 | `ubuntu-latest` Node 22/24 完整检查、冻结 DSH 安装与 Web/profile smoke | `passed` |
 | ChatGPT OAuth 真实登录 | 自动化不读取或修改用户真实 grant | 受控验收待完成 |
 | Codex 额度窗口 | 进入、页面重新可见、重置节点与 `/codex-usage refresh` 触发账号读取；每周不足 24 小时阈值只在本地切换显示；展示套餐、统一剩余语义与安全重置时间 | 自动化回归已通过；真实账号验收发布后记录 |
 | Codex 模型设置 | 通用模型发现配合独立 loopback-only 只读能力 RPC，展示紧凑 `K` 标签、输入模态、当前安装 provider catalog 实际提供的推理档位、Fast 与已选/未选排序 | 自动化与三平台 profile smoke 已通过；RPC 不可用或未知能力不推断 |
@@ -22,11 +22,11 @@
 | Codex 图片输入 | 自动化覆盖 attachment seam 与预算投影 | 自动化回归已通过；`maxPixels=4194304` 真实请求发布后验收 |
 | auto / SSE / WebSocket / cached | 自动化覆盖 transport 映射与会话隔离 | 自动化回归已通过；四种真实请求发布后验收 |
 | Fast / priority tier | 自动化断言只有当前会话明确开启才改变 `service_tier` | 自动化回归已通过；账号权限与真实网络发布后验收 |
-| npm / GitHub Release | 严格工作流校验候选、Registry 回读、provenance、签名与 Release 资产 | `1.1.1` 候选，尚未发布 |
+| npm / GitHub Release | 严格工作流校验候选、Registry 回读、provenance、签名与 Release 资产 | 正式版 [`v1.1.1`](https://github.com/yoshino-xiao7/dsh-codex/releases/tag/v1.1.1) |
 
 `1.1.1` 精确识别 pi-ai 的固定 Codex 服务过载错误并纳入现有限次重试合同；安全文本已经输出时保留内容并引导手动继续，工具调用开始后仍禁止整次请求重放。它继承 `1.1.0` 的全局默认值、额度提醒、一次性真实网络诊断与进程内脱敏历史，不改变这些功能的请求或隐私合同。
 
-`1.1.1` 仍只声明精确的 DSH 预发布依赖目标。本版本[验收记录](releases/v1.1.1.acceptance.json)当前是候选草稿；`1.1.0` 与更早版本的记录仅作为历史证据保留，不能替代本版本门禁。
+`1.1.1` 按正式版发布，同时仍只声明精确的 DSH 预发布依赖目标。候选提交、Linux/macOS/Windows CI/profile smoke 与维护者批准记录在本版本[验收记录](releases/v1.1.1.acceptance.json)中；真实账号验证以 `0/13` 如实发布并在发布后继续记录。`1.1.0` 与更早版本的记录仅作为历史证据保留，不能替代本版本门禁。
 
 根目录 `pnpm-lock.yaml` 锁定插件依赖，`test/fixtures/dsh-runtime/pnpm-lock.yaml` 独立锁定兼容性 smoke 的完整 DSH runtime 与 peer 图；CI 使用 `pnpm --dir test/fixtures/dsh-runtime install --frozen-lockfile --ignore-scripts`，不把该 peer 图交给直接 npm 解算，以避免不确定依赖结果和内存失控。该冻结层验证 Web/profile 集成，不声称覆盖 DSH 依赖中需要生命周期脚本的原生终端或本机构建能力。依赖升级必须通过固定版本变更 PR，同时更新并审查两套 lockfile，在发布前重跑完整 CI、profile smoke 和供应链校验，发布后重新记录受控真实验证。定时兼容工作流只验证当前锁定图并报告 Registry 漂移，不能从宽泛 semver 或一次定时运行推断跨 RC 兼容。
 
