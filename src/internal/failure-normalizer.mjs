@@ -22,6 +22,10 @@ const PI_AI_TRANSPORT_PATTERNS = [
   /^websocket\s+error(?:\s|$)/iu,
 ]
 
+const PI_AI_CODEX_SERVER_PATTERNS = [
+  /^(?:codex\s+error:\s*)?our\s+servers\s+are\s+currently\s+overloaded\.\s*please\s+try\s+again\s+later\.?$/iu,
+]
+
 const MAX_FAILURE_TEXT_CHARS = 65_536
 const MAX_EMBEDDED_JSON_CHARS = 32_768
 const MAX_EMBEDDED_OBJECTS = 16
@@ -366,6 +370,13 @@ function isAmbiguousPiAi429(source, message) {
     && PI_AI_AMBIGUOUS_429_PATTERN.test(message.trim())
 }
 
+function isKnownServerFailure(source, message) {
+  const code = normalizedKey(source.code)
+  if (code === "server" || code === "servererror") return true
+  return code === "piaierror"
+    && PI_AI_CODEX_SERVER_PATTERNS.some((pattern) => pattern.test(message.trim()))
+}
+
 export function inspectCodexFailure(failure) {
   const source = failure !== null && typeof failure === "object" ? failure : {}
   const rawMessage = typeof source.message === "string" ? source.message : String(failure ?? "Unknown Codex failure")
@@ -385,6 +396,8 @@ export function inspectCodexFailure(failure) {
   ].join("\n")
   const transport = !accountQuota && isKnownTransportFailure(source, message)
   const ambiguous429 = !accountQuota && !transport && isAmbiguousPiAi429(source, message)
+  const server = !accountQuota && !transport && !ambiguous429
+    && isKnownServerFailure(source, message)
   return Object.freeze({
     kind: accountQuota
       ? "account-quota"
@@ -392,7 +405,9 @@ export function inspectCodexFailure(failure) {
         ? "transport"
         : ambiguous429
           ? "ambiguous-limit"
-          : "other",
+          : server
+            ? "server"
+            : "other",
     status: parseStatus(trustedText, factRecords, source.status),
     reset: parseReset(trustedText, factRecords),
     requestId: requestIdCandidate(trustedText, factRecords, source.requestId),
@@ -417,6 +432,10 @@ function transportMessage() {
   return "Codex 传输在响应完成前中断。 / Codex transport ended before the response completed."
 }
 
+function serverMessage() {
+  return "Codex 服务当前繁忙，请稍后继续。 / Codex servers are currently overloaded; please continue shortly."
+}
+
 /** Normalize only failures with a public, narrowly verifiable classification. */
 export function normalizeCodexFailure(failure) {
   const facts = inspectCodexFailure(failure)
@@ -438,6 +457,18 @@ export function normalizeCodexFailure(failure) {
       failure: Object.freeze({
         message: ambiguousLimitMessage(),
         code: "QUOTA_OR_RATE_LIMIT",
+        ...(facts.status === undefined ? {} : { status: facts.status }),
+        ...(facts.requestId === undefined ? {} : { requestId: facts.requestId }),
+      }),
+      facts,
+    }
+  }
+  if (facts.kind === "server") {
+    return {
+      changed: true,
+      failure: Object.freeze({
+        message: serverMessage(),
+        code: "SERVER",
         ...(facts.status === undefined ? {} : { status: facts.status }),
         ...(facts.requestId === undefined ? {} : { requestId: facts.requestId }),
       }),

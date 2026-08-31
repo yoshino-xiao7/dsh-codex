@@ -24,11 +24,11 @@ pnpm run verify:release
 
 ## 故障回归
 
-- `failure-normalizer.test.mjs`：精确的 `AccountQuotaExceeded`、DSH canonical `QUOTA`、五小时 reset、request ID、普通/不确定 429、窄化 transport 与敏感字段不回显；嵌套 request metadata 和其他独立 JSON envelope 不得冒充或向命中的 provider `error` envelope 注入配额事实，canonical `QUOTA` 仍可从一个自身匹配的 envelope 保留合法 reset/request ID；
+- `failure-normalizer.test.mjs`：精确的 `AccountQuotaExceeded`、DSH canonical `QUOTA`、五小时 reset、request ID、普通/不确定 429、窄化 transport、固定 Codex server overload 与敏感字段不回显；附近的普通繁忙描述不得冒充 overload，嵌套 request metadata 和其他独立 JSON envelope 不得冒充或向命中的 provider `error` envelope 注入配额事实，canonical `QUOTA` 仍可从一个自身匹配的 envelope 保留合法 reset/request ID；
 - `image-policy.test.mjs`：完整默认值与所有非法数字；
-- `stream-resilience.test.mjs`：半段纯文本保存、pre-output quota、瞬时/不确定 429、直接抛出的 quota/usage-limit/`STREAM_CLOSED`、未完成工具调用、纯工具流失败关闭与非 Codex route；`onRecovery` 观察者自身抛错时也不能破坏已恢复的文本、恢复提示或正常终态；
-- `provider-reliability-public-api.test.mjs`：公开 pi-ai → PiAiAdapter → route → resilience 的成功文本/reasoning/usage、工具调用与两轮 replay、原生图片预算、text-only 图片拒绝、429、`STREAM_CLOSED` 与 WebSocket failure 链路；
-- `llm-runtime-integration.test.mjs`：真实冻结 DSH `LlmRuntime + AgentLoop + Retry` 编排证明瞬时 `RATE_LIMIT` 发生一次重试，而归一化后的 `QUOTA` 与 `QUOTA_OR_RATE_LIMIT` 都只调用 provider 一次；同时验证 waterfall 在恢复策略读取结果前发布非重试 `QUOTA`；
+- `stream-resilience.test.mjs`：半段纯文本保存、pre-output quota、瞬时/不确定 429、Codex server overload、直接抛出的 quota/usage-limit/`STREAM_CLOSED`、未完成工具调用、纯工具流失败关闭与非 Codex route；`onRecovery` 观察者自身抛错时也不能破坏已恢复的文本、恢复提示或正常终态；
+- `provider-reliability-public-api.test.mjs`：公开 pi-ai → PiAiAdapter → route → resilience 的成功文本/reasoning/usage、工具调用与两轮 replay、原生图片预算、text-only 图片拒绝、429、Codex server overload、`STREAM_CLOSED` 与 WebSocket failure 链路；
+- `llm-runtime-integration.test.mjs`：真实冻结 DSH `LlmRuntime + AgentLoop + Retry` 编排证明瞬时 `RATE_LIMIT` 与 pre-output Codex server overload 各发生一次重试，而归一化后的 `QUOTA` 与 `QUOTA_OR_RATE_LIMIT` 都只调用 provider 一次；同时验证 waterfall 在恢复策略读取结果前发布非重试 `QUOTA`；
 - `codex-session-resources.test.mjs`：命名空间与有界 transport generation、双 manager 热替换的 epoch 隔离、未知 session dispose 隔离、真实 WebSocket→SSE fallback rollover、继承默认值与显式覆盖隔离、在途 `next`/`return`/error/result 竞态、reset/agent/runtime 延迟清理、当前 generation 的脱敏传输健康，以及同进程外部 pi-ai session 隔离；
 - `sdk-contract.test.mjs`：真实 pi-ai OAuth/模型目录、DSH profile schema，以及 PNG 穿过真实 attachment seam；
 - `bundle-contract.test.mjs`：bundle 保留通用 `llm-pi-ai` 配置、插入 `dsh-codex`，且图片预算完整；

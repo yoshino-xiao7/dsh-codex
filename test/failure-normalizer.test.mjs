@@ -12,6 +12,11 @@ const reportedFailure = {
   message: "OpenAI API error (429): {\"code\":\"AccountQuotaExceeded\",\"message\":\"You have exceeded the 5-hour usage quota. It will reset at 2026-08-27 16:44:34 +0800 CST. We recommend upgrading your plan for more quota, or waiting for the reset. Request id: req_fixture_0123456789abcdef0123456789abcdef0123456789abcdef\",\"param\":\"\",\"type\":\"TooManyRequests\"}",
 }
 
+const codexOverloadFailure = {
+  code: "PI_AI_ERROR",
+  message: "Codex error: Our servers are currently overloaded. Please try again later.",
+}
+
 test("parses balanced embedded JSON without evaluating surrounding text", () => {
   assert.deepEqual(parseEmbeddedJsonObjects('prefix {"outer":{"value":"}"}} suffix'), [
     { outer: { value: "}" } },
@@ -117,6 +122,39 @@ test("maps only public pi-ai premature-close failures to TRANSPORT", () => {
   assert.equal(result.changed, false)
   assert.equal(result.failure, unrelated)
   assert.equal(result.facts.kind, "other")
+})
+
+test("maps the exact public Codex overload failure to a sanitized SERVER error", () => {
+  const secret = "provider-overload-secret-fixture"
+  const result = normalizeCodexFailure({
+    ...codexOverloadFailure,
+    requestId: "req_overload_fixture",
+    debug: { authorization: secret },
+  })
+
+  assert.equal(result.changed, true)
+  assert.equal(result.facts.kind, "server")
+  assert.deepEqual(Object.keys(result.failure).sort(), ["code", "message", "requestId"])
+  assert.equal(result.failure.code, "SERVER")
+  assert.equal(result.failure.requestId, "req_overload_fixture")
+  assert.match(result.failure.message, /服务当前繁忙/u)
+  assert.doesNotMatch(JSON.stringify(result.failure), /Our servers are currently overloaded/iu)
+  assert.doesNotMatch(JSON.stringify(result.failure), new RegExp(secret, "u"))
+})
+
+test("does not classify nearby unstructured busy prose as a Codex server failure", () => {
+  for (const message of [
+    "Our worker is currently overloaded. Please try again later.",
+    "Codex error: a downstream server may be overloaded",
+    "The user says our servers are currently overloaded. Please try again later.",
+  ]) {
+    const failure = { code: "PI_AI_ERROR", message }
+    const result = normalizeCodexFailure(failure)
+
+    assert.equal(result.changed, false)
+    assert.equal(result.failure, failure)
+    assert.equal(result.facts.kind, "other")
+  }
 })
 
 test("transport normalization does not echo a WebSocket close reason or provider fields", () => {

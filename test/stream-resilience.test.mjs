@@ -5,6 +5,7 @@ import { CODEX_ROUTE_ID } from "../src/internal/codex-route-adapter.mjs"
 import { stabilizeCodexStream } from "../src/internal/stream-resilience.mjs"
 
 const quotaMessage = "OpenAI API error (429): {\"code\":\"AccountQuotaExceeded\",\"message\":\"You have exceeded the 5-hour usage quota. It will reset at 2026-08-27 16:44:34 +0800 CST. Request id: req_quota\"}"
+const codexOverloadMessage = "Codex error: Our servers are currently overloaded. Please try again later."
 
 async function collect(iterable) {
   const values = []
@@ -59,6 +60,40 @@ test("preserves safe partial Codex text and terminates without replay", async ()
     code: "QUOTA",
     requestId: "req_quota",
   }])
+})
+
+test("preserves safe partial text after the public Codex overload error", async () => {
+  let calls = 0
+  const chunks = await collect(stabilizeCodexStream(
+    { provider: CODEX_ROUTE_ID, model: "gpt-fixture" },
+    () => {
+      calls += 1
+      return stream([
+        { type: "block-start", index: 0, blockType: "text" },
+        { type: "text-delta", index: 0, text: "already visible" },
+        {
+          type: "finish",
+          reason: {
+            kind: "error",
+            failure: { code: "PI_AI_ERROR", message: codexOverloadMessage },
+          },
+        },
+      ])()
+    },
+  ))
+
+  assert.equal(calls, 1)
+  assert.equal(chunks.at(-1).reason.kind, "stop")
+  assert.equal(chunks.some((chunk) => (
+    chunk.type === "block-end"
+    && chunk.index === 0
+    && chunk.block.text === "already visible"
+  )), true)
+  assert.equal(chunks.some((chunk) => (
+    chunk.type === "text-delta"
+    && /请发送“继续”/u.test(chunk.text)
+  )), true)
+  assert.doesNotMatch(JSON.stringify(chunks), /Our servers are currently overloaded/iu)
 })
 
 test("maps pre-output account quota to QUOTA so retry policy stops", async () => {
@@ -453,6 +488,36 @@ test("fails closed after a partial tool call and disables full-request replay", 
   assert.equal(chunks.at(-1).reason.kind, "error")
   assert.equal(chunks.at(-1).reason.failure.code, "PARTIAL_RESPONSE")
   assert.doesNotMatch(chunks.at(-1).reason.failure.message, new RegExp(secret, "u"))
+})
+
+test("keeps Codex overload fail-closed after a tool call starts", async () => {
+  let calls = 0
+  const chunks = await collect(stabilizeCodexStream(
+    { provider: CODEX_ROUTE_ID, model: "gpt-fixture" },
+    () => {
+      calls += 1
+      return stream([
+        { type: "block-start", index: 0, blockType: "text" },
+        { type: "text-delta", index: 0, text: "preparing tool" },
+        { type: "block-end", index: 0, block: { type: "text", text: "preparing tool" } },
+        { type: "block-start", index: 1, blockType: "tool-call" },
+        { type: "tool-call-delta", index: 1, id: "call_fixture", name: "write", argumentsDelta: "{" },
+        {
+          type: "finish",
+          reason: {
+            kind: "error",
+            failure: { code: "PI_AI_ERROR", message: codexOverloadMessage },
+          },
+        },
+      ])()
+    },
+  ))
+
+  assert.equal(calls, 1)
+  assert.equal(chunks.at(-1).reason.kind, "error")
+  assert.equal(chunks.at(-1).reason.failure.code, "PARTIAL_RESPONSE")
+  assert.match(chunks.at(-1).reason.failure.message, /确认上方内容及工具执行状态/u)
+  assert.doesNotMatch(JSON.stringify(chunks.at(-1)), /Our servers are currently overloaded/iu)
 })
 
 test("fails closed for a tool-only stream with a retryable terminal failure", async () => {

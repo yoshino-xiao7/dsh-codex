@@ -108,7 +108,7 @@ Each plugin instance runs at most two remote-image jobs and queues at most 32; a
 
 `FailureNormalizer` converts a DSH `LlmFailure`, including embedded structured JSON, into a stable classification. Only verifiable structured `code`/`type` values such as `AccountQuotaExceeded` or `insufficient_quota`, or narrowly scoped account-level text confirming exhausted usage, become `QUOTA`; an ordinary 429 remains `RATE_LIMIT`. Multiple embedded JSON objects retain independent provenance: reset, request ID, and status may come only from the failure's top level or one `error` envelope that independently proves quota, never by combining envelopes. pi-ai `0.82.1` collapses distinct 429 responses into one ChatGPT usage-limit message and no longer exposes the original code/body. That evidence-free result becomes non-retryable `QUOTA_OR_RATE_LIMIT` instead of being mislabeled as confirmed account quota.
 
-`QUOTA`, `QUOTA_OR_RATE_LIMIT`, and confirmed transport failures are rebuilt as minimal failures containing a fixed sanitized message, code, and optional valid HTTP status/safe-character request ID. Arbitrary provider fields and WebSocket close reasons are never reflected. `QUOTA_OR_RATE_LIMIT` is not written to `QuotaObserver`: it fails without retry when no partial output exists and only preserves already safe plain text when partial output exists.
+`QUOTA`, `QUOTA_OR_RATE_LIMIT`, confirmed transport failures, and Codex server overloads are rebuilt as minimal failures containing a fixed sanitized message, code, and optional valid HTTP status/safe-character request ID. Arbitrary provider fields, raw overload text, and WebSocket close reasons are never reflected. When pi-ai loses the structured `server_error`, only a complete match of the fixed Codex overload message becomes `SERVER`; nearby generic busy prose remains unknown. `QUOTA_OR_RATE_LIMIT` is not written to `QuotaObserver`: it fails without retry when no partial output exists and only preserves already safe plain text when partial output exists.
 
 `QuotaObserver` records only successful completion, `QUOTA`, and a reset timestamp accepted by strict format and bounded-horizon checks. Snapshots have three states: `unknown`, `recent-success`, and `exhausted`. It neither polls an account nor displays a balance or percentage. Instead, it is the request-observation fallback when `AccountUsageReader` has no usable live snapshot; the two evidence types never masquerade as each other.
 
@@ -117,9 +117,9 @@ Each plugin instance runs at most two remote-image jobs and queues at most 32; a
 This module runs on the `llm/stream` waterfall:
 
 1. forward provider chunks while tracking open blocks;
-2. apply narrow classification when a terminal error, directly thrown confirmed quota/usage-limit/transport, public `STREAM_CLOSED`/WebSocket failure, or EOF without a terminal chunk arrives;
+2. apply narrow classification when a terminal error, directly thrown confirmed quota/usage-limit/transport/server overload, public `STREAM_CLOSED`/WebSocket failure, or EOF without a terminal chunk arrives;
 3. if plain text exists and no tool call was emitted, close open blocks, append a recovery notice, and finish with `stop`;
-4. if a tool call exists, including a tool-only stream with no text, return a non-retryable failure without replaying the complete request.
+4. if a tool call exists, including a tool-only stream with no text, return a non-retryable failure without replaying the complete request and tell the user to verify tool execution state before continuing manually.
 
 The module does not execute tools or add a hidden pre-stream retry loop. Only a pre-output `RATE_LIMIT`, `SERVER`, `TIMEOUT`, or confirmed `TRANSPORT` that matches the retry policy is eligible for at most two upper-layer retries. Directly thrown confirmed failures use the same sanitization and recovery path, while unrelated exceptions still propagate unchanged. Fast and transport selection never triggers service-tier downgrade or full-request replay.
 

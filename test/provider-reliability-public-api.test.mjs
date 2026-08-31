@@ -172,6 +172,47 @@ test("public PiAiAdapter STREAM_CLOSED preserves partial text without replay", a
   )), true)
 })
 
+test("public PiAiAdapter preserves partial text after Codex reports server overload", async () => {
+  let providerCalls = 0
+  const provider = providerWithStream(() => {
+    providerCalls += 1
+    return piEvents([
+      { type: "text_start", contentIndex: 0, partial: {} },
+      {
+        type: "text_delta",
+        contentIndex: 0,
+        delta: "public overload partial text",
+        partial: {},
+      },
+      {
+        type: "error",
+        reason: "error",
+        error: piErrorMessage(
+          "Codex error: Our servers are currently overloaded. Please try again later.",
+        ),
+      },
+    ])
+  })
+  const { adapter, options } = publicChain(provider, "session-public-server-overload")
+
+  const chunks = await collect(stabilizeCodexStream(
+    options,
+    () => adapter.stream(options),
+  ))
+
+  assert.equal(providerCalls, 1)
+  assert.equal(chunks.at(-1).reason.kind, "stop")
+  assert.equal(chunks.some((chunk) => (
+    chunk.type === "block-end"
+    && chunk.block.text === "public overload partial text"
+  )), true)
+  assert.equal(chunks.some((chunk) => (
+    chunk.type === "text-delta"
+    && /send “continue” to resume/iu.test(chunk.text)
+  )), true)
+  assert.doesNotMatch(JSON.stringify(chunks), /Our servers are currently overloaded/iu)
+})
+
 test("public PiAiAdapter WebSocket error is normalized without its close reason", async () => {
   const secret = "secret-public-close-fixture"
   const provider = providerWithStream(() => piEvents([{
