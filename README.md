@@ -4,7 +4,7 @@
 
 面向 DeepSeek Harness 的 Codex 插件，提供 ChatGPT OAuth 登录、Codex 模型、图片输入和可靠的流式回复。
 
-> 当前版本：`1.1.0` 正式版，通过 npm `latest` 与正式 GitHub Release 发布。npm 包名：`dsh-codex-community`。
+> 当前版本：`1.1.1` 发布候选，尚未发布；当前 npm `latest` 仍为 `1.1.0`。npm 包名：`dsh-codex-community`。
 
 ## 功能
 
@@ -14,6 +14,7 @@
 - 让 `read_image` 安全读取 HTTP(S) 图片，并限制地址、重定向、格式、大小和超时；
 - 为请求图片补全有效的像素与字节预算，避免无效 `maxPixels`；
 - 将 `AccountQuotaExceeded` 识别为不可重试的账户配额错误，并显示脱敏后的重置时间；
+- 将已知 Codex 服务过载错误识别为可有限重试的服务端故障；已有安全文本会保留，工具调用开始后仍不重放整次请求；
 - 流中断时保留安全的半段纯文本；涉及未完成工具调用时停止，不自动重放请求；
 - 每次进入设置页、页面重新可见或额度窗口到达重置节点时主动读取真实的 5 小时与每周额度，也可通过刷新按钮或 `/codex-usage refresh` 立即刷新；每周相对天数递减与不足 24 小时切换都只更新本地时间显示；
 - 使用紧凑的额度卡展示统一的剩余额度语义、套餐类型与安全的重置时间；5 小时额度显示精确时间，每周额度不足 24 小时时也显示精确时间；
@@ -24,6 +25,12 @@
 - OAuth 授权提示支持分别复制登录链接和验证码，复制只在用户点击时发生，不记录短期凭据；
 - 在默认折叠的连接诊断中按需运行“本机检查”或“账号检查”，并复制仅含固定状态与受限事实的脱敏报告；
 - 在会话请求设置中查看本会话的请求数、连接复用、增量上下文和 SSE 回退等脱敏传输健康状态。
+
+`1.1.1` 修复：
+
+- 精确识别 pi-ai 的固定 Codex 服务过载错误，不误判普通的 busy/overloaded 文本；
+- 输出已开始时保留安全文本并引导手动发送“继续”；工具调用已开始时保持禁止整次请求重放；
+- 使用脱敏的中英双语服务繁忙提示，不透传原始服务端错误。
 
 `1.1.0` 新增：
 
@@ -42,7 +49,7 @@
 请固定安装精确版本：
 
 ```sh
-dsh plugin --profile web add dsh-codex-community@1.1.0
+dsh plugin --profile web add dsh-codex-community@1.1.1
 dsh web
 ```
 
@@ -73,7 +80,7 @@ dsh web
 更新：
 
 ```sh
-dsh plugin --profile web update dsh-codex-community@1.1.0
+dsh plugin --profile web update dsh-codex-community@1.1.1
 dsh web
 ```
 
@@ -89,14 +96,15 @@ dsh web
 - `Image request maxPixels must be a positive integer.`：图片预算缺省或为 `null` 时会回填安全默认值；零、负数、浮点和其他显式非法值会在配置加载时被拒绝。
 - `AccountQuotaExceeded`：插件会停止自动重试并保留安全的已显示文本；重置时间存在且通过校验时才会显示。它不会通过切换传输方式绕过账户配额。
 - `QUOTA_OR_RATE_LIMIT`：服务只返回通用 429 文案、缺少结构化证据时，插件不会把它误报为已确认账户配额，也不会自动重试；请稍后手动重试或检查账户页面。
+- Codex 服务繁忙：输出前按现有限次策略重试；已有安全文本时保留内容并结束，提示稍后手动发送“继续”；工具调用开始后不会重放整次请求。
 - 回复到一半中断：纯文本可安全保存；未完成工具调用不会自动重放，以免重复产生副作用。
 
 排查步骤见[故障排查](docs/troubleshooting.md)。
 
 ## 支持边界
 
-- `1.1.0` 的完整检查与 Linux、macOS、Windows CI/profile smoke 已按本版本候选 `3/3` 通过并获维护者批准；发布后真实账号验证从 `0/13` 开始，状态见[验收记录](docs/releases/v1.1.0.acceptance.json)；
-- `1.0.0` 的历史发布证据继续保留，但不会继承为 `1.1.0` 的验收结果；
+- `1.1.1` 本地完整检查已通过；Linux、macOS、Windows CI/profile smoke 与维护者批准仍在发布门禁中，当前状态见[验收记录](docs/releases/v1.1.1.acceptance.json)；
+- `1.1.0` 与 `1.0.0` 的历史发布证据继续保留，但不会继承为 `1.1.1` 的验收结果；
 - 设置页额度通过官方 Codex 客户端使用的 Web 后端兼容接口读取；接口不可用或返回异常时保留最近的安全读数，并降级为请求观测或未知状态，不把错误伪装成零余额；
 - 模型名称、上下文、最大输出和可选的 Low 至 Max 推理档位来自当前安装 provider catalog 的实际语义；插件不会虚构或标注 catalog 未提供的默认档位，无显式 effort 时由当前 Provider 或服务端采用其默认行为。选择器不展示通用的 `Default`、`Off`、`Minimal`，也不把需要主动任务委派的 `Ultra` 伪装成普通推理档位；
 - Fast 仅用于 GPT-5.4、GPT-5.5、GPT-5.6 Luna、Sol 和 Terra，并会提高额度消耗；其他模型不会发送 Fast service tier；

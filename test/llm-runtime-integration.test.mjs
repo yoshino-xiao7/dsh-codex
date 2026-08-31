@@ -104,7 +104,7 @@ class RetryProbeAdapter extends frozenLlm.LlmAdapter {
     return frozenLlm.resolveRetryPolicy({
       mode: "normal",
       maxRetries: 2,
-      retryableCodes: ["RATE_LIMIT"],
+      retryableCodes: ["RATE_LIMIT", "SERVER"],
       backoff: {
         initialDelayMs: 1,
         maxDelayMs: 1,
@@ -226,6 +226,18 @@ test("frozen DSH agent loop retries a transient Codex rate limit through the pro
     status: 429,
     providerRetryAfterMs: 1,
     message: "HTTP 429: too many requests; retry after 1ms",
+  }])
+
+  assert.equal(result.attempts, 2)
+  assert.deepEqual(result.errors, [])
+  assert.equal(result.eventTypes.filter((type) => type === "llm/retry").length, 1)
+  assert.equal(result.eventTypes.filter((type) => type === "llm/retry-started").length, 1)
+})
+
+test("frozen DSH agent loop retries a pre-output Codex server overload", async () => {
+  const result = await runFrozenDshRetryProbe([{
+    code: "PI_AI_ERROR",
+    message: "Codex error: Our servers are currently overloaded. Please try again later.",
   }])
 
   assert.equal(result.attempts, 2)

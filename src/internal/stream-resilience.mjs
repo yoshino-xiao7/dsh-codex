@@ -16,6 +16,7 @@ const SUCCESSFUL_FINISH_KINDS = new Set(["stop", "tool-calls", "max-tokens"])
 const DIRECTLY_HANDLED_FAILURE_KINDS = new Set([
   "account-quota",
   "ambiguous-limit",
+  "server",
   "transport",
 ])
 
@@ -119,7 +120,7 @@ function recoveredChunks(tracker, normalized) {
 
 function partialFailure(failure) {
   return Object.freeze({
-    message: "Codex 在产生部分输出后失败；已禁用整次请求重放，以避免重复输出或工具副作用。 / Codex failed after partial output; full-request replay was disabled to prevent duplicate output or tool side effects.",
+    message: "Codex 在产生部分输出后失败；请先确认上方内容及工具执行状态，再手动发送“继续”。插件不会自动重放整次请求，以避免重复输出或工具副作用。 / Codex failed after partial output. Check the content and tool execution state above, then manually send “continue”. The plugin will not replay the full request, preventing duplicate output or tool side effects.",
     code: "PARTIAL_RESPONSE",
   })
 }
