@@ -4,16 +4,16 @@
 
 Last updated: 2026-09-04.
 
-`1.2.0` is the current release candidate. Its complete checks and Linux, macOS, and Windows CI/profile smoke must pass `3/3` against this candidate and be approved by the maintainer before publication. Post-release live-account validation starts at `0/13` and inherits no older evidence.
+`1.2.0` is the current stable release. Its complete checks and Linux, macOS, and Windows CI/profile smoke passed `3/3` against this release candidate and were approved by the maintainer. Post-release live-account validation starts at `0/13` and inherits no older evidence.
 
 | Component or environment | `1.2.0` compatibility target | Status |
 | --- | --- | --- |
-| DeepSeek Harness | `test/fixtures/dsh-runtime/pnpm-lock.yaml` is pinned to the `@deepseek-ai/dsh@0.1.2-rc.1` runtime/peer graph | Waiting for this version's CI/profile smoke |
-| pi-ai | Pinned to `@earendil-works/pi-ai@0.84.4` with global request defaults, sparse conversation overrides, transport generations, and a one-shot diagnostic seam | Contract regression pending this version's checks; live-network acceptance is recorded after release |
-| Node.js | Declared range `>=22.19.0 <25` | Waiting for this version's Node 22/24 gates |
-| macOS | `macos-latest` Node 22/24 complete checks, frozen DSH installation, and Web/profile smoke | `pending` |
-| Windows x64 | `windows-latest` Node 22/24 complete checks, frozen DSH installation, and Web/profile smoke | `pending` |
-| Linux x64 | `ubuntu-latest` Node 22/24 complete checks, frozen DSH installation, and Web/profile smoke | `pending` |
+| DeepSeek Harness | `test/fixtures/dsh-runtime/pnpm-lock.yaml` is pinned to the `@deepseek-ai/dsh@0.1.2-rc.1` runtime/peer graph | Complete checks and profile smoke passed |
+| pi-ai | Pinned to `@earendil-works/pi-ai@0.84.4` with global request defaults, sparse conversation overrides, transport generations, and a one-shot diagnostic seam | Contract regression passed; live-network acceptance is recorded after release |
+| Node.js | Declared range `>=22.19.0 <25` | Local and three-platform Node 22/24 gates passed |
+| macOS | `macos-latest` Node 22/24 complete checks, frozen DSH installation, and Web/profile smoke | `passed` |
+| Windows x64 | `windows-latest` Node 22/24 complete checks, frozen DSH installation, and Web/profile smoke | `passed` |
+| Linux x64 | `ubuntu-latest` Node 22/24 complete checks, frozen DSH installation, and Web/profile smoke | `passed` |
 | Real ChatGPT OAuth login | Automation does not read or modify a user's real grant | Controlled acceptance pending |
 | Codex usage windows | Entry, visibility, reset boundaries, and `/codex-usage refresh` trigger account reads; the weekly under-24-hour threshold only changes local display; settings shows plan, consistent remaining usage, and safe reset time | Automation regression passed; live-account acceptance is recorded after release |
 | Codex model settings | Generic discovery plus an independent loopback-only read-only capability RPC provides compact `K` labels, input modalities, reasoning efforts exposed by the installed provider catalog, Fast, and selected/unselected ordering | Automation and three-platform profile smoke passed; unavailable RPC data and unknown capabilities are not inferred |
@@ -22,7 +22,7 @@ Last updated: 2026-09-04.
 | Codex image input | Automation covers the attachment seam and budget projection | Automation regression passed; a live request with `maxPixels=4194304` is accepted after release |
 | auto / SSE / WebSocket / cached | Automation covers transport mapping and session isolation | Automation regression passed; one live request through each transport is accepted after release |
 | Fast / priority tier | Automation asserts that only an explicit current-session choice changes `service_tier` | Automation regression passed; account entitlement and live network are accepted after release |
-| npm / GitHub Release | The strict workflow verifies the candidate, Registry readback, provenance, signatures, and Release assets | Candidate [`v1.2.0`](releases/v1.2.0.md) |
+| npm / GitHub Release | The strict workflow verifies the candidate, Registry readback, provenance, signatures, and Release assets | Stable [`v1.2.0`](https://github.com/yoshino-xiao7/dsh-codex/releases/tag/v1.2.0) |
 
 `1.2.0` preserves the overload classification and recovery semantics from `1.1.2` while moving the exact compatibility target to DeepSeek Harness `0.1.2-rc.1`: the settings namespace is registered with `ctx.settings.installSection`, and the Web client inject list uses `dsh-client-ui-renderer`. This release no longer claims compatibility with `0.1.1-rc.2`.
 

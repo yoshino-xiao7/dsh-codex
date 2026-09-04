@@ -4,16 +4,16 @@
 
 最近更新：2026-09-04。
 
-`1.2.0` 是当前候选版。完整检查与 Linux、macOS、Windows CI/profile smoke 必须按本版本候选 `3/3` 通过并获维护者批准后才能正式发布；发布后真实账号验证从 `0/13` 开始，不继承旧版本证据。
+`1.2.0` 是当前正式版。完整检查与 Linux、macOS、Windows CI/profile smoke 已按本版本候选 `3/3` 通过并获维护者批准；发布后真实账号验证从 `0/13` 开始，不继承旧版本证据。
 
 | 组件或环境 | `1.2.0` 兼容目标 | 状态 |
 | --- | --- | --- |
-| DeepSeek Harness | `test/fixtures/dsh-runtime/pnpm-lock.yaml` 锁定 `@deepseek-ai/dsh@0.1.2-rc.1` runtime/peer 图 | 待本版本 CI/profile smoke 绑定 |
-| pi-ai | 锁定 `@earendil-works/pi-ai@0.84.4`，提供全局请求默认值、会话稀疏覆盖、传输 generation 与一次性诊断 seam | 合同回归待本版本检查；真实网络验收发布后记录 |
-| Node.js | 声明 `>=22.19.0 <25` | 待本版本 Node 22/24 门禁 |
-| macOS | `macos-latest` Node 22/24 完整检查、冻结 DSH 安装与 Web/profile smoke | `pending` |
-| Windows x64 | `windows-latest` Node 22/24 完整检查、冻结 DSH 安装与 Web/profile smoke | `pending` |
-| Linux x64 | `ubuntu-latest` Node 22/24 完整检查、冻结 DSH 安装与 Web/profile smoke | `pending` |
+| DeepSeek Harness | `test/fixtures/dsh-runtime/pnpm-lock.yaml` 锁定 `@deepseek-ai/dsh@0.1.2-rc.1` runtime/peer 图 | 完整检查与 profile smoke 已通过 |
+| pi-ai | 锁定 `@earendil-works/pi-ai@0.84.4`，提供全局请求默认值、会话稀疏覆盖、传输 generation 与一次性诊断 seam | 合同回归已通过；真实网络验收发布后记录 |
+| Node.js | 声明 `>=22.19.0 <25` | 本地与三平台 Node 22/24 门禁已通过 |
+| macOS | `macos-latest` Node 22/24 完整检查、冻结 DSH 安装与 Web/profile smoke | `passed` |
+| Windows x64 | `windows-latest` Node 22/24 完整检查、冻结 DSH 安装与 Web/profile smoke | `passed` |
+| Linux x64 | `ubuntu-latest` Node 22/24 完整检查、冻结 DSH 安装与 Web/profile smoke | `passed` |
 | ChatGPT OAuth 真实登录 | 自动化不读取或修改用户真实 grant | 受控验收待完成 |
 | Codex 额度窗口 | 进入、页面重新可见、重置节点与 `/codex-usage refresh` 触发账号读取；每周不足 24 小时阈值只在本地切换显示；展示套餐、统一剩余语义与安全重置时间 | 自动化回归已通过；真实账号验收发布后记录 |
 | Codex 模型设置 | 通用模型发现配合独立 loopback-only 只读能力 RPC，展示紧凑 `K` 标签、输入模态、当前安装 provider catalog 实际提供的推理档位、Fast 与已选/未选排序 | 自动化与三平台 profile smoke 已通过；RPC 不可用或未知能力不推断 |
@@ -22,7 +22,7 @@
 | Codex 图片输入 | 自动化覆盖 attachment seam 与预算投影 | 自动化回归已通过；`maxPixels=4194304` 真实请求发布后验收 |
 | auto / SSE / WebSocket / cached | 自动化覆盖 transport 映射与会话隔离 | 自动化回归已通过；四种真实请求发布后验收 |
 | Fast / priority tier | 自动化断言只有当前会话明确开启才改变 `service_tier` | 自动化回归已通过；账号权限与真实网络发布后验收 |
-| npm / GitHub Release | 严格工作流校验候选、Registry 回读、provenance、签名与 Release 资产 | 候选 [`v1.2.0`](releases/v1.2.0.md) |
+| npm / GitHub Release | 严格工作流校验候选、Registry 回读、provenance、签名与 Release 资产 | 正式版 [`v1.2.0`](https://github.com/yoshino-xiao7/dsh-codex/releases/tag/v1.2.0) |
 
 `1.2.0` 保留 `1.1.2` 的服务过载分类与恢复语义，并将精确兼容目标升级到 DeepSeek Harness `0.1.2-rc.1`：settings 命名空间改由 `ctx.settings.installSection` 注册，Web client inject 改用 `dsh-client-ui-renderer`。本版本不再声明兼容 `0.1.1-rc.2`。
 
