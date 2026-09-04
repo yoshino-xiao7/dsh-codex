@@ -1,0 +1,160 @@
+{
+  "schemaVersion": 3,
+  "version": "1.2.1",
+  "releaseStatus": "approved",
+  "testedCommit": "65e8556a1fffcd3d24a33caf0db03ba98ab00eeb",
+  "approvedBy": "yoshino-xiao7",
+  "approvedAt": "2026-09-04T13:55:12Z",
+  "approvalEvidenceUrl": "https://github.com/yoshino-xiao7/dsh-codex/actions/runs/33880347059",
+  "platforms": {
+    "linux": {
+      "status": "passed",
+      "testedAt": "2026-09-04T13:51:34Z",
+      "runner": "GitHub Actions ubuntu-24.04",
+      "nodeVersion": "24.20.0",
+      "dshVersion": "0.1.2-rc.1",
+      "profileSmoke": "passed",
+      "evidenceUrl": "https://github.com/yoshino-xiao7/dsh-codex/actions/runs/33880347059/job/101047197610"
+    },
+    "macos": {
+      "status": "passed",
+      "testedAt": "2026-09-04T13:51:59Z",
+      "runner": "GitHub Actions macos-26-arm64",
+      "nodeVersion": "24.18.0",
+      "dshVersion": "0.1.2-rc.1",
+      "profileSmoke": "passed",
+      "evidenceUrl": "https://github.com/yoshino-xiao7/dsh-codex/actions/runs/33880347059/job/101047197116"
+    },
+    "windows": {
+      "status": "passed",
+      "testedAt": "2026-09-04T13:53:41Z",
+      "runner": "GitHub Actions windows-2025-vs2026",
+      "nodeVersion": "24.19.0",
+      "dshVersion": "0.1.2-rc.1",
+      "profileSmoke": "passed",
+      "evidenceUrl": "https://github.com/yoshino-xiao7/dsh-codex/actions/runs/33880347059/job/101047197357"
+    }
+  },
+  "liveAcceptance": {
+    "oauthWebSignIn": {
+      "status": "pending",
+      "testedAt": "TBD",
+      "evidenceUrl": "TBD",
+      "assertions": {
+        "flowStartedFromSettings": false,
+        "credentialConfigured": false,
+        "postSignInRequestSucceeded": false
+      }
+    },
+    "modelCatalog": {
+      "status": "pending",
+      "testedAt": "TBD",
+      "evidenceUrl": "TBD",
+      "assertions": {
+        "settingsCatalogVisible": false,
+        "conversationModelSelectable": false
+      }
+    },
+    "textStream": {
+      "status": "pending",
+      "testedAt": "TBD",
+      "evidenceUrl": "TBD",
+      "assertions": {
+        "nonEmptyTextDelta": false,
+        "terminalStopObserved": false
+      }
+    },
+    "reasoningStream": {
+      "status": "pending",
+      "testedAt": "TBD",
+      "evidenceUrl": "TBD",
+      "assertions": {
+        "reasoningBlockObserved": false,
+        "terminalStopObserved": false
+      }
+    },
+    "terminalUsage": {
+      "status": "pending",
+      "testedAt": "TBD",
+      "evidenceUrl": "TBD",
+      "assertions": {
+        "inputTokensObserved": false,
+        "outputTokensObserved": false
+      }
+    },
+    "toolRoundTrip": {
+      "status": "pending",
+      "testedAt": "TBD",
+      "evidenceUrl": "TBD",
+      "assertions": {
+        "toolCallObserved": false,
+        "toolExecuted": false,
+        "toolResultReturned": false,
+        "followUpSucceeded": false
+      }
+    },
+    "replayContinuity": {
+      "status": "pending",
+      "testedAt": "TBD",
+      "evidenceUrl": "TBD",
+      "assertions": {
+        "firstTurnSucceeded": false,
+        "secondTurnUsedPriorContext": false,
+        "secondTurnSucceeded": false
+      }
+    },
+    "imageMaxPixels": {
+      "status": "pending",
+      "testedAt": "TBD",
+      "evidenceUrl": "TBD",
+      "assertions": {
+        "nativeImageAccepted": false,
+        "maxPixels4194304Projected": false,
+        "requestSucceeded": false
+      }
+    },
+    "transportAuto": {
+      "status": "pending",
+      "testedAt": "TBD",
+      "evidenceUrl": "TBD",
+      "assertions": {
+        "requestSucceeded": false
+      }
+    },
+    "transportSse": {
+      "status": "pending",
+      "testedAt": "TBD",
+      "evidenceUrl": "TBD",
+      "assertions": {
+        "requestSucceeded": false
+      }
+    },
+    "transportWebsocket": {
+      "status": "pending",
+      "testedAt": "TBD",
+      "evidenceUrl": "TBD",
+      "assertions": {
+        "requestSucceeded": false
+      }
+    },
+    "transportWebsocketCached": {
+      "status": "pending",
+      "testedAt": "TBD",
+      "evidenceUrl": "TBD",
+      "assertions": {
+        "firstTurnSucceeded": false,
+        "secondTurnSucceeded": false
+      }
+    },
+    "fastPriority": {
+      "status": "pending",
+      "testedAt": "TBD",
+      "evidenceUrl": "TBD",
+      "assertions": {
+        "priorityRequested": false,
+        "requestSucceeded": false,
+        "noAutomaticDowngrade": false
+      }
+    }
+  }
+}

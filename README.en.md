@@ -4,7 +4,7 @@
 
 A Codex plugin for DeepSeek Harness with ChatGPT OAuth sign-in, Codex models, image input, and reliable streaming responses.
 
-> Current version: `1.2.0` stable release, published through npm `latest` and a full GitHub Release. npm package: `dsh-codex-community`.
+> Current version: `1.2.1` stable release, published through npm `latest` and a full GitHub Release. npm package: `dsh-codex-community`.
 
 ## Features
 
@@ -25,6 +25,11 @@ A Codex plugin for DeepSeek Harness with ChatGPT OAuth sign-in, Codex models, im
 - copy the OAuth sign-in link and verification code separately; copying occurs only after an explicit user click and does not log short-lived credentials;
 - run an on-demand local or account check from collapsed connection diagnostics and copy a sanitized report containing only fixed statuses and bounded facts;
 - inspect sanitized per-conversation transport health, including request count, connection reuse, delta context, and SSE fallbacks.
+
+Compatibility fix in `1.2.1`:
+
+- support the Harness `0.1.2-rc.1` typed-remote model-management APIs, restoring model discovery, selection, and persistence while retaining the legacy connection fallback;
+- display the internal `gpt-reserve` quota group as “Usage limit reset”.
 
 Compatibility fix in `1.2.0`:
 
@@ -55,7 +60,7 @@ Added in `1.1.0`:
 Install the exact version:
 
 ```sh
-dsh plugin --profile web add dsh-codex-community@1.2.0
+dsh plugin --profile web add dsh-codex-community@1.2.1
 dsh web
 ```
 
@@ -86,7 +91,7 @@ Available commands:
 Update:
 
 ```sh
-dsh plugin --profile web update dsh-codex-community@1.2.0
+dsh plugin --profile web update dsh-codex-community@1.2.1
 dsh web
 ```
 
@@ -109,8 +114,8 @@ See [Troubleshooting](docs/troubleshooting.en.md) for diagnostic steps.
 
 ## Support boundaries
 
-- The complete checks and Linux, macOS, and Windows CI/profile smoke for `1.2.0` passed `3/3` against this release candidate and were approved by the maintainer. Post-release live-account validation starts at `0/13`; see the [acceptance record](docs/releases/v1.2.0.acceptance.json).
-- Historical `1.1.2` and older release evidence remains available but is not inherited as `1.2.0` acceptance.
+- Complete checks and Linux, macOS, and Windows CI/profile smoke for `1.2.1` passed `3/3` against this candidate and were approved by the maintainer. Post-release live-account validation starts at `0/13`; see the [acceptance record](docs/releases/v1.2.1.acceptance.json).
+- Historical `1.2.0` and older release evidence remains available but is not inherited as `1.2.1` acceptance.
 - The settings page reads usage through the Web-backend compatibility endpoint used by the official Codex client. If that endpoint is unavailable or malformed, the page retains the latest safe reading and falls back to request observation or an unknown state instead of presenting the error as zero remaining usage.
 - Model names, context windows, maximum outputs, and selectable Low-through-Max reasoning efforts follow the actual semantics of the installed provider catalog. The plugin neither invents nor labels a default effort that the catalog does not provide; when no effort is explicit, the current Provider or service applies its default behavior. Generic `Default`, `Off`, and `Minimal` entries are hidden, and agent-level `Ultra` is not disguised as a plain reasoning effort.
 - Fast is limited to GPT-5.4, GPT-5.5, GPT-5.6 Luna, Sol, and Terra and consumes more usage. Other models never receive the Fast service tier.

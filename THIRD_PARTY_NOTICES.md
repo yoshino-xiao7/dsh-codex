@@ -7,6 +7,7 @@ This project composes the following independently published packages. Each relea
 | Package | Role | License |
 | --- | --- | --- |
 | `@deepseek-ai/cordis` | Plugin runtime | MIT |
+| `@deepseek-ai/dsh-api-remotes` | Typed Web remote model and settings APIs | MIT |
 | `@deepseek-ai/dsh-authorization` | OAuth flow registry and interaction seam | MIT |
 | `@deepseek-ai/dsh-client-connection` | Web client connection injection | MIT |
 | `@deepseek-ai/dsh-client-locale` | Web client locale service | MIT |

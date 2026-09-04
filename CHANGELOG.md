@@ -3,6 +3,32 @@
 本项目遵循 Keep a Changelog 的结构；`1.0.0` 起作为正式版发布，具体兼容性边界以对应发布说明为准。
 This project follows the Keep a Changelog structure. Starting with `1.0.0`, releases are stable; each release note defines its exact compatibility boundary.
 
+## [1.2.1] - 2026-09-04
+
+### 中文
+
+#### 新增
+
+- 无新增产品功能；本版本补全 Harness `0.1.2-rc.1` Web 模型管理兼容。
+
+#### 修复
+
+- 通过静态注入 `remote.llm` 与 `remote.settings` 使用 Harness `0.1.2-rc.1` typed remote 接口，同时保留旧版 `connection.api` 回退，修复设置页误报 Codex 模型管理接口不可用的问题。
+- 同时接受新版直接 `RemoteResult` 与旧版嵌套结果结构，恢复模型目录读取、选择与保存。
+- 将内部额度组标识 `gpt-reserve` 本地化为“使用限额重置”／“Usage limit reset”。
+
+### English
+
+#### Added
+
+- No new product features; this release completes Web model-management compatibility for Harness `0.1.2-rc.1`.
+
+#### Fixed
+
+- Statically inject `remote.llm` and `remote.settings` for the Harness `0.1.2-rc.1` typed-remote APIs while retaining the legacy `connection.api` fallback, fixing the incorrect Codex model-management-unavailable state.
+- Accept both the newer direct `RemoteResult` and legacy nested result shapes, restoring model discovery, selection, and persistence.
+- Localize the internal `gpt-reserve` quota-group identifier as “使用限额重置” / “Usage limit reset”.
+
 ## [1.2.0] - 2026-09-04
 
 ### 中文
