@@ -147,6 +147,11 @@ test("Dependabot updates both npm manifests through one coordinated configuratio
   assert.match(actionsBlock, /reviewed-actions:\n\s+patterns:\n\s+- "\*"/u)
 })
 
+test("dependency installation rejects unresolved peer requirements", async () => {
+  const source = await readText(new URL("../.npmrc", import.meta.url))
+  assert.match(source, /^strict-peer-dependencies=true$/mu)
+})
+
 test("root DSH package pins stay aligned with the compatibility runtime", async () => {
   const [rootSource, fixtureSource] = await Promise.all([
     readText(new URL("../package.json", import.meta.url)),
