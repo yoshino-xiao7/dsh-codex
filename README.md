@@ -4,7 +4,7 @@
 
 面向 DeepSeek Harness 的 Codex 插件，提供 ChatGPT OAuth 登录、Codex 模型、图片输入和可靠的流式回复。
 
-> 当前版本：`1.2.0` 正式版，通过 npm `latest` 与正式 GitHub Release 发布。npm 包名：`dsh-codex-community`。
+> 当前版本：`1.2.1` 正式版，通过 npm `latest` 与正式 GitHub Release 发布。npm 包名：`dsh-codex-community`。
 
 ## 功能
 
@@ -25,6 +25,11 @@
 - OAuth 授权提示支持分别复制登录链接和验证码，复制只在用户点击时发生，不记录短期凭据；
 - 在默认折叠的连接诊断中按需运行“本机检查”或“账号检查”，并复制仅含固定状态与受限事实的脱敏报告；
 - 在会话请求设置中查看本会话的请求数、连接复用、增量上下文和 SSE 回退等脱敏传输健康状态。
+
+`1.2.1` 兼容修复：
+
+- 适配 Harness `0.1.2-rc.1` 的 typed remote 模型管理接口，恢复模型目录读取、选择与保存，同时保留旧版连接接口回退；
+- 将内部额度组 `gpt-reserve` 显示为“使用限额重置”。
 
 `1.2.0` 兼容修复：
 
@@ -55,7 +60,7 @@
 请固定安装精确版本：
 
 ```sh
-dsh plugin --profile web add dsh-codex-community@1.2.0
+dsh plugin --profile web add dsh-codex-community@1.2.1
 dsh web
 ```
 
@@ -86,7 +91,7 @@ dsh web
 更新：
 
 ```sh
-dsh plugin --profile web update dsh-codex-community@1.2.0
+dsh plugin --profile web update dsh-codex-community@1.2.1
 dsh web
 ```
 
@@ -109,8 +114,8 @@ dsh web
 
 ## 支持边界
 
-- `1.2.0` 的完整检查与 Linux、macOS、Windows CI/profile smoke 已按本版本候选 `3/3` 通过并获维护者批准；发布后真实账号验证从 `0/13` 开始，状态见[验收记录](docs/releases/v1.2.0.acceptance.json)；
-- `1.1.2` 与更早版本的历史发布证据继续保留，但不会继承为 `1.2.0` 的验收结果；
+- `1.2.1` 的完整检查与 Linux、macOS、Windows CI/profile smoke 必须按本版本候选重新通过并获维护者批准；发布后真实账号验证从 `0/13` 开始，状态见[验收记录](docs/releases/v1.2.1.acceptance.json)；
+- `1.2.0` 与更早版本的历史发布证据继续保留，但不会继承为 `1.2.1` 的验收结果；
 - 设置页额度通过官方 Codex 客户端使用的 Web 后端兼容接口读取；接口不可用或返回异常时保留最近的安全读数，并降级为请求观测或未知状态，不把错误伪装成零余额；
 - 模型名称、上下文、最大输出和可选的 Low 至 Max 推理档位来自当前安装 provider catalog 的实际语义；插件不会虚构或标注 catalog 未提供的默认档位，无显式 effort 时由当前 Provider 或服务端采用其默认行为。选择器不展示通用的 `Default`、`Off`、`Minimal`，也不把需要主动任务委派的 `Ultra` 伪装成普通推理档位；
 - Fast 仅用于 GPT-5.4、GPT-5.5、GPT-5.6 Luna、Sol 和 Terra，并会提高额度消耗；其他模型不会发送 Fast service tier；

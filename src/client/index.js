@@ -58,6 +58,7 @@ window.__ModuleLoader__.load({
       locale: "zh-CN",
       quotaTitle: "使用额度",
       quotaProduct: "Codex",
+      quotaReserve: "使用限额重置",
       quotaPlan: "套餐",
       quotaLoading: "正在读取账户额度…",
       quotaLoadFailed: "暂时无法刷新账户额度。",
@@ -265,6 +266,7 @@ window.__ModuleLoader__.load({
       locale: "en-US",
       quotaTitle: "Usage",
       quotaProduct: "Codex",
+      quotaReserve: "Usage limit reset",
       quotaPlan: "Plan",
       quotaLoading: "Reading account usage…",
       quotaLoadFailed: "Account usage could not be refreshed.",
@@ -1438,7 +1440,8 @@ window.__ModuleLoader__.load({
 
     function resultValue(response) {
       if (response?.result?.ok === true) return response.result.value
-      const message = response?.result?.error?.message
+      if (response?.ok === true) return response.value
+      const message = response?.result?.error?.message ?? response?.error?.message
       throw new Error(typeof message === "string" && message.length > 0 ? message : "DSH API request failed")
     }
 
@@ -1697,6 +1700,8 @@ window.__ModuleLoader__.load({
           const windows = [limit.primary, limit.secondary].filter((window) => window !== undefined)
           const limitLabel = limit.limitId === "codex"
             ? t("quotaProduct")
+            : limit.limitId === "gpt-reserve"
+              ? t("quotaReserve")
             : limit.limitName ?? limit.limitId
           return h("section", { key: limit.limitId, className: "dshCodexQuotaGroup" },
             h("p", { className: "dshCodexQuotaProduct" }, limitLabel),
@@ -1843,10 +1848,31 @@ window.__ModuleLoader__.load({
       }
     }
 
-    function createModelEnablementClient(connection, settingsFace) {
+    function createModelEnablementClient(connection, settingsFace, remote) {
       const api = connection?.api
-      const available = typeof api?.llm?.discoverModels === "function"
-        && typeof api?.settings?.mutate === "function"
+      const discoverModels = typeof remote?.llm?.discoverModels === "function"
+        ? (signal) => remote.llm.discoverModels(
+            CODEX_SETTINGS_NS,
+            { provider: CODEX_PROVIDER },
+            signal,
+          )
+        : typeof api?.llm?.discoverModels === "function"
+          ? (signal) => api.llm.discoverModels(
+              { settingsNs: CODEX_SETTINGS_NS, provider: CODEX_PROVIDER },
+              signal,
+            )
+          : undefined
+      const mutateSettings = typeof remote?.settings?.mutate === "function"
+        ? (payload) => remote.settings.mutate(
+            payload.ns,
+            payload.ops,
+            payload.expectedRevision,
+          )
+        : typeof api?.settings?.mutate === "function"
+          ? (payload, signal) => api.settings.mutate(payload, signal)
+          : undefined
+      const available = discoverModels !== undefined
+        && mutateSettings !== undefined
         && typeof settingsFace?.ensure === "function"
         && typeof settingsFace?.getSnapshot === "function"
         && typeof settingsFace?.subscribe === "function"
@@ -1855,10 +1881,7 @@ window.__ModuleLoader__.load({
       const load = async (signal) => {
         if (!available) return { kind: "unavailable" }
 
-        const catalogRequest = api.llm.discoverModels(
-          { settingsNs: CODEX_SETTINGS_NS, provider: CODEX_PROVIDER },
-          signal,
-        )
+        const catalogRequest = discoverModels(signal)
         const settingsRequest = settingsFace.ensure()
         const capabilityRequest = typeof connection?.rpc?.call === "function"
           ? Promise.resolve()
@@ -1879,7 +1902,10 @@ window.__ModuleLoader__.load({
           ? discoveredModels(capabilityResponse.value?.models, true)
           : []
         const capabilitiesById = new Map(capabilityModels.map((model) => [model.id, model]))
-        const discovered = discoveredModels(resultValue(catalogResponse).models).map((model) => {
+        const catalogValue = resultValue(catalogResponse)
+        const discovered = discoveredModels(
+          Array.isArray(catalogValue) ? catalogValue : catalogValue?.models,
+        ).map((model) => {
           const capability = capabilitiesById.get(model.id)
           if (capability === undefined) return model
           return {
@@ -1947,7 +1973,7 @@ window.__ModuleLoader__.load({
         }
 
         const modelsPath = [...snapshot.settingsPath, "models"]
-        const response = await api.settings.mutate({
+        const response = await mutateSettings({
           ns: snapshot.settingsNs,
           ops: [plan.unsetOverride
             ? { op: "unset", path: modelsPath }
@@ -3476,7 +3502,15 @@ window.__ModuleLoader__.load({
         h(ModelEnablementSettings, { client: modelClient, t }))
     }
 
-    const inject = ["slots", "locale", "connection", "settingsScope"]
+    const inject = [
+      "slots",
+      "locale",
+      "connection",
+      "remote",
+      "remote.llm",
+      "remote.settings",
+      "settingsScope",
+    ]
 
     function apply(ctx) {
       ctx.effect(installStyle, "dsh-codex: client styles")
@@ -3486,7 +3520,11 @@ window.__ModuleLoader__.load({
       const client = createAuthorizationClient(ctx.connection)
       const diagnosticsClient = createConnectionDiagnosticsClient(ctx.connection)
       const sessionPreferenceClient = createSessionPreferenceClient(ctx.connection)
-      const modelClient = createModelEnablementClient(ctx.connection, ctx.settingsScope?.describe?.())
+      const modelClient = createModelEnablementClient(
+        ctx.connection,
+        ctx.settingsScope?.describe?.(),
+        ctx.remote,
+      )
       const defaultsClient = createGlobalRequestDefaultsClient(ctx.settingsScope?.bind?.({ namespace: CODEX_SETTINGS_NS }))
       ctx.slots.inject("settings.section", () => ctx.slots.register({
         name: "settings.section",
