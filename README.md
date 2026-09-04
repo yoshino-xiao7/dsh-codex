@@ -4,7 +4,7 @@
 
 面向 DeepSeek Harness 的 Codex 插件，提供 ChatGPT OAuth 登录、Codex 模型、图片输入和可靠的流式回复。
 
-> 当前版本：`1.1.2` 正式版，通过 npm `latest` 与正式 GitHub Release 发布。npm 包名：`dsh-codex-community`。
+> 当前版本：`1.1.3` 正式版，通过 npm `latest` 与正式 GitHub Release 发布。npm 包名：`dsh-codex-community`。
 
 ## 功能
 
@@ -26,11 +26,11 @@
 - 在默认折叠的连接诊断中按需运行“本机检查”或“账号检查”，并复制仅含固定状态与受限事实的脱敏报告；
 - 在会话请求设置中查看本会话的请求数、连接复用、增量上下文和 SSE 回退等脱敏传输健康状态。
 
-`1.1.2` 维护更新：
+`1.1.3` 维护更新：
 
-- 更新 Cordis `4.0.2`、Schemastery `3.18.2`、pi-ai `0.84.4` 与 TypeScript `7.0.2`，并显式固定 Harness 运行时所需的辅助依赖；
-- 启用严格 peer dependency 安装检查，让不兼容的运行时组合在构建与 CI 阶段直接失败；
-- 发布候选的 npm 漏洞审计对临时 Registry/网络故障执行有界重试和单次超时；真实漏洞与重试耗尽仍失败关闭。
+- 兼容新版 Harness typed remote 模型管理接口与设置服务，同时保留旧版接口路径；
+- 修复新版 Harness 中插件启动失败及设置页误报模型管理接口不可用的问题；
+- 将内部额度组 `gpt-reserve` 显示为“使用限额重置”。
 
 `1.1.0` 新增：
 
@@ -49,7 +49,7 @@
 请固定安装精确版本：
 
 ```sh
-dsh plugin --profile web add dsh-codex-community@1.1.2
+dsh plugin --profile web add dsh-codex-community@1.1.3
 dsh web
 ```
 
@@ -80,7 +80,7 @@ dsh web
 更新：
 
 ```sh
-dsh plugin --profile web update dsh-codex-community@1.1.2
+dsh plugin --profile web update dsh-codex-community@1.1.3
 dsh web
 ```
 
@@ -103,8 +103,8 @@ dsh web
 
 ## 支持边界
 
-- `1.1.2` 的完整检查与 Linux、macOS、Windows CI/profile smoke 已按本版本候选 `3/3` 通过并获维护者批准；发布后真实账号验证从 `0/13` 开始，状态见[验收记录](docs/releases/v1.1.2.acceptance.json)；
-- `1.1.1` 与更早版本的历史发布证据继续保留，但不会继承为 `1.1.2` 的验收结果；
+- `1.1.3` 的完整检查与 Linux、macOS、Windows CI/profile smoke 必须按本版本候选重新通过并获维护者批准；发布后真实账号验证从 `0/13` 开始，状态见[验收记录](docs/releases/v1.1.3.acceptance.json)；
+- `1.1.2` 与更早版本的历史发布证据继续保留，但不会继承为 `1.1.3` 的验收结果；
 - 设置页额度通过官方 Codex 客户端使用的 Web 后端兼容接口读取；接口不可用或返回异常时保留最近的安全读数，并降级为请求观测或未知状态，不把错误伪装成零余额；
 - 模型名称、上下文、最大输出和可选的 Low 至 Max 推理档位来自当前安装 provider catalog 的实际语义；插件不会虚构或标注 catalog 未提供的默认档位，无显式 effort 时由当前 Provider 或服务端采用其默认行为。选择器不展示通用的 `Default`、`Off`、`Minimal`，也不把需要主动任务委派的 `Ultra` 伪装成普通推理档位；
 - Fast 仅用于 GPT-5.4、GPT-5.5、GPT-5.6 Luna、Sol 和 Terra，并会提高额度消耗；其他模型不会发送 Fast service tier；

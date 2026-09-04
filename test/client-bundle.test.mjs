@@ -499,7 +499,15 @@ test("classic web bundle registers the package id and Codex settings section", a
     assert.equal(specifier, "react")
     return { createElement: () => undefined }
   })
-  assert.deepEqual([...clientModule.inject], ["slots", "locale", "connection", "settingsScope"])
+  assert.deepEqual([...clientModule.inject], [
+    "slots",
+    "locale",
+    "connection",
+    "remote",
+    "remote.llm",
+    "remote.settings",
+    "settingsScope",
+  ])
   assert.equal(clientModule.CHANNEL, "/dsh-codex")
   assert.equal(clientModule.DIAGNOSTICS_CHANNEL, "/dsh-codex-diagnostics")
   assert.equal(clientModule.NS, "settings.codex")
@@ -3860,6 +3868,41 @@ test("signed-in settings shows the five-hour exact reset and a distant weekly re
   harness.unmount()
 })
 
+test("the gpt-reserve quota group uses a localized usage-limit reset label", async () => {
+  const now = Date.now()
+  const usage = {
+    observedAt: now,
+    rateLimits: [{
+      limitId: "gpt-reserve",
+      secondary: {
+        usedPercent: 0,
+        windowDurationMins: 10_080,
+        resetsAt: now + 7 * 24 * 60 * 60_000,
+      },
+    }],
+  }
+
+  for (const [locale, expected] of [["zh", "使用限额重置"], ["en", "Usage limit reset"]]) {
+    const harness = hookHarness()
+    const clientModule = await loadClientModule(harness.React)
+    const dictionaries = registeredClientDictionaries(clientModule)
+    harness.mount(clientModule.AuthorizationSettings, {
+      client: {
+        describe: async () => authorizationStatus(true),
+        usage: async () => usage,
+      },
+      t: (key) => dictionaries[locale][key] ?? key,
+    })
+    await settle()
+    harness.flush()
+
+    const text = textContent(harness.tree())
+    assert.match(text, new RegExp(expected, "u"))
+    assert.doesNotMatch(text, /gpt-reserve/u)
+    harness.unmount()
+  }
+})
+
 test("smart usage scheduling advances weekly relative days locally and refreshes only at reset", async () => {
   const clientModule = await loadClientModule({ createElement: () => undefined })
   const now = 1_800_000_000_000
@@ -4406,6 +4449,57 @@ test("quota presentation accepts only bounded timestamp shapes and expires obser
     observedAt: now - 2_000,
     resetAt: now,
   }, now)), { status: "unknown" })
+})
+
+test("model enablement client supports the current Host remote model and settings contracts", async () => {
+  const clientModule = await loadClientModule({ createElement: () => undefined })
+  const calls = []
+  const signal = new AbortController().signal
+  const remote = {
+    llm: {
+      async discoverModels(settingsNs, request, receivedSignal) {
+        calls.push({ method: "discoverModels", settingsNs, request, signal: receivedSignal })
+        return { ok: true, value: [{ id: "gpt-current", name: "GPT Current" }] }
+      },
+    },
+    settings: {
+      async mutate(ns, ops, expectedRevision) {
+        calls.push({ method: "mutate", ns, ops, expectedRevision })
+        return {
+          ok: true,
+          value: { ns, revision: 8, user: {}, value: {} },
+        }
+      },
+    },
+  }
+  const mirror = settingsMirror({
+    writable: true,
+    namespaces: [{
+      ns: "dsh-codex",
+      revision: 7,
+      user: {},
+      value: {},
+    }],
+  })
+  const client = clientModule.createModelEnablementClient({}, mirror, remote)
+
+  assert.equal(client.available, true)
+  const snapshot = await client.load(signal)
+  assert.equal(snapshot.kind, "ready")
+  assert.deepEqual(plain(snapshot.models), [{ id: "gpt-current", name: "GPT Current" }])
+  assert.deepEqual([...snapshot.selectedIds], ["gpt-current"])
+  await client.save(snapshot, ["gpt-current"], signal)
+  assert.equal(calls[0].signal, signal)
+  assert.deepEqual(plain(calls.map(({ signal: _signal, ...call }) => call)), [{
+    method: "discoverModels",
+    settingsNs: "dsh-codex",
+    request: { provider: "dsh-codex" },
+  }, {
+    method: "mutate",
+    ns: "dsh-codex",
+    ops: [{ op: "unset", path: ["models"] }],
+    expectedRevision: 7,
+  }])
 })
 
 test("model enablement client reads the plugin-owned Codex settings namespace directly", async () => {
@@ -5005,6 +5099,7 @@ test("package manifest exports the real classic bundle with required client inje
   assert.equal(manifest.exports["./client"].default, "./dist/client/index.js")
   assert.deepEqual(manifest.dsh.client, {
     inject: [
+      "@deepseek-ai/dsh-api-remotes",
       "@deepseek-ai/dsh-client-connection",
       "@deepseek-ai/dsh-client-runtime",
       "@deepseek-ai/dsh-client-ui-conversation",

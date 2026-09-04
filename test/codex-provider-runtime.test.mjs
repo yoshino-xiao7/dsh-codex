@@ -9,7 +9,9 @@ import {
   CODEX_SETTINGS_NAMESPACE,
   Config,
   createCodexProfile,
+  installCompatibleSettingsSection,
   installCodexProviderRuntime,
+  resolveSettingsNamespace,
 } from "../src/internal/codex-provider-runtime.mjs"
 import { createCodexPiProvider } from "../src/internal/codex-pi-provider.mjs"
 import { CODEX_ROUTE_ID } from "../src/internal/codex-route-adapter.mjs"
@@ -18,6 +20,44 @@ import { createSessionPreferences } from "../src/internal/session-preferences.mj
 const RUNTIME_ACCESS = "runtime-refreshed-access-must-not-leak"
 const RUNTIME_ACCOUNT_ID = "runtime-account-id-must-not-leak"
 const RUNTIME_NOW = 1_787_973_000_000
+
+test("settings integration supports both legacy helpers and the current host service", () => {
+  const calls = []
+  const ctx = {
+    inject(names, callback) {
+      calls.push(["inject", names])
+      callback({
+        settings: {
+          installSection(...args) {
+            calls.push(["installSection", ...args])
+          },
+        },
+      })
+    },
+  }
+  const schema = () => ({})
+  const entry = { defaultFast: false }
+  const hooks = { setSource() {}, onChange() {} }
+
+  assert.equal(resolveSettingsNamespace({}, "dsh-codex"), "dsh-codex")
+  assert.equal(
+    resolveSettingsNamespace({ settingsNamespace: (value) => `legacy:${value}` }, "dsh-codex"),
+    "legacy:dsh-codex",
+  )
+  installCompatibleSettingsSection({}, ctx, "dsh-codex", schema, entry, hooks)
+  assert.deepEqual(calls, [
+    ["inject", ["settings"]],
+    ["installSection", ctx, "dsh-codex", schema, entry, hooks],
+  ])
+
+  let legacyArgs
+  installCompatibleSettingsSection({
+    installSettingsSection(...args) {
+      legacyArgs = args
+    },
+  }, ctx, "dsh-codex", schema, entry, hooks)
+  assert.deepEqual(legacyArgs, [ctx, "dsh-codex", schema, entry, hooks])
+})
 
 function codexProviderWithOAuth(oauth) {
   const provider = createCodexPiProvider()

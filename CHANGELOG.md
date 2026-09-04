@@ -3,6 +3,32 @@
 本项目遵循 Keep a Changelog 的结构；`1.0.0` 起作为正式版发布，具体兼容性边界以对应发布说明为准。
 This project follows the Keep a Changelog structure. Starting with `1.0.0`, releases are stable; each release note defines its exact compatibility boundary.
 
+## [1.1.3] - 2026-09-04
+
+### 中文
+
+#### 新增
+
+- 无新增产品功能；本版本集中于新版 Harness 兼容修复。
+
+#### 修复
+
+- 兼容新版 Harness 的 `remote.llm` 与 `remote.settings` 模型管理接口，同时保留旧版 `connection.api` 调用路径，避免设置页误报“当前环境没有可用的 Codex 模型管理接口”。
+- 兼容新版 `@deepseek-ai/dsh-settings` 服务式安装接口，同时保留旧版具名帮助函数，修复插件在新版 Harness 中启动失败的问题。
+- 将额度组内部标识 `gpt-reserve` 本地化为“使用限额重置”／“Usage limit reset”，不再向用户展示内部 ID。
+
+### English
+
+#### Added
+
+- No new product features; this release focuses on compatibility fixes for newer Harness builds.
+
+#### Fixed
+
+- Support the newer Harness `remote.llm` and `remote.settings` model-management APIs while retaining the legacy `connection.api` path, preventing the settings page from incorrectly reporting that no Codex model-management API is available.
+- Support the newer service-based `@deepseek-ai/dsh-settings` installation API while retaining the legacy named helpers, fixing plugin startup on newer Harness builds.
+- Localize the internal `gpt-reserve` quota-group identifier as “使用限额重置” / “Usage limit reset” instead of exposing the raw ID.
+
 ## [1.1.2] - 2026-09-04
 
 ### 中文

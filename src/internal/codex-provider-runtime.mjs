@@ -1,10 +1,7 @@
 import { PiAiAdapter } from "@deepseek-ai/dsh-llm-pi-ai"
 import { resolveRetryPolicy } from "@deepseek-ai/dsh-llm"
 import { createModels } from "@earendil-works/pi-ai"
-import {
-  installSettingsSection,
-  settingsNamespace,
-} from "@deepseek-ai/dsh-settings"
+import * as dshSettings from "@deepseek-ai/dsh-settings"
 import Schema from "@deepseek-ai/schemastery"
 
 import { registerCodexAuthorizationFlow } from "./codex-authorization.mjs"
@@ -27,7 +24,33 @@ import {
 } from "./image-policy.mjs"
 import { codexModelCapabilityCatalog } from "./codex-model-capabilities.mjs"
 
-export const CODEX_SETTINGS_NAMESPACE = settingsNamespace("dsh-codex")
+export function resolveSettingsNamespace(settingsModule, value) {
+  return typeof settingsModule.settingsNamespace === "function"
+    ? settingsModule.settingsNamespace(value)
+    : value
+}
+
+export function installCompatibleSettingsSection(
+  settingsModule,
+  ctx,
+  namespace,
+  schema,
+  entry,
+  hooks,
+) {
+  if (typeof settingsModule.installSettingsSection === "function") {
+    settingsModule.installSettingsSection(ctx, namespace, schema, entry, hooks)
+    return
+  }
+  ctx.inject(["settings"], (settingsCtx) => {
+    if (typeof settingsCtx.settings?.installSection !== "function") {
+      throw new Error("dsh-codex: the host settings service cannot install a settings section")
+    }
+    settingsCtx.settings.installSection(ctx, namespace, schema, entry, hooks)
+  })
+}
+
+export const CODEX_SETTINGS_NAMESPACE = resolveSettingsNamespace(dshSettings, "dsh-codex")
 
 const DEFAULT_STREAM_IDLE_TIMEOUT_MS = 300_000
 const MAX_TIMER_DELAY_MS = 2_147_483_647
@@ -260,7 +283,7 @@ export function installCodexProviderRuntime(ctx, entryConfig = {}, options = {})
     })))
   })
 
-  installSettingsSection(ctx, CODEX_SETTINGS_NAMESPACE, Config, entry, {
+  installCompatibleSettingsSection(dshSettings, ctx, CODEX_SETTINGS_NAMESPACE, Config, entry, {
     validate: (candidate) => {
       createCodexProfile(candidate, provider)
     },
