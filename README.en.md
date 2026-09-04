@@ -114,7 +114,7 @@ See [Troubleshooting](docs/troubleshooting.en.md) for diagnostic steps.
 
 ## Support boundaries
 
-- Complete checks and Linux, macOS, and Windows CI/profile smoke for `1.2.1` must be rerun against this candidate and approved by the maintainer. Post-release live-account validation starts at `0/13`; see the [acceptance record](docs/releases/v1.2.1.acceptance.json).
+- Complete checks and Linux, macOS, and Windows CI/profile smoke for `1.2.1` passed `3/3` against this candidate and were approved by the maintainer. Post-release live-account validation starts at `0/13`; see the [acceptance record](docs/releases/v1.2.1.acceptance.json).
 - Historical `1.2.0` and older release evidence remains available but is not inherited as `1.2.1` acceptance.
 - The settings page reads usage through the Web-backend compatibility endpoint used by the official Codex client. If that endpoint is unavailable or malformed, the page retains the latest safe reading and falls back to request observation or an unknown state instead of presenting the error as zero remaining usage.
 - Model names, context windows, maximum outputs, and selectable Low-through-Max reasoning efforts follow the actual semantics of the installed provider catalog. The plugin neither invents nor labels a default effort that the catalog does not provide; when no effort is explicit, the current Provider or service applies its default behavior. Generic `Default`, `Off`, and `Minimal` entries are hidden, and agent-level `Ultra` is not disguised as a plain reasoning effort.

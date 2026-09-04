@@ -1,38 +1,38 @@
 {
   "schemaVersion": 3,
   "version": "1.2.1",
-  "releaseStatus": "draft",
-  "testedCommit": "TBD",
-  "approvedBy": "TBD",
-  "approvedAt": "TBD",
-  "approvalEvidenceUrl": "TBD",
+  "releaseStatus": "approved",
+  "testedCommit": "65e8556a1fffcd3d24a33caf0db03ba98ab00eeb",
+  "approvedBy": "yoshino-xiao7",
+  "approvedAt": "2026-09-04T13:55:12Z",
+  "approvalEvidenceUrl": "https://github.com/yoshino-xiao7/dsh-codex/actions/runs/33880347059",
   "platforms": {
     "linux": {
-      "status": "pending",
-      "testedAt": "TBD",
-      "runner": "TBD",
-      "nodeVersion": "TBD",
+      "status": "passed",
+      "testedAt": "2026-09-04T13:51:34Z",
+      "runner": "GitHub Actions ubuntu-24.04",
+      "nodeVersion": "24.20.0",
       "dshVersion": "0.1.2-rc.1",
-      "profileSmoke": "pending",
-      "evidenceUrl": "TBD"
+      "profileSmoke": "passed",
+      "evidenceUrl": "https://github.com/yoshino-xiao7/dsh-codex/actions/runs/33880347059/job/101047197610"
     },
     "macos": {
-      "status": "pending",
-      "testedAt": "TBD",
-      "runner": "TBD",
-      "nodeVersion": "TBD",
+      "status": "passed",
+      "testedAt": "2026-09-04T13:51:59Z",
+      "runner": "GitHub Actions macos-26-arm64",
+      "nodeVersion": "24.18.0",
       "dshVersion": "0.1.2-rc.1",
-      "profileSmoke": "pending",
-      "evidenceUrl": "TBD"
+      "profileSmoke": "passed",
+      "evidenceUrl": "https://github.com/yoshino-xiao7/dsh-codex/actions/runs/33880347059/job/101047197116"
     },
     "windows": {
-      "status": "pending",
-      "testedAt": "TBD",
-      "runner": "TBD",
-      "nodeVersion": "TBD",
+      "status": "passed",
+      "testedAt": "2026-09-04T13:53:41Z",
+      "runner": "GitHub Actions windows-2025-vs2026",
+      "nodeVersion": "24.19.0",
       "dshVersion": "0.1.2-rc.1",
-      "profileSmoke": "pending",
-      "evidenceUrl": "TBD"
+      "profileSmoke": "passed",
+      "evidenceUrl": "https://github.com/yoshino-xiao7/dsh-codex/actions/runs/33880347059/job/101047197357"
     }
   },
   "liveAcceptance": {
