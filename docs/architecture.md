@@ -106,7 +106,7 @@ DSH 原始 session ID 只用于偏好查询和消息/replay provenance；传给 
 
 ## FailureNormalizer 与 QuotaObserver
 
-`FailureNormalizer` 将 DSH `LlmFailure` 和嵌入的结构化 JSON 转换为稳定分类。只有可验证的结构化 `code`/`type`（例如 `AccountQuotaExceeded`、`insufficient_quota`）或窄化的账户级文本特征确认用量耗尽时才映射成 `QUOTA`；普通 429 保持 `RATE_LIMIT`。多个嵌入 JSON 各自保持独立来源：reset、request ID 和 status 只能来自 failure 顶层或一个自身也能独立证明配额的 `error` envelope，不能跨 envelope 拼接。pi-ai `0.82.1` 会把不同 429 折叠成同一条 ChatGPT usage-limit 文案，且不再提供原始 code/body；这种无结构证据的结果映射为非自动重试的 `QUOTA_OR_RATE_LIMIT`，不会谎称为已确认账户配额。
+`FailureNormalizer` 将 DSH `LlmFailure` 和嵌入的结构化 JSON 转换为稳定分类。只有可验证的结构化 `code`/`type`（例如 `AccountQuotaExceeded`、`insufficient_quota`）或窄化的账户级文本特征确认用量耗尽时才映射成 `QUOTA`；普通 429 保持 `RATE_LIMIT`。多个嵌入 JSON 各自保持独立来源：reset、request ID 和 status 只能来自 failure 顶层或一个自身也能独立证明配额的 `error` envelope，不能跨 envelope 拼接。pi-ai `0.84.4` 会把不同 429 折叠成同一条 ChatGPT usage-limit 文案，且不再提供原始 code/body；这种无结构证据的结果映射为非自动重试的 `QUOTA_OR_RATE_LIMIT`，不会谎称为已确认账户配额。
 
 `QUOTA`、`QUOTA_OR_RATE_LIMIT`、已确认 transport 和 Codex server overload 的输出均重新构造为最小 failure，只保留固定脱敏消息、code，以及可选的有效 HTTP status/受限字符集 request ID；不回显任意 provider 字段、原始 overload 文案或 WebSocket close reason。pi-ai 丢失结构化 `server_error` 时，只接受固定 Codex overload 文案的完整匹配并映射为 `SERVER`，附近的普通繁忙描述仍保持未知。`QUOTA_OR_RATE_LIMIT` 不写入 `QuotaObserver`：无 partial 输出时直接失败且不重试，已有安全纯文本时只保存 partial。
 
