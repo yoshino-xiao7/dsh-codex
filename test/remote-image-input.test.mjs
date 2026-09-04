@@ -352,7 +352,8 @@ test("commits verified bytes through the published durable attachment service", 
   const stored = await ctx.attachments.readImage(result.attachment)
 
   assert.match(result.attachment.attachmentId, /^sha256:[\da-f]{64}$/u)
-  assert.equal(result.attachment.mediaType, "image/png")
+  // LocalAttachmentStore 0.1.2-rc.1 normalizes alpha PNG into WebP.
+  assert.equal(result.attachment.mediaType, "image/webp")
   assert.equal(result.attachment.width, 1)
   assert.equal(result.attachment.height, 1)
   assert.equal(stored.data.byteLength, result.attachment.bytes)

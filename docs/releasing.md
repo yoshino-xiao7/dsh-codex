@@ -73,7 +73,7 @@ pnpm run verify:release:publish
 
 1. 在已提交的 release candidate 上运行跨平台 CI/profile smoke 和完整供应链校验；
 2. 由第一次 `pass-platform` 把该提交的完整 40 位 commit 绑定到 `testedCommit`；
-3. 在三个系统分别使用精确 DSH `0.1.1-rc.2` 和已测试的 Node 22（至少 `22.19.0`）或 24 运行 profile smoke，由维护者核验证据后通过 `pass-platform` 记录 `testedAt`、环境信息和不含敏感参数的 HTTPS 证据链接；
+3. 在三个系统分别使用精确 DSH `0.1.2-rc.1` 和已测试的 Node 22（至少 `22.19.0`）或 24 运行 profile smoke，由维护者核验证据后通过 `pass-platform` 记录 `testedAt`、环境信息和不含敏感参数的 HTTPS 证据链接；
 4. 三平台、供应链与候选边界全部通过后，由维护者填写审批信息，并把 `releaseStatus` 改为 `approved`；这表示批准正式发布，不表示真实账号已完成 `13/13`；
 5. `0.0.1` 可以保持 live `0/13` 并使用 npm `latest` 与正式 GitHub Release 发布，Release 和兼容性文档必须如实标明未验证项；
 6. 发布后在受控本地环境中使用测试账号逐项完成下表的真实验证；该过程会消耗账号额度，每项只能在对应断言均有脱敏证据后改为 `passed`，不能用自由文本概括代替；
@@ -120,12 +120,12 @@ pnpm run release:acceptance -- pass-platform <linux|macos|windows> \
   --tested-at=<带时区的RFC3339> \
   --runner=<运行环境单行标识> \
   --node-version=<22.x.y或24.x.y> \
-  --dsh-version=0.1.1-rc.2 \
+  --dsh-version=0.1.2-rc.1 \
   --profile-smoke=passed \
   --evidence-url=<脱敏HTTPS>
 ```
 
-七个选项都必须且只能提供一次，并使用 `--name=value` 形式。`--runner` 必须是去除首尾空格、非占位、最长 128 字符且不含控制字符的单行标识；`--node-version` 接受可带 `v` 前缀的稳定三段 Node 22（至少 `22.19.0`）或 Node 24；`--dsh-version` 和 `--profile-smoke` 必须分别精确为 `0.1.1-rc.2` 与 `passed`；`--evidence-url` 必须是没有 userinfo、查询参数或片段的绝对 HTTPS URL。
+七个选项都必须且只能提供一次，并使用 `--name=value` 形式。`--runner` 必须是去除首尾空格、非占位、最长 128 字符且不含控制字符的单行标识；`--node-version` 接受可带 `v` 前缀的稳定三段 Node 22（至少 `22.19.0`）或 Node 24；`--dsh-version` 和 `--profile-smoke` 必须分别精确为 `0.1.2-rc.1` 与 `passed`；`--evidence-url` 必须是没有 userinfo、查询参数或片段的绝对 HTTPS URL。
 
 `pass-platform` 只把维护者已经核验的 CI/profile smoke 结论写入验收记录；它不运行 smoke、不联网，也不检查提交是否存在。第一次 `pass-platform` 或 `pass` 会绑定完整候选 SHA，此后所有平台和真实网络证据都必须使用同一 SHA。已通过项目只允许完全相同的幂等重放；任一字段不同都会冲突，不能覆盖已有证据。记录批准后同样只接受完全相同的重放。
 
@@ -212,7 +212,7 @@ CycloneDX SBOM 是从已提交 `pnpm-lock.yaml` 与 package manifest 离线生�
 
 根目录 `pnpm-lock.yaml` 锁定插件的构建与发布依赖；`test/fixtures/dsh-runtime/pnpm-lock.yaml` 则锁定兼容性 smoke 使用的完整 DSH runtime 与 peer 图。CI、兼容性监测和发布候选都使用 `pnpm --dir test/fixtures/dsh-runtime install --frozen-lockfile --ignore-scripts`，不会在运行时用 `npm install @deepseek-ai/dsh@...` 重新解算无界 peer 图。后者既可能造成内存失控，也会让相同源码随 Registry 状态得到不同运行时。
 
-同一包体随后由夹具中的精确 `0.1.1-rc.2` DSH runtime 安装到隔离 profile 并启动 Web smoke，同时在空目录用 `--ignore-scripts` 安装并导入 Host。两次实际安装分别保存 `dsh-runtime-dependency-tree.json` 和 `isolated-dependency-tree.json`，与参考 SBOM 并列取证。Web/profile smoke 成功后才生成 `dsh-runtime-environment.json`，记录 DSH 版本、夹具 lock SHA-256、Node 完整版本、pnpm 版本、平台、架构和生命周期脚本禁用状态；严格门禁会根据发布提交重新计算并核对这些值。隔离安装还执行 `npm audit --omit=dev --audit-level=high --json` 并保存 `npm-audit.json`；出现 high 或 critical 生产依赖漏洞会阻止发布。候选 job 只有 `contents: read` 权限，候选产物与证据保留 90 天；审批摘要会显示版本、源提交、包体 SHA-256、Actions 归档 SHA-256、验收进度和候选下载链接。只有 `publish=true`、`refs/heads/main` 且审批前严格门禁通过后，才会请求 `npm-release` environment 审批。Registry job 只有 `contents: read` 与 `id-token: write`，完成 npm 发布、逐字节回读、签名检查及 provenance 对包摘要、仓库、`release.yml`、`main` 和源提交的绑定后，上传不可变 Registry 证据。随后 GitHub Release job 只持有 `contents: write`、没有 OIDC；它下载并复核该证据后才写入 Release。Release 从非公开转为公开后会重新核对双语正文、标题、标签、精确附件集合及每个附件字节，再确认标签提交。
+同一包体随后由夹具中的精确 `0.1.2-rc.1` DSH runtime 安装到隔离 profile 并启动 Web smoke，同时在空目录用 `--ignore-scripts` 安装并导入 Host。两次实际安装分别保存 `dsh-runtime-dependency-tree.json` 和 `isolated-dependency-tree.json`，与参考 SBOM 并列取证。Web/profile smoke 成功后才生成 `dsh-runtime-environment.json`，记录 DSH 版本、夹具 lock SHA-256、Node 完整版本、pnpm 版本、平台、架构和生命周期脚本禁用状态；严格门禁会根据发布提交重新计算并核对这些值。隔离安装还执行 `npm audit --omit=dev --audit-level=high --json` 并保存 `npm-audit.json`；出现 high 或 critical 生产依赖漏洞会阻止发布。候选 job 只有 `contents: read` 权限，候选产物与证据保留 90 天；审批摘要会显示版本、源提交、包体 SHA-256、Actions 归档 SHA-256、验收进度和候选下载链接。只有 `publish=true`、`refs/heads/main` 且审批前严格门禁通过后，才会请求 `npm-release` environment 审批。Registry job 只有 `contents: read` 与 `id-token: write`，完成 npm 发布、逐字节回读、签名检查及 provenance 对包摘要、仓库、`release.yml`、`main` 和源提交的绑定后，上传不可变 Registry 证据。随后 GitHub Release job 只持有 `contents: write`、没有 OIDC；它下载并复核该证据后才写入 Release。Release 从非公开转为公开后会重新核对双语正文、标题、标签、精确附件集合及每个附件字节，再确认标签提交。
 
 冻结夹具使用 `--ignore-scripts`，因此该层只证明 DSH Web/profile 与本插件的兼容性，不声称验证 DSH 依赖中需要生命周期脚本的原生终端或本机构建能力。
 

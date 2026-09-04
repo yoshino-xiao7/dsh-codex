@@ -760,7 +760,7 @@ function hostFixture() {
     type: "oauth",
     access: fakeAccessToken(),
     refresh: "refresh-probe",
-    expires: Date.now() + 60_000,
+    expires: Date.now() + 10 * 60_000,
   })
   const ctx = {
     fiber: { state: 0 },

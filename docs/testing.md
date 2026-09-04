@@ -48,7 +48,7 @@ pnpm run verify:release
 - `remote-image-input.test.mjs`：URL、DNS、重定向、响应大小、MIME、超时、2 个活动任务、32 个排队任务、队列满拒绝、排队取消、插件卸载时的队列封口/活动任务收敛、保存阶段取消边界，以及真实 ToolRuntime 和正式 `read_image` renderer 的端到端执行；模型能力预检位于同一限流器内，阻塞或忽略 abort 的 resolver 也不能绕过活动与排队上限；
 - `generate-sbom.test.mjs`、`release-evidence.test.mjs` 与 `release-workflow.test.mjs`：离线确定性参考依赖图、产物/两套锁文件哈希绑定、DSH smoke 运行环境、实际安装树和生产依赖审计取证、精确 SRI、签名/attestation 审计、Action SHA 固定、最小权限、draft/tag 目标预检和可恢复发布；
 - `release-maintainability.test.mjs`：直接运行依赖声明覆盖、Apache-2.0 贡献许可、双语隐私模板、根/夹具 DSH 版本一致性与协调 Dependabot 配置；
-- `dsh-runtime-fixture.test.mjs`：夹具为 private、精确固定 DSH `0.1.1-rc.2` 且提交完整 pnpm lock；CI、兼容性和发布工作流只能用 `--frozen-lockfile --ignore-scripts` 安装该图，并禁止直接交给 npm 重新解算无界 DSH peer 图；
+- `dsh-runtime-fixture.test.mjs`：夹具为 private、精确固定 DSH `0.1.2-rc.1` 且提交完整 pnpm lock；CI、兼容性和发布工作流只能用 `--frozen-lockfile --ignore-scripts` 安装该图，并禁止直接交给 npm 重新解算无界 DSH peer 图；
 - `types-consumer.ts`：从 npm package exports 消费公开 `.d.ts`，并以严格 TypeScript 配置编译；
 - `host-load.test.mjs`：Host export、Config、waterfall、独立模型能力 RPC 与动态服务注册；配额纵向回归把真实 stream listener 的结构化/模糊 429 观测贯通到脱敏状态 RPC 和 `/codex-usage` 命令，并验证成功请求恢复近期成功状态。
 
@@ -69,7 +69,7 @@ pnpm run release:acceptance -- pass-platform <linux|macos|windows> \
   --tested-at=<带时区的RFC3339> \
   --runner=<运行环境单行标识> \
   --node-version=<22.x.y或24.x.y> \
-  --dsh-version=0.1.1-rc.2 \
+  --dsh-version=0.1.2-rc.1 \
   --profile-smoke=passed \
   --evidence-url=<脱敏HTTPS>
 ```

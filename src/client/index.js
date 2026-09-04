@@ -439,7 +439,7 @@ window.__ModuleLoader__.load({
     const SETTINGS_DIALOG_SELECTOR = '[role="dialog"][aria-modal="true"]'
     const SETTINGS_NAV_SELECTOR = `${SETTINGS_DIALOG_SELECTOR} > nav`
     const SETTINGS_NAV_BUTTON_SELECTOR = `${SETTINGS_NAV_SELECTOR} button`
-    // settings.section has no icon slot in Harness 0.1.1-rc.2. This original code-brackets glyph is applied only to the unique Codex nav entry.
+    // settings.section has no icon slot in Harness 0.1.2-rc.1. This original code-brackets glyph is applied only to the unique Codex nav entry.
     const CODE_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
       <path d="M5.25 3.25 1.5 8l3.75 4.75M10.75 3.25 14.5 8l-3.75 4.75M9.25 2.5l-2.5 11" fill="none" stroke="black" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
     </svg>`

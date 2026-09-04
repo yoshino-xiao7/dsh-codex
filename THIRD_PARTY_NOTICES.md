@@ -10,7 +10,7 @@ This project composes the following independently published packages. Each relea
 | `@deepseek-ai/dsh-authorization` | OAuth flow registry and interaction seam | MIT |
 | `@deepseek-ai/dsh-client-connection` | Web client connection injection | MIT |
 | `@deepseek-ai/dsh-client-locale` | Web client locale service | MIT |
-| `@deepseek-ai/dsh-client-runtime` | Web client plugin runtime | MIT |
+| `@deepseek-ai/dsh-client-ui-renderer` | Web client slot renderer | MIT |
 | `@deepseek-ai/dsh-client-ui-conversation` | Conversation composer slot integration | MIT |
 | `@deepseek-ai/dsh-client-ui-model-selection` | Current-session model directory integration | MIT |
 | `@deepseek-ai/dsh-client-ui-settings` | Web settings-page integration | MIT |

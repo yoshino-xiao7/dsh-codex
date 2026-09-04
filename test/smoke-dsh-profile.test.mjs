@@ -9,6 +9,7 @@ import {
   assertInstalledConfig,
   commandFromDshManifest,
   finalizeSmokeTemporaryDirectory,
+  parseWebReadyUrl,
   resolveDshCommand,
   resolvePluginPackage,
 } from "../scripts/smoke-dsh-profile.mjs"
@@ -124,7 +125,7 @@ test("DSH package metadata resolves the real JS entry through Node", () => {
   assert.deepEqual(
     commandFromDshManifest({
       name: "@deepseek-ai/dsh",
-      version: "0.1.1-rc.2",
+      version: "0.1.2-rc.1",
       bin: { dsh: "lib/bin.js" },
     }, packageRoot, "/node-under-test"),
     {
@@ -142,7 +143,7 @@ test("DSH package metadata rejects a drifting CLI version", () => {
       version: "0.1.1-rc.3",
       bin: { dsh: "lib/bin.js" },
     }, "/runtime/dsh"),
-    /Expected @deepseek-ai\/dsh 0\.1\.1-rc\.2, found 0\.1\.1-rc\.3/u,
+    /Expected @deepseek-ai\/dsh 0\.1\.2-rc\.1, found 0\.1\.1-rc\.3/u,
   )
 })
 
@@ -153,7 +154,7 @@ test("DSH CLI root resolution bypasses platform-specific npm shims", async () =>
     await mkdir(path.join(packageRoot, "lib"), { recursive: true })
     await writeFile(path.join(packageRoot, "package.json"), JSON.stringify({
       name: "@deepseek-ai/dsh",
-      version: "0.1.1-rc.2",
+      version: "0.1.2-rc.1",
       bin: { dsh: "lib/bin.js" },
     }))
     await writeFile(path.join(packageRoot, "lib", "bin.js"), "")
@@ -184,6 +185,14 @@ test("an existing release candidate tarball is used without repacking", async ()
   } finally {
     await rm(temporary, { recursive: true, force: true })
   }
+})
+
+test("profile smoke parses the DSH 0.1.2-rc.1 launch-token ready URL", () => {
+  assert.equal(
+    parseWebReadyUrl("dsh web: http://127.0.0.1:4123/?token=abcDEF012-_ (LAN: http://192.0.2.10:4123/?token=abcDEF012-_)"),
+    "http://127.0.0.1:4123/?token=abcDEF012-_",
+  )
+  assert.equal(parseWebReadyUrl("dsh web: http://127.0.0.1:4123"), undefined)
 })
 
 test("release candidate input rejects non-tarball files", async () => {

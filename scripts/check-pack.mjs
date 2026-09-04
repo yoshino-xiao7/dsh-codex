@@ -4,6 +4,7 @@ import os from "node:os"
 import path from "node:path"
 
 import {
+  validatePackedDistContents,
   validatePackedMarkdownLinks,
   validatePackedPaths,
 } from "./pack-policy.mjs"
@@ -42,6 +43,7 @@ const files = report[0].files.map((entry) => entry.path)
 validatePackedPaths(files)
 
 const markdownByPath = new Map()
+const distByPath = new Map()
 for (const file of files) {
   const sourcePath = path.resolve(process.cwd(), file)
   const sourceStat = await lstat(sourcePath)
@@ -49,5 +51,7 @@ for (const file of files) {
     throw new Error(`Packed artifact source must be a regular file: ${file}`)
   }
   if (file.endsWith(".md")) markdownByPath.set(file, await readFile(sourcePath, "utf8"))
+  if (file.startsWith("dist/")) distByPath.set(file, await readFile(sourcePath, "utf8"))
 }
 validatePackedMarkdownLinks(files, markdownByPath)
+validatePackedDistContents(files, distByPath)

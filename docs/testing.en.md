@@ -48,7 +48,7 @@ Regular CI has a separate read-only `candidate-replay` Ubuntu/Node 24 job. From 
 - `remote-image-input.test.mjs`: URL, DNS, redirect, response-size, MIME, timeout, two active jobs, 32 queued jobs, full-queue rejection, queued cancellation, queue closure and active-job convergence during plugin disposal, and persistence-stage cancellation boundaries, plus end-to-end execution through the real ToolRuntime and published `read_image` renderer; model-capability preflight runs inside the same limiter, so a blocked resolver that ignores abort cannot bypass active or queued bounds;
 - `generate-sbom.test.mjs`, `release-evidence.test.mjs`, and `release-workflow.test.mjs`: offline deterministic reference dependency graphs, artifact/both-lockfile hash binding, the DSH smoke runtime environment, actual-install-tree and production-audit evidence, exact SRI, signature/attestation audit, Action SHA pinning, least privilege, draft/tag target preflight, and recoverable publication;
 - `release-maintainability.test.mjs`: direct runtime-dependency notice coverage, the Apache-2.0 contribution license, bilingual privacy templates, root/fixture DSH version alignment, and coordinated Dependabot configuration;
-- `dsh-runtime-fixture.test.mjs`: the fixture is private, pins exact DSH `0.1.1-rc.2`, and commits its complete pnpm lock; CI, compatibility, and release workflows may install that graph only with `--frozen-lockfile --ignore-scripts`, and must not hand the unbounded DSH peer graph back to direct npm resolution;
+- `dsh-runtime-fixture.test.mjs`: the fixture is private, pins exact DSH `0.1.2-rc.1`, and commits its complete pnpm lock; CI, compatibility, and release workflows may install that graph only with `--frozen-lockfile --ignore-scripts`, and must not hand the unbounded DSH peer graph back to direct npm resolution;
 - `types-consumer.ts`: imports public `.d.ts` files through npm package exports and compiles them under strict TypeScript settings;
 - `host-load.test.mjs`: Host exports, Config, waterfall registration, the independent model-capability RPC, and dynamic service registration; its quota vertical regression carries structured and ambiguous 429 observations from the real stream listener through the sanitized status RPC and `/codex-usage` command, then verifies a successful request restores recent-success state.
 
@@ -69,7 +69,7 @@ pnpm run release:acceptance -- pass-platform <linux|macos|windows> \
   --tested-at=<RFC3339-with-timezone> \
   --runner=<single-line-runner-id> \
   --node-version=<22.x.y-or-24.x.y> \
-  --dsh-version=0.1.1-rc.2 \
+  --dsh-version=0.1.2-rc.1 \
   --profile-smoke=passed \
   --evidence-url=<sanitized-HTTPS>
 ```

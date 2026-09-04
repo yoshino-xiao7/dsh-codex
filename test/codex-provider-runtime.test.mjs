@@ -561,6 +561,33 @@ test("an explicit empty model list hides discovery without invalidating exact mo
   })
 })
 
+test("runtime installs the settings namespace through ctx.settings.installSection", () => {
+  let installed
+  const entry = Config({})
+  const harness = fakeHarness({
+    settingsContext: {
+      settings: {
+        installSection(owner, ns, schema, config, hooks) {
+          installed = { owner, ns, schema, config, hooks }
+          hooks.setSource(() => config)
+          hooks.onChange()
+        },
+      },
+    },
+  })
+  installCodexProviderRuntime(harness.ctx, entry, {
+    sessionPreferences: { resolve: () => ({ fast: false, transport: "auto" }) },
+  })
+
+  assert.equal(installed.owner, harness.ctx)
+  assert.equal(installed.ns, "dsh-codex")
+  assert.equal(installed.schema, Config)
+  assert.deepEqual(installed.config, entry)
+  assert.equal(typeof installed.hooks.setSource, "function")
+  assert.equal(typeof installed.hooks.onChange, "function")
+  assert.equal(typeof installed.hooks.validate, "function")
+})
+
 function fakeHarness(options = {}) {
   const adapterRoutes = []
   const adapters = []
@@ -607,9 +634,36 @@ function fakeHarness(options = {}) {
     },
     inject(services, callback) {
       if (services.length === 1 && services[0] === "settings" && options.settingsContext !== undefined) {
-        callback(options.settingsContext)
+        callback(withInstallSection(options.settingsContext))
       }
     },
   }
   return { ctx, adapterRoutes, adapters, directories, discoveries, flows }
+}
+
+function withInstallSection(settingsContext) {
+  if (typeof settingsContext?.settings?.installSection === "function") return settingsContext
+  const settings = settingsContext?.settings
+  if (typeof settings?.register !== "function") return settingsContext
+  return {
+    ...settingsContext,
+    settings: {
+      ...settings,
+      installSection(owner, ns, schema, entry, hooks) {
+        const scope = settings.register(ns, schema, {
+          base: entry,
+          ...(hooks.validate === undefined ? {} : { validate: hooks.validate }),
+        })
+        hooks.setSource(() => scope.get())
+        settingsContext.effect?.(() => () => {
+          hooks.setSource(() => entry)
+          hooks.onChange()
+        })
+        hooks.onChange()
+        scope.watch(() => {
+          hooks.onChange()
+        })
+      },
+    },
+  }
 }

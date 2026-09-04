@@ -18,10 +18,10 @@ test("the smoke runtime has a committed exact and private pnpm fixture", async (
     version: "0.0.0",
     private: true,
     packageManager: "pnpm@10.34.5",
-    dependencies: { "@deepseek-ai/dsh": "0.1.1-rc.2" },
+    dependencies: { "@deepseek-ai/dsh": "0.1.2-rc.1" },
   })
-  assert.match(lock, /specifier: 0\.1\.1-rc\.2/u)
-  assert.match(lock, /version: 0\.1\.1-rc\.2(?:\(|\s*$)/mu)
+  assert.match(lock, /specifier: 0\.1\.2-rc\.1/u)
+  assert.match(lock, /version: 0\.1\.2-rc\.1(?:\(|\s*$)/mu)
 })
 
 test("the pinned pnpm CLI accepts the complete dependency-tree evidence command", async () => {

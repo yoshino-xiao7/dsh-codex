@@ -35,7 +35,7 @@ const PASS_TIME = "2026-08-29T10:00:00+08:00"
 const COMPLETE_EVIDENCE_TIME = "2026-08-29T02:00:00Z"
 const APPROVED_AT = "2026-08-29T03:00:00Z"
 const POST_RELEASE_PASS_TIME = "2026-08-29T04:00:00Z"
-const DSH_VERSION = "0.1.1-rc.2"
+const DSH_VERSION = "0.1.2-rc.1"
 const PLATFORM_NODE_VERSION = "22.22.2"
 const PLATFORM_RUNNER = "linux-controlled-runner"
 const PLATFORM_EVIDENCE_URL = "https://evidence.example.test/platform/linux"
@@ -445,7 +445,7 @@ test("pass-platform requires every exact option and rejects invalid platform evi
     {
       label: "wrong DSH version",
       arguments: platformPassArguments({ dshVersion: "0.1.1-rc.3" }),
-      pattern: /dshVersion must be 0\.1\.1-rc\.2/iu,
+      pattern: /dshVersion must be 0\.1\.2-rc\.1/iu,
     },
     {
       label: "unconfirmed profile smoke",
@@ -1492,7 +1492,7 @@ function statusAcceptance() {
     testedAt: "2026-08-29T01:00:00Z",
     runner: "status-secret-controlled-runner",
     nodeVersion: "24.19.0",
-    dshVersion: "0.1.1-rc.2",
+    dshVersion: "0.1.2-rc.1",
     profileSmoke: "passed",
     evidenceUrl: "https://status-secret.example.test/platform/linux",
   }

@@ -1,10 +1,6 @@
 import { PiAiAdapter } from "@deepseek-ai/dsh-llm-pi-ai"
 import { resolveRetryPolicy } from "@deepseek-ai/dsh-llm"
 import { createModels } from "@earendil-works/pi-ai"
-import {
-  installSettingsSection,
-  settingsNamespace,
-} from "@deepseek-ai/dsh-settings"
 import Schema from "@deepseek-ai/schemastery"
 
 import { registerCodexAuthorizationFlow } from "./codex-authorization.mjs"
@@ -27,7 +23,7 @@ import {
 } from "./image-policy.mjs"
 import { codexModelCapabilityCatalog } from "./codex-model-capabilities.mjs"
 
-export const CODEX_SETTINGS_NAMESPACE = settingsNamespace("dsh-codex")
+export const CODEX_SETTINGS_NAMESPACE = "dsh-codex"
 
 const DEFAULT_STREAM_IDLE_TIMEOUT_MS = 300_000
 const MAX_TIMER_DELAY_MS = 2_147_483_647
@@ -260,19 +256,21 @@ export function installCodexProviderRuntime(ctx, entryConfig = {}, options = {})
     })))
   })
 
-  installSettingsSection(ctx, CODEX_SETTINGS_NAMESPACE, Config, entry, {
-    validate: (candidate) => {
-      createCodexProfile(candidate, provider)
-    },
-    setSource(current) {
-      source = current
-    },
-    onChange() {
-      // PiAiAdapter reads the profile map once per operation; invalid settings
-      // are rejected by validate before this source can become authoritative.
-      profiles()
-      synchronizeSessionDefaults(source())
-    },
+  ctx.inject(["settings"], (sctx) => {
+    sctx.settings.installSection(ctx, CODEX_SETTINGS_NAMESPACE, Config, entry, {
+      validate: (candidate) => {
+        createCodexProfile(candidate, provider)
+      },
+      setSource(current) {
+        source = current
+      },
+      onChange() {
+        // PiAiAdapter reads the profile map once per operation; invalid settings
+        // are rejected by validate before this source can become authoritative.
+        profiles()
+        synchronizeSessionDefaults(source())
+      },
+    })
   })
 
   const networkProbe = (

@@ -459,7 +459,7 @@ function pendingAcceptance(version) {
     testedAt: "TBD",
     runner: "TBD",
     nodeVersion: "TBD",
-    dshVersion: "0.1.1-rc.2",
+    dshVersion: "0.1.2-rc.1",
     profileSmoke: "pending",
     evidenceUrl: "TBD",
   })

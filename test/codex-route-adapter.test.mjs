@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 
 import {
-  CallId,
+  ToolCallId,
   createAssistantMessage,
   createToolResultMessage,
   createUserMessage,
@@ -186,7 +186,7 @@ test("cross-model replay preserves the producing model while routing the new mod
 test("tool replay maps only assistant provenance and preserves call/result correlation", async () => {
   const delegate = fakeCanonicalAdapter()
   const adapter = new CodexRouteAdapter(delegate)
-  const callId = CallId("call-1")
+  const callId = ToolCallId("call-1")
   const assistant = createAssistantMessage({
     content: [{
       type: "tool-call",
