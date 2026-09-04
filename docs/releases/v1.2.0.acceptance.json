@@ -2,37 +2,37 @@
   "schemaVersion": 3,
   "version": "1.2.0",
   "releaseStatus": "approved",
-  "testedCommit": "d4d595d53f08809cddf4ee8b85edf05ccabbfdfb",
+  "testedCommit": "cae6d90b85da0b48d47a22c3995c8cabf92dc630",
   "approvedBy": "yoshino-xiao7",
-  "approvedAt": "2026-09-04T11:06:16Z",
-  "approvalEvidenceUrl": "https://github.com/yoshino-xiao7/dsh-codex/actions/runs/33865438779",
+  "approvedAt": "2026-09-04T11:50:00Z",
+  "approvalEvidenceUrl": "https://github.com/yoshino-xiao7/dsh-codex/actions/runs/33867879430",
   "platforms": {
     "linux": {
       "status": "passed",
-      "testedAt": "2026-09-04T11:02:05Z",
+      "testedAt": "2026-09-04T11:31:05Z",
       "runner": "GitHub Actions ubuntu-24.04",
       "nodeVersion": "24.20.0",
       "dshVersion": "0.1.2-rc.1",
       "profileSmoke": "passed",
-      "evidenceUrl": "https://github.com/yoshino-xiao7/dsh-codex/actions/runs/33865438779/job/100999106290"
+      "evidenceUrl": "https://github.com/yoshino-xiao7/dsh-codex/actions/runs/33867879430/job/101006763607"
     },
     "macos": {
       "status": "passed",
-      "testedAt": "2026-09-04T11:00:39Z",
+      "testedAt": "2026-09-04T11:29:12Z",
       "runner": "GitHub Actions macos-26-arm64",
-      "nodeVersion": "24.20.0",
+      "nodeVersion": "24.18.0",
       "dshVersion": "0.1.2-rc.1",
       "profileSmoke": "passed",
-      "evidenceUrl": "https://github.com/yoshino-xiao7/dsh-codex/actions/runs/33865438779/job/100999106257"
+      "evidenceUrl": "https://github.com/yoshino-xiao7/dsh-codex/actions/runs/33867879430/job/101006763381"
     },
     "windows": {
       "status": "passed",
-      "testedAt": "2026-09-04T10:56:35Z",
+      "testedAt": "2026-09-04T11:34:24Z",
       "runner": "GitHub Actions windows-2025-vs2026",
       "nodeVersion": "24.19.0",
       "dshVersion": "0.1.2-rc.1",
       "profileSmoke": "passed",
-      "evidenceUrl": "https://github.com/yoshino-xiao7/dsh-codex/actions/runs/33865438779/job/100999106509"
+      "evidenceUrl": "https://github.com/yoshino-xiao7/dsh-codex/actions/runs/33867879430/job/101006763507"
     }
   },
   "liveAcceptance": {
