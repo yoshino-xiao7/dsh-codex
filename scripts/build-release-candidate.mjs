@@ -228,6 +228,7 @@ function isRetryableNpmAuditError(error) {
   const detail = errorChainText(error)
   return /"?statusCode"?\s*:\s*(?:429|500|502|503|504)\b/iu.test(detail)
     || /\b(?:429 Too Many Requests|500 Internal Server Error|502 Bad Gateway|503 Service Unavailable|504 Gateway Timeout)\b/iu.test(detail)
+    || /\bnetwork timeout at:/iu.test(detail)
     || /\b(?:EAI_AGAIN|ECONNREFUSED|ECONNRESET|ENETUNREACH|ENOTFOUND|ERR_SOCKET_TIMEOUT|ETIMEDOUT)\b/u.test(detail)
 }
 
@@ -497,7 +498,10 @@ export async function buildReleaseCandidate({
     )
     const audit = await runNpmAudit(
       processAdapter,
-      commandOptions(isolatedDirectory),
+      commandOptions(isolatedDirectory, true, {
+        npm_config_fetch_retries: "0",
+        npm_config_fetch_timeout: "30000",
+      }),
     )
     await writeFile(
       path.join(stagingDirectory, "npm-audit.json"),

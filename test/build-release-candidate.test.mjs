@@ -366,7 +366,9 @@ test("npm audit fails closed after bounded transient retries", async (t) => {
   const fake = createFakeProcessAdapter({
     auditFailures: Array.from(
       { length: 3 },
-      () => new Error("npm audit failed (1): ERR_SOCKET_TIMEOUT"),
+      () => new Error(
+        "npm audit failed (1): network timeout at: https://registry.npmjs.org/-/npm/v1/security/advisories/bulk",
+      ),
     ),
   })
 
@@ -377,7 +379,7 @@ test("npm audit fails closed after bounded transient retries", async (t) => {
       environment: { RELEASE_SOURCE_COMMIT: SOURCE_COMMIT },
       processAdapter: fake.adapter,
     }),
-    /ERR_SOCKET_TIMEOUT/u,
+    /network timeout at/u,
   )
 
   assert.equal(
@@ -385,6 +387,13 @@ test("npm audit fails closed after bounded transient retries", async (t) => {
     3,
   )
   assert.deepEqual(fake.delays, [1000, 4000])
+  const auditCalls = fake.calls.filter(
+    ({ label }) => label === "npm audit --omit=dev --audit-level=high --json",
+  )
+  assert.ok(auditCalls.every(({ options }) => (
+    options.environment.npm_config_fetch_retries === "0"
+      && options.environment.npm_config_fetch_timeout === "30000"
+  )))
   await assert.rejects(access(path.join(root, "release")), { code: "ENOENT" })
 })
 
