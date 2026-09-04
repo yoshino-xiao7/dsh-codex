@@ -15,7 +15,7 @@ This project follows the Keep a Changelog structure. Starting with `1.0.0`, rele
 
 - 更新 Cordis、Schemastery、pi-ai 与 TypeScript，并显式固定 Harness 运行时所需的 include、loader 与原生模块加载依赖，避免严格 peer 解析时出现隐式依赖漂移。
 - 启用严格 peer dependency 安装检查，使不兼容的运行时依赖在构建和 CI 阶段直接失败。
-- 发布候选的 npm 漏洞审计对 429、5xx、DNS 与网络超时执行最多三次的有界重试，并限制单次等待时间；真实漏洞立即失败，重试耗尽后仍保持失败关闭。
+- 发布候选的 npm 漏洞审计对 429、5xx、DNS 与网络超时执行最多五次的有界重试，单次最多等待 60 秒并采用最长 60 秒的退避；真实漏洞立即失败，重试耗尽后仍保持失败关闭。
 
 ### English
 
@@ -27,7 +27,7 @@ This project follows the Keep a Changelog structure. Starting with `1.0.0`, rele
 
 - Update Cordis, Schemastery, pi-ai, and TypeScript, while explicitly pinning the include, loader, and native-module loading dependencies required by the Harness runtime so strict peer resolution cannot drift through implicit dependencies.
 - Enable strict peer-dependency installation checks so incompatible runtime dependencies fail during build and CI.
-- Add bounded retries for npm audit 429, 5xx, DNS, and network-timeout failures when building a release candidate, with a per-attempt time limit. Real vulnerabilities fail immediately, and exhausted retries remain fail-closed.
+- Add at most five bounded retries for npm audit 429, 5xx, DNS, and network-timeout failures when building a release candidate, with a 60-second per-attempt limit and backoff capped at 60 seconds. Real vulnerabilities fail immediately, and exhausted retries remain fail-closed.
 
 ## [1.1.1] - 2026-08-31
 

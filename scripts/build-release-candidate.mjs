@@ -30,7 +30,7 @@ const NPM_VERSION = "11.16.0"
 const NPM_REGISTRY = "https://registry.npmjs.org/"
 const MAX_COMMAND_DURATION_MS = 10 * 60 * 1000
 const MAX_COMMAND_OUTPUT_BYTES = 128 * 1024 * 1024
-const NPM_AUDIT_RETRY_DELAYS_MS = Object.freeze([1000, 4000])
+const NPM_AUDIT_RETRY_DELAYS_MS = Object.freeze([5000, 15000, 30000, 60000])
 const repositoryRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)))
 
 const EXPLICIT_CREDENTIAL_NAMES = new Set([
@@ -500,7 +500,7 @@ export async function buildReleaseCandidate({
       processAdapter,
       commandOptions(isolatedDirectory, true, {
         npm_config_fetch_retries: "0",
-        npm_config_fetch_timeout: "30000",
+        npm_config_fetch_timeout: "60000",
       }),
     )
     await writeFile(

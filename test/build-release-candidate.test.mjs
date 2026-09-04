@@ -314,6 +314,10 @@ test("npm audit retries bounded transient service failures before capturing evid
     auditFailures: [
       new Error('npm audit failed (1): {"statusCode":503,"error":"Service Unavailable"}'),
       new Error("npm audit failed (1): 503 Service Unavailable"),
+      new Error(
+        "npm audit failed (1): network timeout at: https://registry.npmjs.org/-/npm/v1/security/advisories/bulk",
+      ),
+      new Error("npm audit failed (1): ETIMEDOUT"),
     ],
   })
 
@@ -326,9 +330,9 @@ test("npm audit retries bounded transient service failures before capturing evid
 
   assert.equal(
     fake.calls.filter(({ label }) => label === "npm audit --omit=dev --audit-level=high --json").length,
-    3,
+    5,
   )
-  assert.deepEqual(fake.delays, [1000, 4000])
+  assert.deepEqual(fake.delays, [5000, 15000, 30000, 60000])
   const audit = JSON.parse(await readFile(path.join(root, "release/npm-audit.json"), "utf8"))
   assert.equal(audit.metadata.vulnerabilities.high, 0)
 })
@@ -365,7 +369,7 @@ test("npm audit fails closed after bounded transient retries", async (t) => {
   const root = await createRepository(t)
   const fake = createFakeProcessAdapter({
     auditFailures: Array.from(
-      { length: 3 },
+      { length: 5 },
       () => new Error(
         "npm audit failed (1): network timeout at: https://registry.npmjs.org/-/npm/v1/security/advisories/bulk",
       ),
@@ -384,15 +388,15 @@ test("npm audit fails closed after bounded transient retries", async (t) => {
 
   assert.equal(
     fake.calls.filter(({ label }) => label === "npm audit --omit=dev --audit-level=high --json").length,
-    3,
+    5,
   )
-  assert.deepEqual(fake.delays, [1000, 4000])
+  assert.deepEqual(fake.delays, [5000, 15000, 30000, 60000])
   const auditCalls = fake.calls.filter(
     ({ label }) => label === "npm audit --omit=dev --audit-level=high --json",
   )
   assert.ok(auditCalls.every(({ options }) => (
     options.environment.npm_config_fetch_retries === "0"
-      && options.environment.npm_config_fetch_timeout === "30000"
+      && options.environment.npm_config_fetch_timeout === "60000"
   )))
   await assert.rejects(access(path.join(root, "release")), { code: "ENOENT" })
 })
