@@ -81,6 +81,7 @@ function commandLabel(tool, arguments_) {
 }
 
 function createFakeProcessAdapter({
+  auditFailures = [],
   failAt,
   head = SOURCE_COMMIT,
   npmVersion = "11.16.0",
@@ -88,7 +89,9 @@ function createFakeProcessAdapter({
   runtime = {},
 } = {}) {
   const calls = []
+  const delays = []
   const npmConfigReads = []
+  let auditFailureIndex = 0
   const adapter = {
     runtime: {
       nodeVersion: "v24.9.0",
@@ -136,6 +139,9 @@ function createFakeProcessAdapter({
         })}\n`
       }
       if (tool === "npm" && arguments_[0] === "audit") {
+        const failure = auditFailures[auditFailureIndex]
+        auditFailureIndex += 1
+        if (failure !== undefined) throw failure
         return `${JSON.stringify({
           auditReportVersion: 2,
           metadata: { vulnerabilities: { low: 0, moderate: 0, high: 0, critical: 0 } },
@@ -143,8 +149,11 @@ function createFakeProcessAdapter({
       }
       return ""
     },
+    async wait(milliseconds) {
+      delays.push(milliseconds)
+    },
   }
-  return { adapter, calls, npmConfigReads }
+  return { adapter, calls, delays, npmConfigReads }
 }
 
 test("the deep candidate interface replays the reviewed build once and installs bound evidence", async (t) => {
@@ -292,6 +301,100 @@ test("a command failure leaves no managed output and always removes the isolated
   const temporaryRoot = path.dirname(fake.calls[0].options.environment.npm_config_userconfig)
   await assert.rejects(access(isolatedDirectory), { code: "ENOENT" })
   await assert.rejects(access(temporaryRoot), { code: "ENOENT" })
+  assert.equal(
+    fake.calls.filter(({ label }) => label === "npm audit --omit=dev --audit-level=high --json").length,
+    1,
+  )
+  assert.deepEqual(fake.delays, [])
+})
+
+test("npm audit retries bounded transient service failures before capturing evidence", async (t) => {
+  const root = await createRepository(t)
+  const fake = createFakeProcessAdapter({
+    auditFailures: [
+      new Error('npm audit failed (1): {"statusCode":503,"error":"Service Unavailable"}'),
+      new Error("npm audit failed (1): 503 Service Unavailable"),
+    ],
+  })
+
+  await buildReleaseCandidate({
+    repositoryRoot: root,
+    version: VERSION,
+    environment: { RELEASE_SOURCE_COMMIT: SOURCE_COMMIT },
+    processAdapter: fake.adapter,
+  })
+
+  assert.equal(
+    fake.calls.filter(({ label }) => label === "npm audit --omit=dev --audit-level=high --json").length,
+    3,
+  )
+  assert.deepEqual(fake.delays, [1000, 4000])
+  const audit = JSON.parse(await readFile(path.join(root, "release/npm-audit.json"), "utf8"))
+  assert.equal(audit.metadata.vulnerabilities.high, 0)
+})
+
+test("npm audit does not retry a vulnerability result", async (t) => {
+  const root = await createRepository(t)
+  const vulnerabilityReport = JSON.stringify({
+    auditReportVersion: 2,
+    metadata: { vulnerabilities: { high: 1, critical: 0 } },
+  })
+  const fake = createFakeProcessAdapter({
+    auditFailures: [new Error(`npm audit failed (1):\n${vulnerabilityReport}`)],
+  })
+
+  await assert.rejects(
+    buildReleaseCandidate({
+      repositoryRoot: root,
+      version: VERSION,
+      environment: { RELEASE_SOURCE_COMMIT: SOURCE_COMMIT },
+      processAdapter: fake.adapter,
+    }),
+    /"high":1/u,
+  )
+
+  assert.equal(
+    fake.calls.filter(({ label }) => label === "npm audit --omit=dev --audit-level=high --json").length,
+    1,
+  )
+  assert.deepEqual(fake.delays, [])
+  await assert.rejects(access(path.join(root, "release")), { code: "ENOENT" })
+})
+
+test("npm audit fails closed after bounded transient retries", async (t) => {
+  const root = await createRepository(t)
+  const fake = createFakeProcessAdapter({
+    auditFailures: Array.from(
+      { length: 3 },
+      () => new Error(
+        "npm audit failed (1): network timeout at: https://registry.npmjs.org/-/npm/v1/security/advisories/bulk",
+      ),
+    ),
+  })
+
+  await assert.rejects(
+    buildReleaseCandidate({
+      repositoryRoot: root,
+      version: VERSION,
+      environment: { RELEASE_SOURCE_COMMIT: SOURCE_COMMIT },
+      processAdapter: fake.adapter,
+    }),
+    /network timeout at/u,
+  )
+
+  assert.equal(
+    fake.calls.filter(({ label }) => label === "npm audit --omit=dev --audit-level=high --json").length,
+    3,
+  )
+  assert.deepEqual(fake.delays, [1000, 4000])
+  const auditCalls = fake.calls.filter(
+    ({ label }) => label === "npm audit --omit=dev --audit-level=high --json",
+  )
+  assert.ok(auditCalls.every(({ options }) => (
+    options.environment.npm_config_fetch_retries === "0"
+      && options.environment.npm_config_fetch_timeout === "30000"
+  )))
+  await assert.rejects(access(path.join(root, "release")), { code: "ENOENT" })
 })
 
 test("an existing managed output is rejected before commands or writes and is never overwritten", async (t) => {

@@ -30,6 +30,7 @@ const NPM_VERSION = "11.16.0"
 const NPM_REGISTRY = "https://registry.npmjs.org/"
 const MAX_COMMAND_DURATION_MS = 10 * 60 * 1000
 const MAX_COMMAND_OUTPUT_BYTES = 128 * 1024 * 1024
+const NPM_AUDIT_RETRY_DELAYS_MS = Object.freeze([1000, 4000])
 const repositoryRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)))
 
 const EXPLICIT_CREDENTIAL_NAMES = new Set([
@@ -197,6 +198,7 @@ async function readRepositoryJson(root, relativePath) {
 function assertProcessAdapter(processAdapter) {
   assert(processAdapter !== null && typeof processAdapter === "object", "processAdapter is required")
   assert(typeof processAdapter.run === "function", "processAdapter.run must be a function")
+  assert(typeof processAdapter.wait === "function", "processAdapter.wait must be a function")
   assert(
     processAdapter.runtime !== null && typeof processAdapter.runtime === "object",
     "processAdapter.runtime is required",
@@ -207,6 +209,40 @@ async function run(processAdapter, tool, arguments_, options) {
   const output = await processAdapter.run(tool, arguments_, options)
   assert(typeof output === "string", `${tool} process adapter output must be a string`)
   return output
+}
+
+function errorChainText(error) {
+  const messages = []
+  const visited = new Set()
+  let current = error
+  while (current !== null && current !== undefined && !visited.has(current)) {
+    visited.add(current)
+    if (current instanceof Error) messages.push(current.message)
+    else messages.push(String(current))
+    current = typeof current === "object" ? current.cause : undefined
+  }
+  return messages.join("\n")
+}
+
+function isRetryableNpmAuditError(error) {
+  const detail = errorChainText(error)
+  return /"?statusCode"?\s*:\s*(?:429|500|502|503|504)\b/iu.test(detail)
+    || /\b(?:429 Too Many Requests|500 Internal Server Error|502 Bad Gateway|503 Service Unavailable|504 Gateway Timeout)\b/iu.test(detail)
+    || /\bnetwork timeout at:/iu.test(detail)
+    || /\b(?:EAI_AGAIN|ECONNREFUSED|ECONNRESET|ENETUNREACH|ENOTFOUND|ERR_SOCKET_TIMEOUT|ETIMEDOUT)\b/u.test(detail)
+}
+
+async function runNpmAudit(processAdapter, options) {
+  const arguments_ = ["audit", "--omit=dev", "--audit-level=high", "--json"]
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await run(processAdapter, "npm", arguments_, options)
+    } catch (error) {
+      const delay = NPM_AUDIT_RETRY_DELAYS_MS[attempt]
+      if (delay === undefined || !isRetryableNpmAuditError(error)) throw error
+      await processAdapter.wait(delay)
+    }
+  }
 }
 
 function normalizedCapturedJson(source, label) {
@@ -460,11 +496,12 @@ export async function buildReleaseCandidate({
       path.join(stagingDirectory, "isolated-dependency-tree.json"),
       normalizedCapturedJson(isolatedTree, "npm ls"),
     )
-    const audit = await run(
+    const audit = await runNpmAudit(
       processAdapter,
-      "npm",
-      ["audit", "--omit=dev", "--audit-level=high", "--json"],
-      commandOptions(isolatedDirectory),
+      commandOptions(isolatedDirectory, true, {
+        npm_config_fetch_retries: "0",
+        npm_config_fetch_timeout: "30000",
+      }),
     )
     await writeFile(
       path.join(stagingDirectory, "npm-audit.json"),
@@ -561,6 +598,9 @@ export function createLocalProcessAdapter({
         )
       }
       return capture ? result.stdout ?? "" : ""
+    },
+    wait(milliseconds) {
+      return new Promise((resolve) => setTimeout(resolve, milliseconds))
     },
   })
 }
