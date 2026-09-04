@@ -4,7 +4,7 @@
 
 Last updated: 2026-09-04.
 
-`1.1.3` is the current stable release. Complete checks and Linux, macOS, and Windows CI/profile smoke must be rerun against this candidate and approved by the maintainer. Post-release live-account validation starts at `0/13` and inherits no older evidence.
+`1.1.3` is the current stable release. Complete checks and Linux, macOS, and Windows CI/profile smoke passed `3/3` against this candidate and were approved by the maintainer. Post-release live-account validation starts at `0/13` and inherits no older evidence.
 
 | Component or environment | `1.1.3` compatibility target | Status |
 | --- | --- | --- |
