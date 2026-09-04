@@ -4,7 +4,7 @@
 
 A Codex plugin for DeepSeek Harness with ChatGPT OAuth sign-in, Codex models, image input, and reliable streaming responses.
 
-> Current version: `1.1.1` stable release, published through npm `latest` and a full GitHub Release. npm package: `dsh-codex-community`.
+> Current version: `1.1.2` release candidate. npm package: `dsh-codex-community`; npm `latest` remains `1.1.1` until publication completes.
 
 ## Features
 
@@ -26,11 +26,11 @@ A Codex plugin for DeepSeek Harness with ChatGPT OAuth sign-in, Codex models, im
 - run an on-demand local or account check from collapsed connection diagnostics and copy a sanitized report containing only fixed statuses and bounded facts;
 - inspect sanitized per-conversation transport health, including request count, connection reuse, delta context, and SSE fallbacks.
 
-Fixed in `1.1.1`:
+Maintenance in `1.1.2`:
 
-- precisely recognize pi-ai's fixed Codex overload error without misclassifying ordinary busy or overloaded prose;
-- preserve safe text after output starts and direct the user to send “continue” manually, while keeping full-request replay disabled after tool execution starts;
-- show a sanitized bilingual overload message instead of exposing the raw server error.
+- update Cordis `4.0.2`, Schemastery `3.18.2`, pi-ai `0.84.4`, and TypeScript `7.0.2`, while explicitly pinning the supporting dependencies required by the Harness runtime;
+- enable strict peer-dependency installation checks so incompatible runtime combinations fail during build and CI;
+- give release-candidate npm audits bounded retries and per-attempt timeouts for transient Registry or network failures, while real vulnerabilities and exhausted retries remain fail-closed.
 
 Added in `1.1.0`:
 
@@ -49,7 +49,7 @@ Added in `1.1.0`:
 Install the exact version:
 
 ```sh
-dsh plugin --profile web add dsh-codex-community@1.1.1
+dsh plugin --profile web add dsh-codex-community@1.1.2
 dsh web
 ```
 
@@ -80,7 +80,7 @@ Available commands:
 Update:
 
 ```sh
-dsh plugin --profile web update dsh-codex-community@1.1.1
+dsh plugin --profile web update dsh-codex-community@1.1.2
 dsh web
 ```
 
@@ -103,8 +103,8 @@ See [Troubleshooting](docs/troubleshooting.en.md) for diagnostic steps.
 
 ## Support boundaries
 
-- The complete checks and Linux, macOS, and Windows CI/profile smoke for `1.1.1` passed `3/3` against this release candidate and were approved by the maintainer. Post-release live-account validation starts at `0/13`; see the [acceptance record](docs/releases/v1.1.1.acceptance.json).
-- Historical `1.1.0` and `1.0.0` release evidence remains available but is not inherited as `1.1.1` acceptance.
+- Platform and publication evidence for `1.1.2` will be recorded independently after this candidate is frozen; see the [acceptance record](docs/releases/v1.1.2.acceptance.json).
+- Historical `1.1.1` and older release evidence remains available but is not inherited as `1.1.2` acceptance.
 - The settings page reads usage through the Web-backend compatibility endpoint used by the official Codex client. If that endpoint is unavailable or malformed, the page retains the latest safe reading and falls back to request observation or an unknown state instead of presenting the error as zero remaining usage.
 - Model names, context windows, maximum outputs, and selectable Low-through-Max reasoning efforts follow the actual semantics of the installed provider catalog. The plugin neither invents nor labels a default effort that the catalog does not provide; when no effort is explicit, the current Provider or service applies its default behavior. Generic `Default`, `Off`, and `Minimal` entries are hidden, and agent-level `Ultra` is not disguised as a plain reasoning effort.
 - Fast is limited to GPT-5.4, GPT-5.5, GPT-5.6 Luna, Sol, and Terra and consumes more usage. Other models never receive the Fast service tier.
