@@ -13,7 +13,12 @@ const acceptancePath = new URL("../docs/releases/v0.0.1.acceptance.json", import
 const draft = JSON.parse(await readFile(acceptancePath, "utf8"))
 
 test("draft acceptance enumerates every release-critical live capability", () => {
-  assert.doesNotThrow(() => assertAcceptanceRecord(draft, { version: "0.0.1" }))
+  const generated = createDraftAcceptanceRecord("0.0.1")
+  assert.doesNotThrow(() => assertAcceptanceRecord(generated, { version: "0.0.1" }))
+  assert.deepEqual(
+    Object.keys(generated.liveAcceptance).sort(),
+    Object.keys(LIVE_ACCEPTANCE_ASSERTIONS).sort(),
+  )
   assert.deepEqual(
     Object.keys(draft.liveAcceptance).sort(),
     Object.keys(LIVE_ACCEPTANCE_ASSERTIONS).sort(),
@@ -28,7 +33,7 @@ test("new release acceptance starts from a fresh schema-v3 draft", () => {
   for (const platform of Object.values(generated.platforms)) {
     assert.equal(platform.status, "pending")
     assert.equal(platform.profileSmoke, "pending")
-    assert.equal(platform.dshVersion, "0.1.1-rc.2")
+    assert.equal(platform.dshVersion, "0.1.2-rc.1")
   }
   for (const result of Object.values(generated.liveAcceptance)) {
     assert.equal(result.status, "pending")
@@ -37,7 +42,7 @@ test("new release acceptance starts from a fresh schema-v3 draft", () => {
 })
 
 test("obsolete acceptance schemas cannot omit reasoning, tools, or replay", () => {
-  const obsolete = structuredClone(draft)
+  const obsolete = createDraftAcceptanceRecord("0.0.1")
   obsolete.schemaVersion = 2
   delete obsolete.liveAcceptance.reasoningStream
   delete obsolete.liveAcceptance.toolRoundTrip
@@ -99,14 +104,14 @@ test("an approved record permits pending live checks but validates every claimed
 })
 
 test("acceptance rejects missing, renamed, or unreviewed live checks", () => {
-  const missing = structuredClone(draft)
+  const missing = createDraftAcceptanceRecord("0.0.1")
   delete missing.liveAcceptance.imageMaxPixels
   assert.throws(
     () => assertAcceptanceRecord(missing, { version: "0.0.1" }),
     /Acceptance liveAcceptance must contain exactly/u,
   )
 
-  const extra = structuredClone(draft)
+  const extra = createDraftAcceptanceRecord("0.0.1")
   extra.liveAcceptance.freeFormClaim = structuredClone(extra.liveAcceptance.transportAuto)
   assert.throws(
     () => assertAcceptanceRecord(extra, { version: "0.0.1" }),
@@ -154,7 +159,7 @@ test("approval cannot predate the newest accepted platform evidence", () => {
 
 test("platform evidence must use the exact DSH runtime and a tested Node line", () => {
   for (const [field, value, pattern] of [
-    ["dshVersion", "0.1.1-rc.3", /dshVersion must be 0\.1\.1-rc\.2/u],
+    ["dshVersion", "0.1.1-rc.3", /dshVersion must be 0\.1\.2-rc\.1/u],
     ["nodeVersion", "20.19.0", /must use the tested Node 22 or 24 line/u],
     ["nodeVersion", "22.18.9", /must be at least 22\.19\.0/u],
     ["nodeVersion", "23.11.0", /must use the tested Node 22 or 24 line/u],
@@ -191,7 +196,7 @@ function approvedFixture() {
     result.testedAt = "2026-08-29T00:00:00Z"
     result.runner = `${platform}-controlled-runner`
     result.nodeVersion = "22.22.2"
-    result.dshVersion = "0.1.1-rc.2"
+    result.dshVersion = "0.1.2-rc.1"
     result.evidenceUrl = `https://example.test/platform/${platform}`
   }
 

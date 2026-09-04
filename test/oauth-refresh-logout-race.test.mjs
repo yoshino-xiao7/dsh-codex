@@ -204,7 +204,7 @@ function freshCredential() {
     type: "oauth",
     access: fakeAccessToken(),
     refresh: "fresh-refresh-fixture",
-    expires: Date.now() + 60_000,
+    expires: Date.now() + 10 * 60_000,
   }
 }
 

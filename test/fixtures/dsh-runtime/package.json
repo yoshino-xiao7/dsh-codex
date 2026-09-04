@@ -4,6 +4,6 @@
   "private": true,
   "packageManager": "pnpm@10.34.5",
   "dependencies": {
-    "@deepseek-ai/dsh": "0.1.1-rc.2"
+    "@deepseek-ai/dsh": "0.1.2-rc.1"
   }
 }

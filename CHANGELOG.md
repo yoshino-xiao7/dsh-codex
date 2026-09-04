@@ -3,6 +3,32 @@
 本项目遵循 Keep a Changelog 的结构；`1.0.0` 起作为正式版发布，具体兼容性边界以对应发布说明为准。
 This project follows the Keep a Changelog structure. Starting with `1.0.0`, releases are stable; each release note defines its exact compatibility boundary.
 
+## [1.2.0] - 2026-09-04
+
+### 中文
+
+#### 新增
+
+- 无新增产品功能；本版本将精确兼容目标升级到 DeepSeek Harness `0.1.2-rc.1`。
+
+#### 修复
+
+- 停止从 `@deepseek-ai/dsh-settings` 导入已移除的 `installSettingsSection` / `settingsNamespace`，改为通过 `ctx.settings.installSection(ctx, "dsh-codex", Config, entry, hooks)` 注册设置命名空间，修复在 Harness `0.1.2-rc.1` Web profile 中 ready 前退出的问题。
+- 发布包门禁扫描全部 `dist/**`，避免只检查顶层 entry 而遗漏 internal chunk 中的旧 settings API。
+- 将 Web client inject 从已停止发布的 `dsh-client-runtime` 切换为 `dsh-client-ui-renderer`，并显式固定 `0.1.2-rc.1` 运行时所需的 Harness peer 依赖。
+
+### English
+
+#### Added
+
+- No new product features; this release moves the exact compatibility target to DeepSeek Harness `0.1.2-rc.1`.
+
+#### Fixed
+
+- Stop importing the removed `installSettingsSection` / `settingsNamespace` named exports from `@deepseek-ai/dsh-settings`. Register the settings namespace with `ctx.settings.installSection(ctx, "dsh-codex", Config, entry, hooks)` so the plugin can reach ready on Harness `0.1.2-rc.1` Web profiles.
+- Scan every packed `dist/**` file in the publication gate so a leftover settings API in an internal chunk cannot escape a top-level entry check.
+- Switch the Web client inject list from the unpublished `dsh-client-runtime` package to `dsh-client-ui-renderer`, and explicitly pin the Harness peer dependencies required by `0.1.2-rc.1`.
+
 ## [1.1.2] - 2026-09-04
 
 ### 中文

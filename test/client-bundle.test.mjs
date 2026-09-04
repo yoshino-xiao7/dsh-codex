@@ -350,6 +350,33 @@ function requestDefaultsScope(value, { writable = true, status = "ready" } = {})
   }
 }
 
+function withInstallSection(settingsContext) {
+  if (typeof settingsContext?.settings?.installSection === "function") return settingsContext
+  const settings = settingsContext?.settings
+  if (typeof settings?.register !== "function") return settingsContext
+  return {
+    ...settingsContext,
+    settings: {
+      ...settings,
+      installSection(owner, ns, schema, entry, hooks) {
+        const scope = settings.register(ns, schema, {
+          base: entry,
+          ...(hooks.validate === undefined ? {} : { validate: hooks.validate }),
+        })
+        hooks.setSource(() => scope.get())
+        settingsContext.effect?.(() => () => {
+          hooks.setSource(() => entry)
+          hooks.onChange()
+        })
+        hooks.onChange()
+        scope.watch(() => {
+          hooks.onChange()
+        })
+      },
+    },
+  }
+}
+
 function modelSettingsRuntimeHarness() {
   const provider = createCodexPiProvider()
   let resolved = Config({})
@@ -412,7 +439,9 @@ function modelSettingsRuntimeHarness() {
     logger: { warn() {} },
     get: () => undefined,
     inject(services, callback) {
-      if (services.length === 1 && services[0] === "settings") callback(settingsContext)
+      if (services.length === 1 && services[0] === "settings") {
+        callback(withInstallSection(settingsContext))
+      }
     },
   }
   const runtime = installCodexProviderRuntime(ctx, resolved, {
@@ -5006,7 +5035,7 @@ test("package manifest exports the real classic bundle with required client inje
   assert.deepEqual(manifest.dsh.client, {
     inject: [
       "@deepseek-ai/dsh-client-connection",
-      "@deepseek-ai/dsh-client-runtime",
+      "@deepseek-ai/dsh-client-ui-renderer",
       "@deepseek-ai/dsh-client-ui-conversation",
       "@deepseek-ai/dsh-client-ui-model-selection",
       "@deepseek-ai/dsh-client-ui-settings",
@@ -5018,7 +5047,7 @@ test("package manifest exports the real classic bundle with required client inje
     "@deepseek-ai/dsh-client-ui-conversation",
     "@deepseek-ai/dsh-client-ui-model-selection",
   ]) {
-    assert.equal(manifest.peerDependencies[dependency], "0.1.1-rc.2")
+    assert.equal(manifest.peerDependencies[dependency], "0.1.2-rc.1")
     assert.deepEqual(manifest.peerDependenciesMeta[dependency], { optional: true })
   }
 })

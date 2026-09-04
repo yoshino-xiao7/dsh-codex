@@ -98,6 +98,29 @@ function resolvePackedLink(source, rawDestination) {
   return target
 }
 
+const FORBIDDEN_PACKED_DIST_EXPORTS = Object.freeze([
+  "installSettingsSection",
+  "settingsNamespace",
+])
+
+export function validatePackedDistContents(files, contentsByPath) {
+  const packed = Array.isArray(files) ? files : []
+  for (const file of packed) {
+    if (typeof file !== "string" || !file.startsWith("dist/")) continue
+    const source = contentsByPath.get(file)
+    if (typeof source !== "string") {
+      throw new Error(`Packed dist source could not be read: ${file}`)
+    }
+    for (const name of FORBIDDEN_PACKED_DIST_EXPORTS) {
+      if (new RegExp(`\\b${name}\\b`, "u").test(source)) {
+        throw new Error(
+          `Packed artifact ${file} still references removed dsh-settings export ${name}`,
+        )
+      }
+    }
+  }
+}
+
 export function validatePackedMarkdownLinks(files, markdownByPath) {
   const packed = new Set(files)
   for (const source of files.filter((file) => file.endsWith(".md"))) {

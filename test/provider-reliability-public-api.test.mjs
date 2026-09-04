@@ -26,7 +26,7 @@ test("public pi-ai chain keeps a generalized 429 with discarded body/code unconf
     type: "oauth",
     access: token,
     refresh: "refresh-probe",
-    expires: Date.now() + 60_000,
+    expires: Date.now() + 10 * 60_000,
   }
   const provider = createCodexPiProvider({
     resolveSessionPreferences: () => ({ fast: false, transport: "sse" }),
@@ -279,7 +279,7 @@ test("public PiAiAdapter sends a positive maxPixels budget through the attachmen
         type: "oauth",
         access: fakeAccessToken(),
         refresh: "refresh-probe",
-        expires: Date.now() + 60_000,
+        expires: Date.now() + 10 * 60_000,
       }),
       authContext: { env: async () => undefined, fileExists: async () => false },
     },
@@ -401,7 +401,7 @@ test("read_image tool replay projects the image budget into the next provider re
         type: "oauth",
         access: fakeAccessToken(),
         refresh: "refresh-probe",
-        expires: Date.now() + 60_000,
+        expires: Date.now() + 10 * 60_000,
       }),
       authContext: { env: async () => undefined, fileExists: async () => false },
     },
@@ -494,7 +494,7 @@ test("public PiAiAdapter rejects an image for a text-only model before attachmen
         type: "oauth",
         access: fakeAccessToken(),
         refresh: "refresh-probe",
-        expires: Date.now() + 60_000,
+        expires: Date.now() + 10 * 60_000,
       }),
       authContext: { env: async () => undefined, fileExists: async () => false },
     },
@@ -581,6 +581,7 @@ test("public adapter success preserves text, reasoning, terminal usage, and repl
     usage: {
       inputTokens: 17,
       outputTokens: 9,
+      totalTokens: 26,
       cacheReadTokens: 2,
       cacheWriteTokens: 1,
     },
@@ -753,7 +754,7 @@ function publicChain(provider, sessionId) {
     type: "oauth",
     access: fakeAccessToken(),
     refresh: "refresh-probe",
-    expires: Date.now() + 60_000,
+    expires: Date.now() + 10 * 60_000,
   }
   const profile = createCodexProfile(Config({}), provider)
   const canonical = new PiAiAdapter({

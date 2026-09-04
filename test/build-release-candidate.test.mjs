@@ -58,7 +58,7 @@ async function createRepository(t, { manifestVersion = VERSION } = {}) {
     name: "candidate-builder-dsh-runtime",
     private: true,
     packageManager: "pnpm@10.34.5",
-    dependencies: { "@deepseek-ai/dsh": "0.1.1-rc.2" },
+    dependencies: { "@deepseek-ai/dsh": "0.1.2-rc.1" },
   })
   await writeFile(
     path.join(root, "test/fixtures/dsh-runtime/pnpm-lock.yaml"),
@@ -66,7 +66,7 @@ async function createRepository(t, { manifestVersion = VERSION } = {}) {
   )
   await writeJson(
     path.join(root, "test/fixtures/dsh-runtime/node_modules/@deepseek-ai/dsh/package.json"),
-    { name: "@deepseek-ai/dsh", version: "0.1.1-rc.2" },
+    { name: "@deepseek-ai/dsh", version: "0.1.2-rc.1" },
   )
   return root
 }
@@ -129,7 +129,7 @@ function createFakeProcessAdapter({
       if (tool === "pnpm" && arguments_.includes("list")) {
         return `${JSON.stringify([{
           name: "candidate-builder-dsh-runtime",
-          dependencies: { "@deepseek-ai/dsh": { version: "0.1.1-rc.2" } },
+          dependencies: { "@deepseek-ai/dsh": { version: "0.1.2-rc.1" } },
         }])}\n`
       }
       if (tool === "npm" && arguments_[0] === "ls") {
@@ -266,7 +266,7 @@ test("the deep candidate interface replays the reviewed build once and installs 
   assert.deepEqual(runtimeEnvironment, {
     schemaVersion: 1,
     runtimePackage: "@deepseek-ai/dsh",
-    runtimeVersion: "0.1.1-rc.2",
+    runtimeVersion: "0.1.2-rc.1",
     fixtureLockSha256: sha256(await readFile(
       path.join(root, "test/fixtures/dsh-runtime/pnpm-lock.yaml"),
     )),

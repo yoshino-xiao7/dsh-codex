@@ -4,16 +4,16 @@
 
 Last updated: 2026-09-04.
 
-`1.1.2` is the current stable release. Its complete checks and Linux, macOS, and Windows CI/profile smoke passed `3/3` against this release candidate and were approved by the maintainer. Post-release live-account validation starts at `0/13` and inherits no older evidence.
+`1.2.0` is the current release candidate. Its complete checks and Linux, macOS, and Windows CI/profile smoke must pass `3/3` against this candidate and be approved by the maintainer before publication. Post-release live-account validation starts at `0/13` and inherits no older evidence.
 
-| Component or environment | `1.1.2` compatibility target | Status |
+| Component or environment | `1.2.0` compatibility target | Status |
 | --- | --- | --- |
-| DeepSeek Harness | `test/fixtures/dsh-runtime/pnpm-lock.yaml` remains pinned to the `@deepseek-ai/dsh@0.1.1-rc.2` runtime/peer graph | Complete checks and profile smoke passed |
-| pi-ai | Pinned to `@earendil-works/pi-ai@0.84.4` with global request defaults, sparse conversation overrides, transport generations, and a one-shot diagnostic seam | Contract regression passed; live-network acceptance is recorded after release |
-| Node.js | Declared range `>=22.19.0 <25` | Local and three-platform Node 22/24 gates passed |
-| macOS | `macos-latest` Node 22/24 complete checks, frozen DSH installation, and Web/profile smoke | `passed` |
-| Windows x64 | `windows-latest` Node 22/24 complete checks, frozen DSH installation, and Web/profile smoke | `passed` |
-| Linux x64 | `ubuntu-latest` Node 22/24 complete checks, frozen DSH installation, and Web/profile smoke | `passed` |
+| DeepSeek Harness | `test/fixtures/dsh-runtime/pnpm-lock.yaml` is pinned to the `@deepseek-ai/dsh@0.1.2-rc.1` runtime/peer graph | Waiting for this version's CI/profile smoke |
+| pi-ai | Pinned to `@earendil-works/pi-ai@0.84.4` with global request defaults, sparse conversation overrides, transport generations, and a one-shot diagnostic seam | Contract regression pending this version's checks; live-network acceptance is recorded after release |
+| Node.js | Declared range `>=22.19.0 <25` | Waiting for this version's Node 22/24 gates |
+| macOS | `macos-latest` Node 22/24 complete checks, frozen DSH installation, and Web/profile smoke | `pending` |
+| Windows x64 | `windows-latest` Node 22/24 complete checks, frozen DSH installation, and Web/profile smoke | `pending` |
+| Linux x64 | `ubuntu-latest` Node 22/24 complete checks, frozen DSH installation, and Web/profile smoke | `pending` |
 | Real ChatGPT OAuth login | Automation does not read or modify a user's real grant | Controlled acceptance pending |
 | Codex usage windows | Entry, visibility, reset boundaries, and `/codex-usage refresh` trigger account reads; the weekly under-24-hour threshold only changes local display; settings shows plan, consistent remaining usage, and safe reset time | Automation regression passed; live-account acceptance is recorded after release |
 | Codex model settings | Generic discovery plus an independent loopback-only read-only capability RPC provides compact `K` labels, input modalities, reasoning efforts exposed by the installed provider catalog, Fast, and selected/unselected ordering | Automation and three-platform profile smoke passed; unavailable RPC data and unknown capabilities are not inferred |
@@ -22,17 +22,17 @@ Last updated: 2026-09-04.
 | Codex image input | Automation covers the attachment seam and budget projection | Automation regression passed; a live request with `maxPixels=4194304` is accepted after release |
 | auto / SSE / WebSocket / cached | Automation covers transport mapping and session isolation | Automation regression passed; one live request through each transport is accepted after release |
 | Fast / priority tier | Automation asserts that only an explicit current-session choice changes `service_tier` | Automation regression passed; account entitlement and live network are accepted after release |
-| npm / GitHub Release | The strict workflow verifies the candidate, Registry readback, provenance, signatures, and Release assets | Stable [`v1.1.2`](https://github.com/yoshino-xiao7/dsh-codex/releases/tag/v1.1.2) |
+| npm / GitHub Release | The strict workflow verifies the candidate, Registry readback, provenance, signatures, and Release assets | Candidate [`v1.2.0`](releases/v1.2.0.md) |
 
-`1.1.2` preserves the overload classification and recovery semantics from `1.1.1` while updating the reviewed runtime dependencies to Cordis `4.0.2`, Schemastery `3.18.2`, and pi-ai `0.84.4`. Strict peer checks and bounded npm audit network retries only strengthen build and publication gates without changing request or privacy contracts.
+`1.2.0` preserves the overload classification and recovery semantics from `1.1.2` while moving the exact compatibility target to DeepSeek Harness `0.1.2-rc.1`: the settings namespace is registered with `ctx.settings.installSection`, and the Web client inject list uses `dsh-client-ui-renderer`. This release no longer claims compatibility with `0.1.1-rc.2`.
 
-`1.1.2` still declares only the exact DSH prerelease dependency target. Its candidate commit, Linux/macOS/Windows CI/profile smoke, and maintainer approval are recorded in this version's [acceptance record](releases/v1.1.2.acceptance.json). Live-account validation starts independently at `0/13`. Records for `1.1.1` and older releases remain historical evidence only and do not replace this version's gates.
+`1.2.0` declares only the exact DSH prerelease dependency target. Its candidate commit, Linux/macOS/Windows CI/profile smoke, and maintainer approval are recorded in this version's [acceptance record](releases/v1.2.0.acceptance.json). Live-account validation starts independently at `0/13`. Records for `1.1.2` and older releases remain historical evidence only and do not replace this version's gates.
 
 The root `pnpm-lock.yaml` locks plugin dependencies, while `test/fixtures/dsh-runtime/pnpm-lock.yaml` independently locks the complete DSH runtime and peer graph used by compatibility smoke. CI runs `pnpm --dir test/fixtures/dsh-runtime install --frozen-lockfile --ignore-scripts` instead of handing that peer graph to direct npm resolution, avoiding nondeterministic dependency results and uncontrolled memory use. This frozen layer verifies Web/profile integration; it does not claim coverage of native terminal or native-build capabilities in DSH dependencies that require lifecycle scripts. Dependency upgrades must use a pinned-version PR, update and review both lockfiles, repeat complete CI, profile smoke, and supply-chain verification before publication, and renew controlled live validation afterward. The scheduled compatibility workflow only verifies the current locked graph and reports Registry drift; neither a broad semver range nor one scheduled run proves cross-RC compatibility.
 
 ## Profile composition
 
-The `1.1.2` bundle does not modify the general `llm-pi-ai` Cordis row. It provides:
+The `1.2.0` bundle does not modify the general `llm-pi-ai` Cordis row. It provides:
 
 - the `dsh-codex` route;
 - the `dsh-codex` settings namespace;
@@ -51,9 +51,9 @@ Fast, Transport, reply verbosity, and reasoning summary in plugin settings are p
 ## Credentials and capability boundaries
 
 - The Codex route accepts ChatGPT OAuth only and does not read an OpenAI Platform API key.
-- Cancel sign-in through the plugin settings page or `/codex-login cancel`: cancellation succeeds before write linearization, while an in-progress commit is reported as too late and remains observed through its final state; `logout` always deletes the credential. The current DSH public seam has no post-commit cancellation barrier, so third-party code that calls `ctx.authorization.cancel()` directly bypasses this coordination and is not a supported `1.1.2` interaction path.
+- Cancel sign-in through the plugin settings page or `/codex-login cancel`: cancellation succeeds before write linearization, while an in-progress commit is reported as too late and remains observed through its final state; `logout` always deletes the credential. The current DSH public seam has no post-commit cancellation barrier, so third-party code that calls `ctx.authorization.cancel()` directly bypasses this coordination and is not a supported `1.2.0` interaction path.
 - When a plugin or hot-reload flow owner is disposed, sign-in is cancelled before commit selection, while a selected credential commit is allowed to reach its final write before disposal completes. An unsupported or malformed stored record is shown as `invalid`, requires signing in again or signing out to clear it, and is never presented as signed in.
 - The usage card reads real five-hour and weekly limits when settings opens, becomes visible again, reaches a reset boundary, or is refreshed manually; the weekly under-24-hour threshold rerenders locally only. `/codex-usage refresh` uses the same reader, while `status` reads only the process-local `QuotaObserver`. The Host returns only strictly parsed windows, percentages, reset times, and an optional plan type, never OAuth credentials or raw responses. If the endpoint is unavailable or malformed, the latest safe reading is retained and the card falls back to request observation or an unknown state rather than presenting the failure as zero remaining usage.
 - DSH Web search uses its own provider and credentials; it does not reuse ChatGPT OAuth.
-- `1.1.2` does not provide image generation or editing.
+- `1.2.0` does not provide image generation or editing.
 - Session compaction continues to use DSH's built-in automatic compaction and `/compact`.

@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url"
 import { resolveNpmCommand } from "./npm-command.mjs"
 
 const root = path.resolve(fileURLToPath(new URL("..", import.meta.url)))
-const supportedDshVersion = "0.1.1-rc.2"
+const supportedDshVersion = "0.1.2-rc.1"
 
 if (isMainModule()) {
   const temporary = await mkdtemp(path.join(os.tmpdir(), "dsh-codex-profile-smoke-"))
@@ -294,10 +294,10 @@ async function expectWebReady(command, environment) {
     const timer = setTimeout(() => reject(new Error(`DSH Web did not become ready:\n${output}`)), 30_000)
     const consume = (chunk) => {
       output += chunk.toString("utf8")
-      const match = output.match(/dsh web:\s+(http:\/\/127\.0\.0\.1:\d+)/u)
-      if (match === null) return
+      const authenticatedUrl = parseWebReadyUrl(output)
+      if (authenticatedUrl === undefined) return
       clearTimeout(timer)
-      resolve(match[1])
+      resolve(authenticatedUrl)
     }
     child.stdout.on("data", consume)
     child.stderr.on("data", consume)
@@ -313,9 +313,10 @@ async function expectWebReady(command, environment) {
 
   let shutdownRequested = false
   try {
-    const baseUrl = await ready
-    await probeAuthorizationRpc(baseUrl)
-    await probeClientBundle(baseUrl)
+    const authenticatedUrl = await ready
+    const session = await createBrowserSession(authenticatedUrl)
+    await probeAuthorizationRpc(session)
+    await probeClientBundle(session)
   } finally {
     shutdownRequested = await stopChild(child, exited)
   }
@@ -360,11 +361,53 @@ async function preserveSmokeArtifact(packageFile, destination) {
   process.stdout.write(`verified npm artifact: ${artifact}\n`)
 }
 
-async function probeAuthorizationRpc(baseUrl) {
+export function parseWebReadyUrl(output) {
+  const match = output.match(/dsh web:\s+(http:\/\/127\.0\.0\.1:\d+\/\?token=[A-Za-z0-9_-]+)/u)
+  return match?.[1]
+}
+
+function sessionCookieHeader(response) {
+  const cookies = typeof response.headers.getSetCookie === "function"
+    ? response.headers.getSetCookie()
+    : [response.headers.get("set-cookie")].filter((value) => typeof value === "string")
+  const pairs = cookies.flatMap((entry) => {
+    const pair = entry.split(";", 1)[0]?.trim()
+    return pair ? [pair] : []
+  })
+  if (pairs.length === 0) throw new Error("DSH Web did not issue a browser session cookie")
+  return pairs.join("; ")
+}
+
+export async function createBrowserSession(authenticatedUrl) {
+  const login = new URL(authenticatedUrl)
+  if (login.protocol !== "http:"
+    || login.hostname !== "127.0.0.1"
+    || login.pathname !== "/"
+    || login.searchParams.getAll("token").length !== 1) {
+    throw new Error(`DSH Web ready URL is not a loopback launch token: ${authenticatedUrl}`)
+  }
+  const response = await fetch(login, {
+    method: "GET",
+    redirect: "manual",
+    signal: AbortSignal.timeout(10_000),
+  })
+  if (response.status !== 303) {
+    throw new Error(`DSH Web launch-token exchange returned HTTP ${response.status}`)
+  }
+  return {
+    origin: login.origin,
+    cookie: sessionCookieHeader(response),
+  }
+}
+
+async function probeAuthorizationRpc(session) {
   const rpcId = randomUUID()
-  const response = await fetch(`${baseUrl}/dsh-codex/status`, {
+  const response = await fetch(`${session.origin}/dsh-codex/status`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      cookie: session.cookie,
+    },
     body: JSON.stringify({
       type: "client-request",
       rpcId,
@@ -397,8 +440,20 @@ async function probeAuthorizationRpc(baseUrl) {
   }
 }
 
-async function probeClientBundle(baseUrl) {
-  const response = await fetch(`${baseUrl}/plugins/dsh-codex-community/client.js`, {
+async function probeClientBundle(session) {
+  const index = await fetch(`${session.origin}/`, {
+    headers: { cookie: session.cookie },
+    signal: AbortSignal.timeout(10_000),
+  })
+  if (!index.ok) throw new Error(`DSH Web index returned HTTP ${index.status}`)
+  const html = await index.text()
+  const comboPath = html.match(/\/plugins\/\?\?[^"' \s]*dsh-codex-community\/client\.js[^"' \s]*/u)?.[0]
+    ?.replaceAll("&amp;", "&")
+  if (comboPath === undefined) {
+    throw new Error("DSH Web index did not advertise the Codex community client combo")
+  }
+  const response = await fetch(`${session.origin}${comboPath}`, {
+    headers: { cookie: session.cookie },
     signal: AbortSignal.timeout(10_000),
   })
   if (!response.ok) throw new Error(`Codex client bundle returned HTTP ${response.status}`)

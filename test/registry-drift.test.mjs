@@ -25,10 +25,10 @@ test("runtime drift checks merge exact pins from every runtime manifest", () => 
       peerDependencies: { shared: "2.0.0" },
     },
     {
-      dependencies: { "@deepseek-ai/dsh": "0.1.1-rc.2", shared: "2.0.0" },
+      dependencies: { "@deepseek-ai/dsh": "0.1.2-rc.1", shared: "2.0.0" },
     },
   ), [
-    { name: "@deepseek-ai/dsh", pinned: "0.1.1-rc.2" },
+    { name: "@deepseek-ai/dsh", pinned: "0.1.2-rc.1" },
     { name: "alpha", pinned: "1.0.0" },
     { name: "shared", pinned: "2.0.0" },
   ])

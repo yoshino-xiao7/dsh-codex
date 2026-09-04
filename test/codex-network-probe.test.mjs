@@ -55,7 +55,7 @@ function publicProviderProbe(responseFactory) {
         type: "oauth",
         access: fakeAccessToken(),
         refresh: "refresh-probe",
-        expires: Date.now() + 60_000,
+        expires: Date.now() + 10 * 60_000,
       }),
       authContext: { env: async () => undefined, fileExists: async () => false },
     },

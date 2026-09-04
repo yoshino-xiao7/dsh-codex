@@ -31,6 +31,7 @@ const [
   frozenLlm,
   frozenAgent,
   frozenSession,
+  frozenSessionProjection,
   frozenSystemPrompt,
   frozenTools,
   frozenAgentLoop,
@@ -40,6 +41,7 @@ const [
   loadFrozenDshPackage("@deepseek-ai/dsh-llm"),
   loadFrozenDshPackage("@deepseek-ai/dsh-agent"),
   loadFrozenDshPackage("@deepseek-ai/dsh-session"),
+  loadFrozenDshPackage("@deepseek-ai/dsh-session-projection"),
   loadFrozenDshPackage("@deepseek-ai/dsh-system-prompt"),
   loadFrozenDshPackage("@deepseek-ai/dsh-tools"),
   loadFrozenDshPackage("@deepseek-ai/dsh-agent-loop"),
@@ -150,6 +152,7 @@ async function runFrozenDshRetryProbe(failures) {
     await root.plugin(frozenLlm.default)
     await root.plugin(frozenAgent.default)
     await root.plugin(frozenSession.default)
+    await root.plugin(frozenSessionProjection.default)
     await root.plugin(frozenSystemPrompt.default, {})
     await root.plugin(frozenTools.default, { mode: "native" })
     await root.plugin(frozenAgentLoop.default, {
@@ -179,7 +182,7 @@ async function runFrozenDshRetryProbe(failures) {
     return {
       attempts: adapter.attempts,
       errors: errors.map((error) => error?.failure),
-      eventTypes: agent.session.events.map((event) => event.type),
+      eventTypes: agent.session.snapshotEvents().map((event) => event.type),
     }
   } finally {
     await root.fiber.dispose()

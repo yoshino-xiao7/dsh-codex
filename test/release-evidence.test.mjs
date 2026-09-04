@@ -13,7 +13,7 @@ import {
 const sha256 = (value) => createHash("sha256").update(value).digest("hex")
 
 const expected = Object.freeze({
-  dshVersion: "0.1.1-rc.2",
+  dshVersion: "0.1.2-rc.1",
   dshRuntimeLockSha256: "a".repeat(64),
   npmCliVersion: "11.16.0",
   packageName: "dsh-codex-community",
@@ -24,12 +24,12 @@ const expected = Object.freeze({
 function validRecords() {
   return {
     dshRuntimeDependencyTreeSha256: [{
-      dependencies: { "@deepseek-ai/dsh": { version: "0.1.1-rc.2" } },
+      dependencies: { "@deepseek-ai/dsh": { version: "0.1.2-rc.1" } },
     }],
     dshRuntimeEnvironmentSha256: {
       schemaVersion: 1,
       runtimePackage: "@deepseek-ai/dsh",
-      runtimeVersion: "0.1.1-rc.2",
+      runtimeVersion: "0.1.2-rc.1",
       fixtureLockSha256: "a".repeat(64),
       nodeVersion: "v24.7.0",
       pnpmVersion: "10.34.5",

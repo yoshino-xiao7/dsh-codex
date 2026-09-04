@@ -1,5 +1,5 @@
 const PLATFORM_NAMES = Object.freeze(["linux", "macos", "windows"])
-const SUPPORTED_DSH_VERSION = "0.1.1-rc.2"
+const SUPPORTED_DSH_VERSION = "0.1.2-rc.1"
 const SUPPORTED_NODE_MAJORS = new Set([22, 24])
 const MINIMUM_NODE_22 = Object.freeze([22, 19, 0])
 const PLACEHOLDER_PATTERN = /\b(?:TBD|TODO|PENDING|DRAFT|UNRELEASED)\b|待补|未发布|草稿/iu

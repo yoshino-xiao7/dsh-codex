@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 
 import {
+  validatePackedDistContents,
   validatePackedMarkdownLinks,
   validatePackedPaths,
 } from "../scripts/pack-policy.mjs"
@@ -31,6 +32,47 @@ test("packed path policy rejects sensitive files inside an allowed directory", (
     ]),
     /Packed artifact contains a path outside the allowlist: docs\/\.env/u,
   )
+})
+
+test("packed dist contents reject removed dsh-settings named exports in every dist file", () => {
+  const files = [
+    "dist/host/index.mjs",
+    "dist/internal/codex-provider-runtime.mjs",
+  ]
+  assert.throws(
+    () => validatePackedDistContents(
+      files,
+      new Map([
+        ["dist/host/index.mjs", "export const name = \"dsh-codex\"\n"],
+        ["dist/internal/codex-provider-runtime.mjs", "import { installSettingsSection } from \"@deepseek-ai/dsh-settings\"\n"],
+      ]),
+    ),
+    /Packed artifact dist\/internal\/codex-provider-runtime\.mjs still references removed dsh-settings export installSettingsSection/u,
+  )
+  assert.throws(
+    () => validatePackedDistContents(
+      files,
+      new Map([
+        ["dist/host/index.mjs", "export const name = \"dsh-codex\"\n"],
+        ["dist/internal/codex-provider-runtime.mjs", "const ns = settingsNamespace(\"dsh-codex\")\n"],
+      ]),
+    ),
+    /Packed artifact dist\/internal\/codex-provider-runtime\.mjs still references removed dsh-settings export settingsNamespace/u,
+  )
+  assert.throws(
+    () => validatePackedDistContents(
+      files,
+      new Map([["dist/host/index.mjs", "export const name = \"dsh-codex\"\n"]]),
+    ),
+    /Packed dist source could not be read: dist\/internal\/codex-provider-runtime\.mjs/u,
+  )
+  assert.doesNotThrow(() => validatePackedDistContents(
+    files,
+    new Map([
+      ["dist/host/index.mjs", "export const name = \"dsh-codex\"\n"],
+      ["dist/internal/codex-provider-runtime.mjs", "ctx.settings.installSection(ctx, \"dsh-codex\", Config, entry, hooks)\n"],
+    ]),
+  ))
 })
 
 test("packed Markdown links must resolve to another packed file", () => {
