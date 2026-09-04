@@ -4,12 +4,12 @@
 
 Last updated: 2026-09-04.
 
-`1.1.2` is the current release candidate. Platform CI/profile smoke, maintainer approval, and supply-chain evidence will be recorded independently after the candidate is frozen; `1.1.1` remains npm `latest` until publication completes.
+`1.1.2` is the current stable release. Its complete checks and Linux, macOS, and Windows CI/profile smoke passed `3/3` against this release candidate and were approved by the maintainer. Post-release live-account validation starts at `0/13` and inherits no older evidence.
 
 | Component or environment | `1.1.2` compatibility target | Status |
 | --- | --- | --- |
 | DeepSeek Harness | `test/fixtures/dsh-runtime/pnpm-lock.yaml` remains pinned to the `@deepseek-ai/dsh@0.1.1-rc.2` runtime/peer graph | Complete checks and profile smoke passed |
-| pi-ai | Pinned to `@earendil-works/pi-ai@0.84.4` with global request defaults, sparse conversation overrides, transport generations, and a one-shot diagnostic seam | Contract regression awaits binding to this candidate CI; live-network acceptance is recorded after release |
+| pi-ai | Pinned to `@earendil-works/pi-ai@0.84.4` with global request defaults, sparse conversation overrides, transport generations, and a one-shot diagnostic seam | Contract regression passed; live-network acceptance is recorded after release |
 | Node.js | Declared range `>=22.19.0 <25` | Local and three-platform Node 22/24 gates passed |
 | macOS | `macos-latest` Node 22/24 complete checks, frozen DSH installation, and Web/profile smoke | `passed` |
 | Windows x64 | `windows-latest` Node 22/24 complete checks, frozen DSH installation, and Web/profile smoke | `passed` |
@@ -22,11 +22,11 @@ Last updated: 2026-09-04.
 | Codex image input | Automation covers the attachment seam and budget projection | Automation regression passed; a live request with `maxPixels=4194304` is accepted after release |
 | auto / SSE / WebSocket / cached | Automation covers transport mapping and session isolation | Automation regression passed; one live request through each transport is accepted after release |
 | Fast / priority tier | Automation asserts that only an explicit current-session choice changes `service_tier` | Automation regression passed; account entitlement and live network are accepted after release |
-| npm / GitHub Release | The strict workflow verifies the candidate, Registry readback, provenance, signatures, and Release assets | `v1.1.2` pending; current stable [`v1.1.1`](https://github.com/yoshino-xiao7/dsh-codex/releases/tag/v1.1.1) |
+| npm / GitHub Release | The strict workflow verifies the candidate, Registry readback, provenance, signatures, and Release assets | Stable [`v1.1.2`](https://github.com/yoshino-xiao7/dsh-codex/releases/tag/v1.1.2) |
 
 `1.1.2` preserves the overload classification and recovery semantics from `1.1.1` while updating the reviewed runtime dependencies to Cordis `4.0.2`, Schemastery `3.18.2`, and pi-ai `0.84.4`. Strict peer checks and bounded npm audit network retries only strengthen build and publication gates without changing request or privacy contracts.
 
-`1.1.2` still declares only the exact DSH prerelease dependency target. Its candidate commit, Linux/macOS/Windows CI/profile smoke, and maintainer approval will be recorded in this version's [acceptance record](releases/v1.1.2.acceptance.json). Live-account validation starts independently at `0/13`. Records for `1.1.1` and older releases remain historical evidence only and do not replace this version's gates.
+`1.1.2` still declares only the exact DSH prerelease dependency target. Its candidate commit, Linux/macOS/Windows CI/profile smoke, and maintainer approval are recorded in this version's [acceptance record](releases/v1.1.2.acceptance.json). Live-account validation starts independently at `0/13`. Records for `1.1.1` and older releases remain historical evidence only and do not replace this version's gates.
 
 The root `pnpm-lock.yaml` locks plugin dependencies, while `test/fixtures/dsh-runtime/pnpm-lock.yaml` independently locks the complete DSH runtime and peer graph used by compatibility smoke. CI runs `pnpm --dir test/fixtures/dsh-runtime install --frozen-lockfile --ignore-scripts` instead of handing that peer graph to direct npm resolution, avoiding nondeterministic dependency results and uncontrolled memory use. This frozen layer verifies Web/profile integration; it does not claim coverage of native terminal or native-build capabilities in DSH dependencies that require lifecycle scripts. Dependency upgrades must use a pinned-version PR, update and review both lockfiles, repeat complete CI, profile smoke, and supply-chain verification before publication, and renew controlled live validation afterward. The scheduled compatibility workflow only verifies the current locked graph and reports Registry drift; neither a broad semver range nor one scheduled run proves cross-RC compatibility.
 

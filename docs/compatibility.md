@@ -4,12 +4,12 @@
 
 最近更新：2026-09-04。
 
-`1.1.2` 是当前发布候选。平台 CI/profile smoke、维护者批准与供应链证据会在候选冻结后按本版本独立记录；正式发布前 `1.1.1` 仍是 npm `latest`。
+`1.1.2` 是当前正式版。完整检查与 Linux、macOS、Windows CI/profile smoke 已按本版本候选 `3/3` 通过并获维护者批准；发布后真实账号验证从 `0/13` 开始，不继承旧版本证据。
 
 | 组件或环境 | `1.1.2` 兼容目标 | 状态 |
 | --- | --- | --- |
 | DeepSeek Harness | `test/fixtures/dsh-runtime/pnpm-lock.yaml` 继续锁定 `@deepseek-ai/dsh@0.1.1-rc.2` runtime/peer 图 | 完整检查与 profile smoke 已通过 |
-| pi-ai | 锁定 `@earendil-works/pi-ai@0.84.4`，提供全局请求默认值、会话稀疏覆盖、传输 generation 与一次性诊断 seam | 合同回归待本候选 CI 绑定；真实网络验收发布后记录 |
+| pi-ai | 锁定 `@earendil-works/pi-ai@0.84.4`，提供全局请求默认值、会话稀疏覆盖、传输 generation 与一次性诊断 seam | 合同回归已通过；真实网络验收发布后记录 |
 | Node.js | 声明 `>=22.19.0 <25` | 本地与三平台 Node 22/24 门禁已通过 |
 | macOS | `macos-latest` Node 22/24 完整检查、冻结 DSH 安装与 Web/profile smoke | `passed` |
 | Windows x64 | `windows-latest` Node 22/24 完整检查、冻结 DSH 安装与 Web/profile smoke | `passed` |
@@ -22,11 +22,11 @@
 | Codex 图片输入 | 自动化覆盖 attachment seam 与预算投影 | 自动化回归已通过；`maxPixels=4194304` 真实请求发布后验收 |
 | auto / SSE / WebSocket / cached | 自动化覆盖 transport 映射与会话隔离 | 自动化回归已通过；四种真实请求发布后验收 |
 | Fast / priority tier | 自动化断言只有当前会话明确开启才改变 `service_tier` | 自动化回归已通过；账号权限与真实网络发布后验收 |
-| npm / GitHub Release | 严格工作流校验候选、Registry 回读、provenance、签名与 Release 资产 | `v1.1.2` 待发布；当前正式版 [`v1.1.1`](https://github.com/yoshino-xiao7/dsh-codex/releases/tag/v1.1.1) |
+| npm / GitHub Release | 严格工作流校验候选、Registry 回读、provenance、签名与 Release 资产 | 正式版 [`v1.1.2`](https://github.com/yoshino-xiao7/dsh-codex/releases/tag/v1.1.2) |
 
 `1.1.2` 保留 `1.1.1` 的服务过载分类与恢复语义，并将已评审的运行时依赖更新到 Cordis `4.0.2`、Schemastery `3.18.2` 与 pi-ai `0.84.4`；严格 peer 检查与有界 npm audit 网络重试只强化构建和发布门禁，不改变请求或隐私合同。
 
-`1.1.2` 仍只声明精确的 DSH 预发布依赖目标。候选提交、Linux/macOS/Windows CI/profile smoke 与维护者批准会记录在本版本[验收记录](releases/v1.1.2.acceptance.json)中；真实账号验证从 `0/13` 独立开始。`1.1.1` 与更早版本的记录仅作为历史证据保留，不能替代本版本门禁。
+`1.1.2` 仍只声明精确的 DSH 预发布依赖目标。候选提交、Linux/macOS/Windows CI/profile smoke 与维护者批准记录在本版本[验收记录](releases/v1.1.2.acceptance.json)中；真实账号验证从 `0/13` 独立开始。`1.1.1` 与更早版本的记录仅作为历史证据保留，不能替代本版本门禁。
 
 根目录 `pnpm-lock.yaml` 锁定插件依赖，`test/fixtures/dsh-runtime/pnpm-lock.yaml` 独立锁定兼容性 smoke 的完整 DSH runtime 与 peer 图；CI 使用 `pnpm --dir test/fixtures/dsh-runtime install --frozen-lockfile --ignore-scripts`，不把该 peer 图交给直接 npm 解算，以避免不确定依赖结果和内存失控。该冻结层验证 Web/profile 集成，不声称覆盖 DSH 依赖中需要生命周期脚本的原生终端或本机构建能力。依赖升级必须通过固定版本变更 PR，同时更新并审查两套 lockfile，在发布前重跑完整 CI、profile smoke 和供应链校验，发布后重新记录受控真实验证。定时兼容工作流只验证当前锁定图并报告 Registry 漂移，不能从宽泛 semver 或一次定时运行推断跨 RC 兼容。
 

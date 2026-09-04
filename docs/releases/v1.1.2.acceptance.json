@@ -1,38 +1,38 @@
 {
   "schemaVersion": 3,
   "version": "1.1.2",
-  "releaseStatus": "draft",
-  "testedCommit": "TBD",
-  "approvedBy": "TBD",
-  "approvedAt": "TBD",
-  "approvalEvidenceUrl": "TBD",
+  "releaseStatus": "approved",
+  "testedCommit": "5cd7534811da9cf0ded59a29e8c8353de71c2089",
+  "approvedBy": "yoshino-xiao7",
+  "approvedAt": "2026-09-04T07:42:00Z",
+  "approvalEvidenceUrl": "https://github.com/yoshino-xiao7/dsh-codex/actions/runs/33848740243",
   "platforms": {
     "linux": {
-      "status": "pending",
-      "testedAt": "TBD",
-      "runner": "TBD",
-      "nodeVersion": "TBD",
+      "status": "passed",
+      "testedAt": "2026-09-04T07:34:20Z",
+      "runner": "GitHub Actions ubuntu-24.04",
+      "nodeVersion": "24.20.0",
       "dshVersion": "0.1.1-rc.2",
-      "profileSmoke": "pending",
-      "evidenceUrl": "TBD"
+      "profileSmoke": "passed",
+      "evidenceUrl": "https://github.com/yoshino-xiao7/dsh-codex/actions/runs/33848740243/job/100949362233"
     },
     "macos": {
-      "status": "pending",
-      "testedAt": "TBD",
-      "runner": "TBD",
-      "nodeVersion": "TBD",
+      "status": "passed",
+      "testedAt": "2026-09-04T07:31:40Z",
+      "runner": "GitHub Actions macos-26-arm64",
+      "nodeVersion": "24.18.0",
       "dshVersion": "0.1.1-rc.2",
-      "profileSmoke": "pending",
-      "evidenceUrl": "TBD"
+      "profileSmoke": "passed",
+      "evidenceUrl": "https://github.com/yoshino-xiao7/dsh-codex/actions/runs/33848740243/job/100949362374"
     },
     "windows": {
-      "status": "pending",
-      "testedAt": "TBD",
-      "runner": "TBD",
-      "nodeVersion": "TBD",
+      "status": "passed",
+      "testedAt": "2026-09-04T07:29:18Z",
+      "runner": "GitHub Actions windows-2025",
+      "nodeVersion": "24.19.0",
       "dshVersion": "0.1.1-rc.2",
-      "profileSmoke": "pending",
-      "evidenceUrl": "TBD"
+      "profileSmoke": "passed",
+      "evidenceUrl": "https://github.com/yoshino-xiao7/dsh-codex/actions/runs/33848740243/job/100949362410"
     }
   },
   "liveAcceptance": {
