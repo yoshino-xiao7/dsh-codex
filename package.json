@@ -159,7 +159,7 @@
     "@deepseek-ai/dsh-tool-fs": "0.1.2-rc.1",
     "@deepseek-ai/dsh-tools": "0.1.2-rc.1",
     "@deepseek-ai/dsh-user-approval": "0.1.2-rc.1",
-    "@deepseek-ai/schemastery": "3.18.2",
+    "@deepseek-ai/schemastery": "3.18.4",
     "node-addon-require-builtin": "0.1.5",
     "typescript": "7.0.2"
   },
