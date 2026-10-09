@@ -160,7 +160,7 @@
     "@deepseek-ai/dsh-tools": "0.1.2-rc.1",
     "@deepseek-ai/dsh-user-approval": "0.1.2-rc.1",
     "@deepseek-ai/schemastery": "3.18.2",
-    "node-addon-require-builtin": "0.1.5",
+    "node-addon-require-builtin": "0.1.7",
     "typescript": "7.0.2"
   },
   "publishConfig": {
